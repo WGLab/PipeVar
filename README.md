@@ -19,5 +19,103 @@ REQUIRED PARAMETERS:
   --note <FILE> Clinical note text file, in a format of VCF. used for HPO term extraction. Only neded if HPO terms are not available.
   --hpo <FILE> HPO ID file; note file can be used instead.
 
+  
+OPTIONAL PARAMETERS:
+    --input_directory <DIR>   Directory containing input files
+    --output_directory <DIR>  Path to output directory (default: current dir)
+    --mode <sv|snp>           Variant type to analyze (required with --vcf or --bam)
+    --type <short|long>       Input data type: short or long reads (required with --bam)
+    --light <yes|no>          Use lightweight PhenoSV model and NanoCaller (faster, lower memory)
+    --gq <INT>                Minimum genotype quality [default: 20]
+    --ad <INT>                Minimum allelic depth [default: 15]
+    --gnomad <FLOAT>          Max gnomAD allele frequency [default: 0.0001]
+    --help                    Print this help message and exit
+
+EXAMPLES:
+    1. Long-read full pipeline (SV + SNP + STR):
+        nextflow run main.nf \
+          --bam /data/sample.bam \
+          --ref_fa /refs/hg38.fa \
+          --out_prefix patient1 \
+          --hpo /data/hpo.txt \
+          --type long
+
+    2. Short-read full pipeline:
+        nextflow run main.nf \
+          --bam /data/sample.bam \
+          --ref_fa /refs/hg38.fa \
+          --out_prefix patient1 \
+          --hpo /data/hpo.txt \
+          --type short
+
+    3. Short-read with lightweight model:
+        nextflow run main.nf \
+          --bam /data/sample.bam \
+          --ref_fa /refs/hg38.fa \
+          --out_prefix patient1 \
+          --hpo /data/hpo.txt \
+          --type short \
+          --light yes
+
+    4. Variant re-annotation using VCF (SV mode):
+        nextflow run main.nf \
+          --vcf /data/sample.vcf \
+          --ref_fa /refs/hg38.fa \
+          --out_prefix patient_sv \
+          --hpo /data/hpo.txt \
+          --mode sv
+
+    5. Auto-extract HPO from clinical notes:
+        nextflow run main.nf \
+          --bam /data/sample.bam \
+          --ref_fa /refs/hg38.fa \
+          --out_prefix patient1 \
+          --note /data/note.txt \
+          --type ont
+
+NOTES:
+    - At least one of `--hpo` or `--note` must be provided.
+    - If `--note` is used, `--hpo` is auto-generated via phenotagger.
+    - `--mode` must be specified for VCF input, and helps direct SNV vs SV flow.
+    - `--type` is required for BAM input to specify sequencing technology.
+    - All file paths must be absolute or relative to `--input_directory`.
+    - `--light yes` uses faster, resource-friendly software such as haplotypecaller, NanoCaller and PhenoSV-light.
+
+# Softwares used
+
+PIPELINE MODULES:
+    SNV CALLING
+      - clair3         : Deep learning SNP caller (long-read)
+      - nanocaller     : Lightweight long-read SNP caller
+      - haplotypecaller: Short-read SNP caller (GATK)
+      - deepvariant    : Deep learning short-read SNP caller
+
+    SV CALLING
+      - cuteSV         : Long-read SV caller
+      - sniffles       : Long-read SV caller
+      - Manta          : Short-read SV caller
+      - truvari        : SV comparison/benchmarking
+      - SURVIVOR       : SV merging
+
+    STR DETECTION
+      - NanoRepeat     : Long-read STR caller
+      - ExpansionHunter: Short-read STR detection
+
+    PHENOTYPING
+      - Phen2gene      : HPO-to-gene mapping
+      - phenotagger    : NLP-based clinical note to HPO term conversion
+      - PhenoGpt2      : To be implemented
+
+    VARIANT RANKING
+      - ANNOVAR        : SNV/SV annotation
+      - RankVar        : Final SNV ranking
+      - Rankscore_analysis: Additional ranking analysis
+
+
 
 # Update that needs to be done.
+
+Add LongPhase process, and ACMG Guideline, and PhenoGPT2 for note direction.
+
+
+
