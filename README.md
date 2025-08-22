@@ -7,4 +7,17 @@ PipeVar is implenmetned in Nextflow, and can be ran using Docker or Singularity.
 
 # Usage
 
+nextflow run main.nf --bam <FILE>
+nextflow run main.nf --vcf <FILE> 
 
+
+REQUIRED PARAMETERS:
+  --bam <FILE> Path to input BAM file. Cannot be used with VCF option. Must be full path.
+  --vcf <FILE> Path to input VCF file. Cannot be used with BAM option. Must be full path.
+  --ref_fa <FILE> Reference genome in FASTA format. Must be full path.
+  --out_prefix <STRING> Prefix for output files
+  --note <FILE> Clinical note text file, in a format of VCF. used for HPO term extraction. Only neded if HPO terms are not available.
+  --hpo <FILE> HPO ID file; note file can be used instead.
+
+
+# Update that needs to be done.
