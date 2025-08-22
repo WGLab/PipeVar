@@ -5,3 +5,6 @@ PipeVar is a pathogenic variant prioritization workflow for undiagnosed, rare di
 PipeVar is implenmetned in Nextflow, and can be ran using Docker or Singularity. We are in the development of utilizing Conda for running, but for the best consistency, use either Docker or Singularity for running PipeVar.
 
 
+#Usage
+
+
