@@ -23,7 +23,7 @@ nextflow run main.nf --vcf <FILE>
 
 
   REQUIRED PARAMETERS:
-  --bam <FILE> Path to input BAM file. Cannot be used with VCF option. Must be full path. Requires .bai index file.
+  --bam <FILE> Path to input BAM file. Cannot be used with VCF option. Must be full path. Requires .bai index file. \n
   --vcf <FILE> Path to input VCF file. Cannot be used with BAM option. Must be full path.
   --ref_fa <FILE> Reference genome in FASTA format. Must be full path.
   --out_prefix <STRING> Prefix for output files
