@@ -32,6 +32,7 @@ OPTIONAL PARAMETERS:
     --help                    Print this help message and exit
 
 EXAMPLES:
+
     1. Long-read full pipeline (SV + SNP + STR):
         nextflow run main.nf \
           --bam /data/sample.bam \
@@ -84,6 +85,7 @@ NOTES:
 # Softwares used
 
 PIPELINE MODULES:
+
     SNV CALLING
       - clair3         : Deep learning SNP caller (long-read)
       - nanocaller     : Lightweight long-read SNP caller
