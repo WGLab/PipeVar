@@ -4,6 +4,17 @@ PipeVar is a pathogenic variant prioritization workflow for undiagnosed, rare di
 
 PipeVar is implenmetned in Nextflow, and can be ran using Docker or Singularity. We are in the development of utilizing Conda for running, but for the best consistency, use either Docker or Singularity for running PipeVar. We currently only have support for Slurm, but are working on other cluster system as well.
 
+# Requirements
+
+PipeVar requires either Docker or Singularity to run. If your system do not have Singularity installed as a module, you can try to install Singularity using conda with
+
+
+  conda create -n singularity singularity
+
+  or install singualrity in your conda environment by
+
+  conda install conda-forge::singularity
+
 
 # Usage
 
@@ -12,14 +23,18 @@ nextflow run main.nf --vcf <FILE>
 
 
 REQUIRED PARAMETERS:
-  --bam <FILE> Path to input BAM file. Cannot be used with VCF option. Must be full path.
+  --bam <FILE> Path to input BAM file. Cannot be used with VCF option. Must be full path. Requires .bai index file.
   --vcf <FILE> Path to input VCF file. Cannot be used with BAM option. Must be full path.
   --ref_fa <FILE> Reference genome in FASTA format. Must be full path.
   --out_prefix <STRING> Prefix for output files
   --note <FILE> Clinical note text file, in a format of VCF. used for HPO term extraction. Only neded if HPO terms are not available.
   --hpo <FILE> HPO ID file; note file can be used instead.
 
-  
+  # Example hpo.txt
+    HP:0001250
+    HP:0000750
+    HP:0001257
+
 OPTIONAL PARAMETERS:
     --input_directory <DIR>   Directory containing input files
     --output_directory <DIR>  Path to output directory (default: current dir)
@@ -112,6 +127,12 @@ PIPELINE MODULES:
       - ANNOVAR        : SNV/SV annotation
       - RankVar        : Final SNV ranking
       - Rankscore_analysis: Additional ranking analysis
+
+
+# Output
+
+All the output will be stored in output folder, or the launch folder. The list of outputs are as followed:
+
 
 
 
