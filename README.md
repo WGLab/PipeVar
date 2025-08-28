@@ -5,7 +5,7 @@ PipeVar is a pathogenic variant prioritization workflow for undiagnosed, rare di
 PipeVar is implenmetned in Nextflow, and can be ran using Docker or Singularity. We are in the development of utilizing Conda for running, but for the best consistency, use either Docker or Singularity for running PipeVar. We currently only have support for Slurm, but are working on other cluster system as well.
 
 
-graph TD
+'''graph TD
     subgraph Inputs
         A[Input Files: BAM/VCF, HPO, Ref Genome]
     end
@@ -133,6 +133,7 @@ graph TD
             end
         end
     end
+'''
 # Requirements
 
 PipeVar requires either Docker or Singularity to run. If your system do not have Singularity installed as a module, you can try to install Singularity using conda with
