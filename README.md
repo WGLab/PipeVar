@@ -4,6 +4,135 @@ PipeVar is a pathogenic variant prioritization workflow for undiagnosed, rare di
 
 PipeVar is implenmetned in Nextflow, and can be ran using Docker or Singularity. We are in the development of utilizing Conda for running, but for the best consistency, use either Docker or Singularity for running PipeVar. We currently only have support for Slurm, but are working on other cluster system as well.
 
+
+graph TD
+    subgraph Inputs
+        A[Input Files: BAM/VCF, HPO, Ref Genome]
+    end
+
+    A --> B{Input Data Type?};
+    B -- VCF --> C[VCF-Based Analysis];
+    B -- BAM --> D[BAM-Based Analysis];
+
+    subgraph VCF-Based Analysis
+        C --> C1{Mode?};
+        C1 -- --mode sv --> C2[ANNOVAR_SV];
+        C2 --> C3[SURVIVOR];
+        C3 --> C4[PhenoSV];
+        C4 --> C_OUT[Prioritized SVs];
+
+        C1 -- --mode snp --> C5[ANNOVAR];
+        C_HPO[HPO File] --> C6[Phen2gene];
+        C5 --> C7[RankVar];
+        C6 --> C7;
+        C5 --> C8[Rankscore_analysis]
+        C6 --> C8
+        C7 --> C_OUT2[Prioritized SNVs];
+        C8 --> C_OUT2
+    end
+
+    subgraph BAM-Based Analysis
+        D --> D1{Read Type?};
+        D1 -- Long-Read (Default) --> LR[Long-Read Pipelines];
+        D1 -- --type short --> SR[Short-Read Pipelines];
+
+        subgraph Long-Read Pipelines
+            LR --> LR1{Analysis Mode?};
+
+            LR1 -- Full Analysis (Default) --> LR_FULL;
+            subgraph Full Long-Read Analysis
+                LR_FULL -- SNV Analysis --> LR_SNV_CALLER{--light yes?};
+                LR_SNV_CALLER -- No (Default) --> CLAIR3[clair3];
+                LR_SNV_CALLER -- Yes --> NANOCALLER[nanocaller];
+                CLAIR3 --> ANNOVAR1[ANNOVAR];
+                NANOCALLER --> ANNOVAR1;
+                HPO1[HPO File] --> PHEN2GENE1[Phen2gene];
+                ANNOVAR1 --> RANKVAR1[RankVar];
+                PHEN2GENE1 --> RANKVAR1;
+                ANNOVAR1 --> RANKSCORE1[Rankscore_analysis]
+                PHEN2GENE1 --> RANKSCORE1
+                RANKVAR1 --> LROUT1[Prioritized SNVs];
+                RANKSCORE1 --> LROUT1
+                
+                LR_FULL -- SV Analysis --> CUTESV[cuteSV];
+                LR_FULL -- SV Analysis --> SNIFFLES[sniffles];
+                CUTESV --> TRUVARI[truvari];
+                SNIFFLES --> TRUVARI;
+                TRUVARI --> SURVIVOR1[SURVIVOR];
+                SURVIVOR1 --> PHENOSV1[PhenoSV];
+                PHENOSV1 --> LROUT2[Prioritized SVs];
+
+                LR_FULL -- STR Analysis --> NANOREPEAT[NanoRepeat];
+                NANOREPEAT --> LROUT3[STR Calls];
+            end
+
+            LR1 -- --mode sv --> LR_SV_ONLY[SV Analysis Only];
+            subgraph SV Only
+                LR_SV_ONLY --> CUTESV2[cuteSV];
+                LR_SV_ONLY --> SNIFFLES2[sniffles];
+                CUTESV2 --> TRUVARI2[truvari];
+                SNIFFLES2 --> TRUVARI2;
+                TRUVARI2 --> SURVIVOR2[SURVIVOR];
+                SURVIVOR2 --> PHENOSV2[PhenoSV];
+                PHENOSV2 --> LROUT4[Prioritized SVs];
+            end
+
+            LR1 -- --mode snp --> LR_SNP_ONLY[SNP Analysis Only];
+            subgraph SNP Only
+                LR_SNP_ONLY --> LR_SNV_CALLER2{--light yes?};
+                LR_SNV_CALLER2 -- No (Default) --> CLAIR3_2[clair3];
+                LR_SNV_CALLER2 -- Yes --> NANOCALLER_2[nanocaller];
+                CLAIR3_2 --> ANNOVAR2[ANNOVAR];
+                NANOCALLER_2 --> ANNOVAR2;
+                HPO2[HPO File] --> PHEN2GENE2[Phen2gene];
+                ANNOVAR2 --> RANKVAR2[RankVar];
+                PHEN2GENE2 --> RANKVAR2;
+                ANNOVAR2 --> RANKSCORE2[Rankscore_analysis]
+                PHEN2GENE2 --> RANKSCORE2
+                RANKVAR2 --> LROUT5[Prioritized SNVs];
+                RANKSCORE2 --> LROUT5
+            end
+        end
+
+        subgraph Short-Read Pipelines
+            SR --> SR1{Lightweight Mode?};
+            SR1 -- No (Default) --> SR_DEFAULT[Full Short-Read Analysis];
+            subgraph Full Short-Read Analysis
+                SR_DEFAULT -- SNV Analysis --> DEEPVARIANT[deepvariant];
+                DEEPVARIANT --> ANNOVAR3[ANNOVAR];
+                HPO3[HPO File] --> PHEN2GENE3[Phen2gene];
+                ANNOVAR3 --> RANKVAR3[RankVar];
+                PHEN2GENE3 --> RANKVAR3;
+                RANKVAR3 --> SROUT1[Prioritized SNVs];
+                
+                SR_DEFAULT -- SV Analysis --> MANTA[Manta];
+                MANTA --> SURVIVOR3[SURVIVOR];
+                SURVIVOR3 --> PHENOSV3[PhenoSV];
+                PHENOSV3 --> SROUT2[Prioritized SVs];
+
+                SR_DEFAULT -- STR Analysis --> EXPHUNTER[ExpansionHunter];
+                EXPHUNTER --> SROUT3[STR Calls];
+            end
+
+            SR1 -- --light yes --> SR_LIGHT[Light Short-Read Analysis];
+             subgraph Light Short-Read Analysis
+                SR_LIGHT -- SNV Analysis --> HAPLOTYPECALLER[haplotypecaller];
+                HAPLOTYPECALLER --> ANNOVAR4[ANNOVAR];
+                HPO4[HPO File] --> PHEN2GENE4[Phen2gene];
+                ANNOVAR4 --> RANKVAR4[RankVar];
+                PHEN2GENE4 --> RANKVAR4;
+                RANKVAR4 --> SROUT4[Prioritized SNVs];
+
+                SR_LIGHT -- SV Analysis --> MANTA2[Manta];
+                MANTA2 --> SURVIVOR4[SURVIVOR];
+                SURVIVOR4 --> PHENOSV4[PhenoSV];
+                PHENOSV4 --> SROUT5[Prioritized SVs];
+
+                SR_LIGHT -- STR Analysis --> EXPHUNTER2[ExpansionHunter];
+                EXPHUNTER2 --> SROUT6[STR Calls];
+            end
+        end
+    end
 # Requirements
 
 PipeVar requires either Docker or Singularity to run. If your system do not have Singularity installed as a module, you can try to install Singularity using conda with
