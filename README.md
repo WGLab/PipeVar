@@ -23,12 +23,13 @@ PipeVar requires either Docker or Singularity to run. If your system do not have
 
 To use PipeVar, there is a set up stage required for two softwares. The first one is ANNOVAR.
 
-To download ANNOVAR,
+To download ANNOVAR, go to this link https://www.openbioinformatics.org/annovar/annovar_download_form.php
 
+Once ANNOVAR is downloaded, run setup.sh in ANNOVAR folder to download the necessary files for ANNOVAR.
 
-You will need to download PhenoSV model files. You can download the light version, or download the full version. If you download the light version, the pipeline can be only ran with --light yes option.
+setup.sh will also download necessarily PhenoSV model files as well.
 
-After downloading PhenoSV model file, run this setup.sh file in your folder. It will modify nextflow.config to contain your required phenosv and download necessary datasets to run ANNOVAR.
+After downloading PhenoSV model file, run this setup_config.sh file in your folder. It will modify nextflow.config to contain your required phenosv and download necessary datasets to run ANNOVAR.
 
 
 # Usage
