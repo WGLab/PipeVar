@@ -27,7 +27,7 @@ process longphase {
 	#Final process to organize the results and show them in ACMG guideline format; might take long to develop.
 
 
-	/longphase_linux-x64 phase -s $output_directory_full/$snv_vcf_path --sv-file=$output_directory_full/$sv_vcf_path -t 8 -o $output_directory_full/$out_prefix --ont -b $bam_directory/$bam_path -r $ref_fa_full/$ref_fa
+	/longphase_linux-x64 phase -s $output_directory_full/$snv_vcf_path --sv-file=$output_directory_full/${sv_vcf_path}.gz -t 8 -o $output_directory_full/$out_prefix --ont -b $bam_directory/$bam_path -r $ref_fa_full/$ref_fa
 
 	#Process long phase vcf results here, given the phasing.
 	#Based on ACMG guideline.
