@@ -12,7 +12,7 @@ process cuteSV {
 	val output_directory_full
 
 	output:
-	val "$output_directory_full/${out_prefix}.cutesv.vcf.gz"
+	val "$output_directory_full/${out_prefix}.cutesv.vcf"
 
 	script:
 	def args   = task.ext.args ?: ''
