@@ -1,6 +1,6 @@
 
 process Rankscore_analysis {
-	container ='beoungl/docker_test:rankscore'
+	container ='beoungl/docker_test:rankscore_0.1'
 
 
 	input:
