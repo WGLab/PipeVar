@@ -177,6 +177,26 @@ samtools sort -o your.sorted.bam your.bam
 samtools index -b your.bam (or your.sorted.bam if you sorted).
 ```
 
+***VCF file***
+
+***Out prefix***
+
+***Medical Note***
+
+***HPO file***
+
+***Mode selection***
+
+***Sequencing type***
+
+***Output direcrtory***
+
+***Genomic quality***
+
+***Allelic depth***
+
+***Gnomad frequency***
+
 
 
 # Softwares used
