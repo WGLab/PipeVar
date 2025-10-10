@@ -128,6 +128,7 @@ EXAMPLES:
 ```
 
 NOTES:
+
     - At least one of `--hpo` or `--note` must be provided.
     
     - If `--note` is used, `--hpo` is auto-generated via phenotagger.
