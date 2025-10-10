@@ -11,13 +11,13 @@ PipeVar is implenmetned in Nextflow, and can be ran using Docker or Singularity.
 
 PipeVar requires either Docker or Singularity to run. If your system do not have Singularity installed as a module, you can try to install Singularity using conda with
 
-
+```
   conda create -n singularity singularity
-
+```
   or install singualrity in your conda environment by
-
+```
   conda install conda-forge::singularity
-
+```
 
 # Set up
 
