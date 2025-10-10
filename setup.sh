@@ -5,6 +5,14 @@ version="$1"
 
 #After downloading annovar, download all the files necessary, and do the add annotation options
 
+check_annovar="annovar"
+
+# Check if the directory does NOT exist
+if ! [ -d "$check_annovar" ]; then
+    echo "Error: Directory '$check_annovar' not found. Aborting." >&2
+    exit 1
+fi
+
 cd annovar
 
 perl annotate_variation.pl -buildver hg38 -downdb cytoBand humandb/
