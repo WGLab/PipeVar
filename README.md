@@ -127,6 +127,10 @@ EXAMPLES:
           --type ont
 ```
 
+Ideally, the job would be the best ran using the job submission since variant calling process can take long depending on your job. Following is aa simple example for SLURM job submission for default setting.
+
+ADD EXAMPLE HERE!
+
 NOTES:
 
     - At least one of `--hpo` or `--note` must be provided.
@@ -172,6 +176,8 @@ samtools sort -o your.sorted.bam your.bam
 #Index bam
 samtools index -b your.bam (or your.sorted.bam if you sorted).
 ```
+
+
 
 # Softwares used
 
