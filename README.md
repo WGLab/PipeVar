@@ -267,7 +267,7 @@ out_prefix.phenosv.filtered.tsv -
 ```
 out_prefix_nanoRepeat_output.tsv -
 out_prefix_nanorepeat_result.tsv - 
-``
+```
 
 For Short-Read sequencing option
 
@@ -280,30 +280,30 @@ out_prefix.clinvar.txt -
 out_prefix.rank_var.tsv -
 out_prefix.rankscore_filtered.tsv -
 out_prefix.(ref_genome)_multianno.txt/vcf-
-
+```
 
 
 ***SV analaysis output***
-
+```
 out_prefix.manta.vcf.gz -
 out_prefix.bed -
 out_prefix.phenosv.filtered.tsv -
-
+```
 ***Repeat expansion analysis output***
-
+```
 out_prefix_nanoRepeat_output.tsv -
 out_prefix_nanorepeat_result.tsv - 
-
+```
 
 In both analysis :
 
 ***Phenotype analysis ouptut***
 
 These outputs are mostly temp outputs that are used to process the downstream analysis for SV/SNV, but are kept for the record keeping.
-
+```
 out_prefix_phenotagger_patient_hpo.txt -
 out_prefix_phen2gene -
-
+```
 
 The output will be cleaned up for better readability as the pipeline gets updated.
 
