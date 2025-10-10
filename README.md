@@ -245,28 +245,27 @@ For Long-read sequencing option (pacbio/ont) -
 
 ***SNV analysis output***
 ```
-out_prefix.clair.vcf.gz - Clair3 output in VCF format for SNV variant callnig. Available when used with default option.
-out_prefix.nanocaller.vcf.gz - NanoCaller output in VCF for SNV variant calling. Available when used with light optino.
-out_prefix.clinvar.txt - List of variants that are listed as pathogenic by ClinVar and has a related phenotype gene based on Phen2Gene score. Threshold is top 500.
-out_prefix.rank_var.tsv - List of variants that are scored using RankVar. The usual filter is 0.1 for pathogenicity score.
-out_prefix.rankscore_filtered.tsv - List of variants that are scored as pathogenic based on RankScore analysis (takes average of 10 different popular software). 0.50 as a filter, and filtered based on top 500 genes that are related with phenotype based on Phen2Gene.
-
-out_prefix.(ref_genome)_multianno.txt/vcf- Temp output file from ANNOVAR with annotations on SNV variant calling files.
+out_prefix.clair.vcf.gz - Clair3 output in VCF format for SNV variant calling. Available when used with default option.
+out_prefix.nanocaller.vcf.gz - NanoCaller output in VCF for SNV variant calling. Available when used with light option
+___out_prefix.clinvar.txt___ - List of variants that are listed as pathogenic by ClinVar and has a related phenotype gene based on Phen2Gene score. Threshold is top 500.
+___out_prefix.rank_var.tsv___ - List of variants that are scored using RankVar. The usual filter is 0.1 for pathogenicity score.
+___out_prefix.rankscore_filtered.tsv___ - List of variants that are scored as pathogenic based on RankScore analysis (takes average of 10 different popular software). 0.50 as a filter, and filtered based on top 500 genes that are related with phenotype based on Phen2Gene.
+___out_prefix.(ref_genome)_multianno.txt/vcf- Temp output file from ANNOVAR with annotations on SNV variant calling files.
 ```
 
 ***SV analaysis output***
 ```
-out_prefix.cutesv.vcf.gz -
-out_prefix.sniffles.vcf.gz -
-out_preifx_truvari* -
-out_prefix.bed -
-out_prefix.phenosv.filtered.tsv -
+out_prefix.cutesv.vcf.gz - CuteSV output in VCF format for SV calling.
+out_prefix.sniffles.vcf.gz - Sniffles output in VCF format for SV calling.
+out_preifx_truvari* - Filtering process using cuteSV and Sniffles, only using common SVs found in cuteSV and Sniffles.
+out_prefix.bed - Bed file used as the input for PhenoSV with information of exnoic SVs.
+___out_prefix.phenosv.filtered.tsv___ - List of SVs that are scored as pathogenic based on PhenoSV results, with pathogenicty score higher than 0.5.
 ```
 
 ***Repeat expansion analysis output***
 ```
-out_prefix_nanoRepeat_output.tsv -
-out_prefix_nanorepeat_result.tsv - 
+out_prefix_nanoRepeat_output.tsv - Summary of all repeat expansion analysis, includes ~60 known repeat regions that are known to cause diseases.
+___out_prefix_nanorepeat_result.tsv___ - Summary results that show repeat regions that are greater than disease threshold.
 ```
 
 For Short-Read sequencing option
@@ -274,20 +273,20 @@ For Short-Read sequencing option
 
 ***SNV analysis output***
 ```
-out_prefix.deepvariant.vcf.gz -
-out_prefix.recal.vcf.gz -
-out_prefix.clinvar.txt -
-out_prefix.rank_var.tsv -
-out_prefix.rankscore_filtered.tsv -
-out_prefix.(ref_genome)_multianno.txt/vcf-
+out_prefix.deepvariant.vcf.gz - Deepvariant output in VCF format for SNV variant calling. Available when used with default option.
+out_prefix.recal.vcf.gz - HaplotypeCaller output in VCF for SNV variant calling. Available when used with light option.
+out_prefix.clinvar.txt - List of variants that are listed as pathogenic by ClinVar and has a related phenotype gene based on Phen2Gene score. Threshold is top 500.
+out_prefix.rank_var.tsv - List of variants that are scored using RankVar. The usual filter is 0.1 for pathogenicity score.
+out_prefix.rankscore_filtered.tsv - List of variants that are scored as pathogenic based on RankScore analysis (takes average of 10 different popular software). 0.50 as a filter, and filtered based on top 500 genes that are related with phenotype based on Phen2Gene.
+out_prefix.(ref_genome)_multianno.txt/vcf- Temp output file from ANNOVAR with annotations on SNV variant calling files.
 ```
 
 
 ***SV analaysis output***
 ```
-out_prefix.manta.vcf.gz -
-out_prefix.bed -
-out_prefix.phenosv.filtered.tsv -
+out_prefix.manta.vcf.gz - Manta output in VCF format for SV calling.
+out_prefix.bed - Bed file used as the input for PhenoSV with information of exnoic SVs.
+___out_prefix.phenosv.filtered.tsv___ - List of SVs that are scored as pathogenic based on PhenoSV results, with pathogenicty score higher than 0.5.
 ```
 ***Repeat expansion analysis output***
 ```
