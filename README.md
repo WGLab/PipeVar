@@ -129,10 +129,15 @@ EXAMPLES:
 
 NOTES:
     - At least one of `--hpo` or `--note` must be provided.
+    
     - If `--note` is used, `--hpo` is auto-generated via phenotagger.
+    
     - `--mode` must be specified for VCF input, and helps direct SNV vs SV flow.
+    
     - `--type` is required for BAM input to specify sequencing technology.
+    
     - All file paths must be absolute or relative to `--input_directory`.
+    
     - `--light yes` uses faster, resource-friendly software such as haplotypecaller, NanoCaller and PhenoSV-light.
 
 # Softwares used
