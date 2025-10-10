@@ -21,16 +21,24 @@ PipeVar requires either Docker or Singularity to run. If your system do not have
 
 # Set up
 
-To use PipeVar, there is a set up stage required for two softwares. The first one is ANNOVAR.
+First, download the git repo using:
 
-To download ANNOVAR, go to this link https://www.openbioinformatics.org/annovar/annovar_download_form.php
 
-Once ANNOVAR is downloaded, run setup.sh in ANNOVAR folder to download the necessary files for ANNOVAR.
+git clone https://github.com/WGLab/PipeVar.git
 
-setup.sh will also download necessarily PhenoSV model files as well.
+To use PipeVar, there is a set up stage required for two software, ANNOVAR and PhenoSV.
 
-After downloading PhenoSV model file, run this setup_config.sh file in your folder. It will modify nextflow.config to contain your required phenosv and download necessary datasets to run ANNOVAR.
+To download ANNOVAR, go to this link https://www.openbioinformatics.org/annovar/annovar_download_form.php , and follow the instruction in the format. Make sure to have ANNOVAR in the PipeVar folder for setup script to run properly.
 
+Once ANNOVAR is downloaded, run setup.sh in the directory you cloned PipeVar to download the necessary files for ANNOVAR and PhenoSV using
+
+./setup.sh 
+
+or
+
+./setup.sh light
+
+If you want to download a lighter version of PhenoSV. PhenoSV light is about ~50GB in size, while full PhenoSV is about ~150GB in size. The setup script will also modify the nextflow.config to annovar/PhenoSV directory location to necessary location to run the pipeline.
 
 # Usage
 
