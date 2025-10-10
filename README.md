@@ -178,25 +178,63 @@ samtools index -b your.bam (or your.sorted.bam if you sorted).
 ```
 
 ***VCF file***
+```
+--vcf
+```
+VCF file can be used if you want to run PipeVar on SV or SNV. Does not require indexing or sorting.
 
 ***Out prefix***
 
+```
+--out_prefix
+```
+String for the prefix for the output and processing. Makes sure to not include any special characters or space in between.
+
 ***Medical Note***
+```
+--note
+```
+Medical notes that can be in csv, tsv or txt format. Make sure to input one medical not for one patient.
 
 ***HPO file***
+```
+--hpo
+
+#Example
+HP:0031647
+HP:0031647
+
+```
+Text file with list of HPO terms. Make sure each HPO term is in new line, and only contain HPO terms. 
 
 ***Mode selection***
 
+```
+--mode
+```
+
+Option for either SV or SNV. Required for VCF option, but optional for BAM option. Only 'sv' or 'snv' is accepted.
+
 ***Sequencing type***
 
+```
+--type
+```
+
+Option for sequencing type. The default is 'ONT' for now, and has 'short' for NGS and 'pacbio' for Pac-Bio option. For long-read sequencing, they are used in repeat and SV process.
+
 ***Output direcrtory***
+```
+--output_directory
+```
+Option for output directory location. Must provide full path. The default is current directory where the script is submitted.
 
-***Genomic quality***
-
-***Allelic depth***
 
 ***Gnomad frequency***
-
+```
+---gnomad
+```
+Option for gnomad allele frequency filtering for SNV Rankscore and SV score. The default is 0.0001, but may be lowered for autosomal recessive variant priortization. SV filtering in progress.
 
 
 # Softwares used
