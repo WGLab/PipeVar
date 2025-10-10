@@ -12,12 +12,14 @@ PipeVar is implenmetned in Nextflow, and can be ran using Docker or Singularity.
 PipeVar requires either Docker or Singularity to run. If your system do not have Singularity installed as a module, you can try to install Singularity using conda with
 
 ```
-  conda create -n singularity singularity
+conda create -n singularity singularity
 ```
   or install singualrity in your conda environment by
 ```
-  conda install conda-forge::singularity
+conda install conda-forge::singularity
 ```
+
+Currently, PipeVar is only tested to run in SLURM environment. It can be ran in other environment by changing executor paramemter in nextflow.config, but it has not been tested yet. We plan to test PipeVar in different environments.
 
 # Set up
 
@@ -54,7 +56,7 @@ nextflow run main.nf --vcf <FILE> --mode sv or snv --ref_fa <FILE> --out_prefix 
 ```
 
 ```
-  REQUIRED PARAMETERS:
+REQUIRED PARAMETERS:
   
   --bam <FILE> Path to input BAM file. Cannot be used with VCF option. Must be full path. Requires .bai index file.
   
@@ -69,17 +71,9 @@ nextflow run main.nf --vcf <FILE> --mode sv or snv --ref_fa <FILE> --out_prefix 
   --hpo <FILE> HPO ID file; note file can be used instead.
 
   --mode <sv|snv>. Option run either SV mode or SNV mode. Required for VCF mode. Optional for BAM.
-```
 
-  # Example hpo.txt
-    HP:0001250
-    HP:0000750
-    HP:0001257
-
-```
 OPTIONAL PARAMETERS:
     --output_directory <DIR>  Path to output directory (default: current directory)
-    --mode <sv|snp>           Variant type to analyze (required with --vcf or --bam)
     --type <short|long>       Input data type: short or long reads (required with --bam).
     --light <yes|no>          Use lightweight PhenoSV model, NanoCaller (faster, lower memory, but with lower accuracy)
     --gq <INT>                Minimum genotype quality [default: 20] used for filtering for RankVar and RankScore analysis.
