@@ -245,13 +245,13 @@ For Long-read sequencing option (pacbio/ont) -
 
 ***SNV analysis output***
 
-out_prefix.clair.vcf.gz -
-out_prefix.nanocaller.vcf.gz -
-out_prefix.clinvar.txt -
-out_prefix.rank_var.tsv -
-out_prefix.rankscore_filtered.tsv -
+out_prefix.clair.vcf.gz - Clair3 output in VCF format for SNV variant callnig. Available when used with default option.
+out_prefix.nanocaller.vcf.gz - NanoCaller output in VCF for SNV variant calling. Available when used with light optino.
+out_prefix.clinvar.txt - List of variants that are listed as pathogenic by ClinVar and has a related phenotype gene based on Phen2Gene score. Threshold is top 500.
+out_prefix.rank_var.tsv - List of variants that are scored using RankVar. The usual filter is 0.1 for pathogenicity score.
+out_prefix.rankscore_filtered.tsv - List of variants that are scored as pathogenic based on RankScore analysis (takes average of 10 different popular software). 0.50 as a filter, and filtered based on top 500 genes that are related with phenotype based on Phen2Gene.
 
-out_prefix.(ref_genome)_multianno.txt/vcf-
+out_prefix.(ref_genome)_multianno.txt/vcf- Temp output file from ANNOVAR with annotations on SNV variant calling files.
 
 
 ***SV analaysis output***
@@ -272,21 +272,18 @@ out_prefix_nanorepeat_result.tsv -
 
 ***SNV analysis output***
 
-out_prefix.clair.vcf.gz -
-out_prefix.nanocaller.vcf.gz -
+out_prefix.deepvariant.vcf.gz -
+out_prefix.recal.vcf.gz -
 out_prefix.clinvar.txt -
 out_prefix.rank_var.tsv -
 out_prefix.rankscore_filtered.tsv -
-
 out_prefix.(ref_genome)_multianno.txt/vcf-
 
 
 
 ***SV analaysis output***
 
-out_prefix.cutesv.vcf.gz -
-out_prefix.sniffles.vcf.gz -
-out_preifx_truvari* -
+out_prefix.manta.vcf.gz -
 out_prefix.bed -
 out_prefix.phenosv.filtered.tsv -
 
@@ -295,7 +292,8 @@ out_prefix.phenosv.filtered.tsv -
 out_prefix_nanoRepeat_output.tsv -
 out_prefix_nanorepeat_result.tsv - 
 
-In both analysis - 
+
+In both analysis :
 
 ***Phenotype analysis ouptut***
 
