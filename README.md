@@ -143,8 +143,9 @@ NOTES:
 
 # Parameter details
 
+
+***Reference genome***
 ```
-Reference genome
 --ref_fa
 ```
 
@@ -156,8 +157,9 @@ FASTA file can be indexed using samtools with following command if needed:
 samtools faidx file.fa
 ``` 
 
+
+***BAM file***
 ```
-Alignment file
 --bam
 ```
 
