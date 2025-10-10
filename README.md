@@ -364,4 +364,4 @@ Add LongPhase process, and ACMG Guideline, and PhenoGPT2 for note direction. Cle
 
 We are also working on version so reference genome may not be previously downloaded, but can be ran with hg38 or grch38 option.
 
-SAM/CRAM support will be included in future as well.
+SAM/CRAM support will be included in future as well. Add parallel processing to allow multi-sample option.
