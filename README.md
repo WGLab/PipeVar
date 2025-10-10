@@ -247,7 +247,7 @@ For Long-read sequencing option (pacbio/ont) -
 ```
 out_prefix.clair.vcf.gz - Clair3 output in VCF format for SNV variant calling. Available when used with default option.
 out_prefix.nanocaller.vcf.gz - NanoCaller output in VCF for SNV variant calling. Available when used with light option
-___out_prefix.clinvar.txt___ - List of variants that are listed as pathogenic by ClinVar and has a related phenotype gene based on Phen2Gene score. Threshold is top 500.
+__out_prefix.clinvar.txt__ - List of variants that are listed as pathogenic by ClinVar and has a related phenotype gene based on Phen2Gene score. Threshold is top 500.
 ___out_prefix.rank_var.tsv___ - List of variants that are scored using RankVar. The usual filter is 0.1 for pathogenicity score.
 ___out_prefix.rankscore_filtered.tsv___ - List of variants that are scored as pathogenic based on RankScore analysis (takes average of 10 different popular software). 0.50 as a filter, and filtered based on top 500 genes that are related with phenotype based on Phen2Gene.
 ___out_prefix.(ref_genome)_multianno.txt/vcf- Temp output file from ANNOVAR with annotations on SNV variant calling files.
