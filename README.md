@@ -23,8 +23,9 @@ PipeVar requires either Docker or Singularity to run. If your system do not have
 
 First, download the git repo using:
 
-
+```
 git clone https://github.com/WGLab/PipeVar.git
+```
 
 To use PipeVar, there is a set up stage required for two software, ANNOVAR and PhenoSV.
 
