@@ -237,6 +237,15 @@ Option for output directory location. Must provide full path. The default is cur
 Option for gnomad allele frequency filtering for SNV Rankscore and SV score. The default is 0.0001, but may be lowered for autosomal recessive variant priortization. SV filtering in progress.
 
 
+# Output
+
+All the output will be stored in output directory, or the launch folder based on --output_directory parameter. The list of outputs are as followed:
+
+
+The output will be cleaned up for better readability as the pipeline gets updated.
+
+
+
 # Softwares used
 
 PIPELINE MODULES:
@@ -267,12 +276,6 @@ PIPELINE MODULES:
       - ANNOVAR        : SNV/SV annotation
       - RankVar        : Final SNV ranking
       - Rankscore_analysis: Additional ranking analysis
-
-
-# Output
-
-All the output will be stored in output folder, or the launch folder. The list of outputs are as followed:
-
 
 
 
