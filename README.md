@@ -74,7 +74,7 @@ REQUIRED PARAMETERS:
 
 OPTIONAL PARAMETERS:
     --output_directory <DIR>  Path to output directory (default: current directory)
-    --type <short|long>       Input data type: short or long reads (required with --bam).
+    --type <ont|pacbio|short>       Input data type: short/long reads(either Pac-Bio or ONT) (default is ONT).
     --light <yes|no>          Use lightweight PhenoSV model, NanoCaller (faster, lower memory, but with lower accuracy)
     --gq <INT>                Minimum genotype quality [default: 20] used for filtering for RankVar and RankScore analysis.
     --ad <INT>                Minimum allelic depth [default: 15] used for filtering for RankVar and RankScore analysis.
