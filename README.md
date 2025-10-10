@@ -241,6 +241,69 @@ Option for gnomad allele frequency filtering for SNV Rankscore and SV score. The
 
 All the output will be stored in output directory, or the launch folder based on --output_directory parameter. The list of outputs are as followed:
 
+For Long-read sequencing option (pacbio/ont) -
+
+***SNV analysis output***
+
+out_prefix.clair.vcf.gz -
+out_prefix.nanocaller.vcf.gz -
+out_prefix.clinvar.txt -
+out_prefix.rank_var.tsv -
+out_prefix.rankscore_filtered.tsv -
+
+out_prefix.(ref_genome)_multianno.txt/vcf-
+
+
+***SV analaysis output***
+
+out_prefix.cutesv.vcf.gz -
+out_prefix.sniffles.vcf.gz -
+out_preifx_truvari* -
+out_prefix.bed -
+out_prefix.phenosv.filtered.tsv -
+
+
+For Short-Read sequencing option
+
+***Repeat expansion analysis output***
+
+out_prefix_nanoRepeat_output.tsv -
+out_prefix_nanorepeat_result.tsv - 
+
+***SNV analysis output***
+
+out_prefix.clair.vcf.gz -
+out_prefix.nanocaller.vcf.gz -
+out_prefix.clinvar.txt -
+out_prefix.rank_var.tsv -
+out_prefix.rankscore_filtered.tsv -
+
+out_prefix.(ref_genome)_multianno.txt/vcf-
+
+
+
+***SV analaysis output***
+
+out_prefix.cutesv.vcf.gz -
+out_prefix.sniffles.vcf.gz -
+out_preifx_truvari* -
+out_prefix.bed -
+out_prefix.phenosv.filtered.tsv -
+
+***Repeat expansion analysis output***
+
+out_prefix_nanoRepeat_output.tsv -
+out_prefix_nanorepeat_result.tsv - 
+
+In both analysis - 
+
+***Phenotype analysis ouptut***
+
+These outputs are mostly temp outputs that are used to process the downstream analysis for SV/SNV, but are kept for the record keeping.
+
+out_prefix_phenotagger_patient_hpo.txt -
+out_prefix_phen2gene -
+
 
 The output will be cleaned up for better readability as the pipeline gets updated.
 
