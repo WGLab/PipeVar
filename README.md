@@ -150,12 +150,26 @@ Reference genome
 
 Used to specifcy the reference genome FASTA file. It must be indexed.
 
+FASTA file can be indexed using samtools with following command if needed:
+
+```
+samtools faidx file.fa
+``` 
+
 ```
 Alignment file
 --bam
 ```
 
-BAM file needed to run the workflow. Must be indexed and sorted. SAM/CRAM are not accepted for now, but will be in future.
+BAM file needed to run the workflow. Must be indexed and sorted. SAM/CRAM are not accepted for now, but will be in future. If bam files is not indexed or sorted, use following example command
+
+```
+#Sorting bam
+samtools sort -o your.sorted.bam your.bam
+
+#Index bam
+samtools index -b your.bam (or your.sorted.bam if you sorted).
+```
 
 # Softwares used
 
