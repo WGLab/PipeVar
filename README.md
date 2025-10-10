@@ -41,10 +41,10 @@ or
 If you want to download a lighter version of PhenoSV. PhenoSV light is about ~50GB in size, while full PhenoSV is about ~150GB in size. The setup script will also modify the nextflow.config to annovar/PhenoSV directory location to necessary location to run the pipeline.
 
 # Usage
-
+'''
 nextflow run main.nf --bam <FILE>
 nextflow run main.nf --vcf <FILE> 
-
+'''
 
   REQUIRED PARAMETERS:
   
