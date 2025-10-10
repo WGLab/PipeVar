@@ -141,6 +141,22 @@ NOTES:
     
     - `--light yes` uses faster, resource-friendly software such as haplotypecaller, NanoCaller and PhenoSV-light.
 
+# Parameter details
+
+```
+Reference genome
+--ref_fa
+```
+
+Used to specifcy the reference genome FASTA file. It must be indexed.
+
+```
+Alignment file
+--bam
+```
+
+BAM file needed to run the workflow. Must be indexed and sorted. SAM/CRAM are not accepted for now, but will be in future.
+
 # Softwares used
 
 PIPELINE MODULES:
@@ -182,7 +198,8 @@ All the output will be stored in output folder, or the launch folder. The list o
 
 # Update that needs to be done.
 
-Add LongPhase process, and ACMG Guideline, and PhenoGPT2 for note direction.
+Add LongPhase process, and ACMG Guideline, and PhenoGPT2 for note direction. Clean up the output results as well.
 
+We are also working on version so reference genome may not be previously downloaded, but can be ran with hg38 or grch38 option.
 
-
+SAM/CRAM support will be included in future as well.
