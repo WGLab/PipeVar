@@ -53,6 +53,7 @@ nextflow run main.nf --bam <FILE> --ref_fa <FILE> --out_prefix <FOLDER> --note <
 nextflow run main.nf --vcf <FILE> --mode sv or snv --ref_fa <FILE> --out_prefix <FOLDER> --note <FILE> or hpo <FILE> 
 ```
 
+```
   REQUIRED PARAMETERS:
   
   --bam <FILE> Path to input BAM file. Cannot be used with VCF option. Must be full path. Requires .bai index file.
@@ -68,6 +69,7 @@ nextflow run main.nf --vcf <FILE> --mode sv or snv --ref_fa <FILE> --out_prefix 
   --hpo <FILE> HPO ID file; note file can be used instead.
 
   --mode <sv|snv>. Option run either SV mode or SNV mode. Required for VCF mode. Optional for BAM.
+```
 
   # Example hpo.txt
     HP:0001250
