@@ -24,6 +24,7 @@ PipeVar requires either Docker or Singularity to run. If your system do not have
 First, download the git repo using:
 
 ```
+#Download PipeVar
 git clone https://github.com/WGLab/PipeVar.git
 ```
 
@@ -33,18 +34,23 @@ To download ANNOVAR, go to this link https://www.openbioinformatics.org/annovar/
 
 Once ANNOVAR is downloaded, run setup.sh in the directory you cloned PipeVar to download the necessary files for ANNOVAR and PhenoSV using
 ```
+#Install full PhenoSV.
 ./setup.sh 
 ```
 or
 ```
+#Install lighter version of PhenoSV.
 ./setup.sh light
 ```
 If you want to download a lighter version of PhenoSV. PhenoSV light is about ~50GB in size, while full PhenoSV is about ~150GB in size. The setup script will also modify the nextflow.config to annovar/PhenoSV directory location to necessary location to run the pipeline.
 
 # Usage
 ```
-nextflow run main.nf --bam <FILE>
-nextflow run main.nf --vcf <FILE> 
+#BAM version.
+nextflow run main.nf --bam <FILE> --ref_fa <FILE> --out_prefix <FOLDER> --note <FILE> or hpo <FILE>
+
+#VCF version. Requires either SV or SNV option.
+nextflow run main.nf --vcf <FILE> --mode sv or snv --ref_fa <FILE> --out_prefix <FOLDER> --note <FILE> or hpo <FILE> 
 ```
 
   REQUIRED PARAMETERS:
@@ -61,25 +67,28 @@ nextflow run main.nf --vcf <FILE>
   
   --hpo <FILE> HPO ID file; note file can be used instead.
 
+  --mode <sv|snv>. Option run either SV mode or SNV mode. Required for VCF mode. Optional for BAM.
 
   # Example hpo.txt
     HP:0001250
     HP:0000750
     HP:0001257
 
+```
 OPTIONAL PARAMETERS:
-    --input_directory <DIR>   Directory containing input files
-    --output_directory <DIR>  Path to output directory (default: current dir)
+    --output_directory <DIR>  Path to output directory (default: current directory)
     --mode <sv|snp>           Variant type to analyze (required with --vcf or --bam)
-    --type <short|long>       Input data type: short or long reads (required with --bam)
-    --light <yes|no>          Use lightweight PhenoSV model and NanoCaller (faster, lower memory)
-    --gq <INT>                Minimum genotype quality [default: 20]
-    --ad <INT>                Minimum allelic depth [default: 15]
-    --gnomad <FLOAT>          Max gnomAD allele frequency [default: 0.0001]
+    --type <short|long>       Input data type: short or long reads (required with --bam).
+    --light <yes|no>          Use lightweight PhenoSV model, NanoCaller (faster, lower memory, but with lower accuracy)
+    --gq <INT>                Minimum genotype quality [default: 20] used for filtering for RankVar and RankScore analysis.
+    --ad <INT>                Minimum allelic depth [default: 15] used for filtering for RankVar and RankScore analysis.
+    --gnomad <FLOAT>          Max gnomAD allele frequency [default: 0.0001] used for filtering for RankVar and RankScore analysis.
     --help                    Print this help message and exit
+```
 
 EXAMPLES:
 
+```
     1. Long-read full pipeline (SV + SNP + STR):
         nextflow run main.nf \
           --bam /data/sample.bam \
@@ -120,6 +129,7 @@ EXAMPLES:
           --out_prefix patient1 \
           --note /data/note.txt \
           --type ont
+```
 
 NOTES:
     - At least one of `--hpo` or `--note` must be provided.
