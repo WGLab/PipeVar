@@ -127,9 +127,26 @@ EXAMPLES:
           --type ont
 ```
 
-Ideally, the job would be the best ran using the job submission since variant calling process can take long depending on your job. Following is aa simple example for SLURM job submission for default setting.
+Ideally, the job would be the best ran using the job submission since variant calling process can take long depending on your job. Following is aa simple example for SLURM job submission for default setting for 48 hour job submission.
 
-ADD EXAMPLE HERE!
+```
+
+#!/bin/bash
+
+#SBATCH --time=47:59:59
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=4G
+
+nextflow run main.nf \
+          --bam /data/sample.bam \
+          --ref_fa /refs/hg38.fa \
+          --out_prefix patient1 \
+          --note /data/note.txt \
+
+
+
+```
+
 
 NOTES:
 
