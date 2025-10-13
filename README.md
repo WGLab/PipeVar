@@ -307,8 +307,8 @@ out_prefix.phenosv.filtered.tsv - List of SVs that are scored as pathogenic base
 ```
 ***Repeat expansion analysis output***
 ```
-out_prefix_nanoRepeat_output.tsv -
-out_prefix_nanorepeat_result.tsv - 
+out_prefix.json - ExpansionHunter result including repeat expansion information in selected regions.
+out_prefix.eh.tsv - Output results including repeats that passes diseases threshold. 
 ```
 
 In both analysis :
