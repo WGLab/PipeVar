@@ -108,7 +108,7 @@ include { ANNOVAR_SV } from './modules/annovar_sv/'
 include { ExpansionHunter } from './modules/expansion_hunter/'
 include { Rankscore_analysis } from './modules/rankscore_analysis/'
 include { phenotagger } from './modules/phenotagger/'
-
+include { longphase } from './modules/longphase/'
 
 
 
@@ -222,14 +222,14 @@ workflow {
                 ANNOVAR(clair3.out,output_directory_full,out_prefix,output_directory,output_directory_full)
 		Phen2gene(hpo,hpo_directory,out_prefix,output_directory,output_directory_full)
                 RankVar(ANNOVAR.out,Phen2gene.out,hpo,hpo_directory,out_prefix,gnomad,gq,ad,output_directory,output_directory_full)
-                Rankscore_analysis(ANNOVAR.Out,Phen2gene.out,out_prefix,output_directory,output_directory_full)
+                rankscore_result=Rankscore_analysis(ANNOVAR.Out,Phen2gene.out,out_prefix,output_directory,output_directory_full)
                 cuteSV(bam,input_directory,out_prefix,ref_fa,ref_fa_directory,output_directory,output_directory_full)
                 sniffles(bam,input_directory,out_prefix,ref_fa,ref_fa_directory,output_directory,output_directory_full)
                 truvari(cuteSV.out,sniffles.out,ref_fa,ref_fa_directory,out_prefix,output_directory,output_directory_full)
                 SURVIVOR(truvari.out,out_prefix,output_directory,output_directory_full)
                 PhenoSV(SURVIVOR.out,out_prefix,hpo,hpo_directory,output_directory,output_directory_full)
                 NanoRepeat(bam,input_directory,out_prefix,ref_fa,ref_fa_directory,output_directory,output_directory_full)
-
+		longphase(bam,input_directory,clair3.out,cuteSV.out,output_directory,output_directory_full,PhenoSV.out,rankscore_result.rankscore,rankscore_result.clinvar,RankVar.out,out_prefix,ref_fa,ref_fa_directory)
 	}
 }
 
