@@ -1,35 +1,43 @@
 
 process longphase {
-	container='beoungl/docker_test:longphase'
+	container='beoungl/docker_test:longphase_0.2.8'
 
 	input:
-	path bam_path
-	val bam_directory
-	path snv_vcf_path
-	path sv_vcf_path
-	path output_directory
-	val output_directory_full
-	val sv_pathogenic
-	val snv_rankscore
-	val snv_pathogenic
-	val snv_rankvar
+	tuple path(bam_path), path(index)
+	path annovar_vcf
+	path annovar_sv_vcf
+	path sv_pathogenic
+	path snv_rankscore
+	path snv_pathogenic
+	path snv_rankvar
 	val out_prefix
-	path ref_fa
-	val ref_fa_full
+	tuple path(ref_fa), path(fa_index)
 
-
+	output:
+	path "${out_prefix}.prio.vcf"
 
 	
 	script:
 
 
 	"""
-	#Final process to organize the results and show them in ACMG guideline format; might take long to develop.
+	/longphase_linux-x64 phase -s $annovar_vcf --sv-file=$annovar_sv_vcf -t 8 -o ${out_prefix}_phased --ont -b $bam_path -r $ref_fa
+
+	/longphase_linux-x64 haplotag -r $ref_fa -s ${out_prefix}_phased.vcf --sv-file ${out_prefix}_phased_SV.vcf -b $bam_path -t 4 -o ${out_prefix}_haplotag
 
 
-	/longphase_linux-x64 phase -s $output_directory_full/$snv_vcf_path --sv-file=$output_directory_full/${sv_vcf_path}.gz -t 8 -o $output_directory_full/$out_prefix --ont -b $bam_directory/$bam_path -r $ref_fa_full/$ref_fa
+        bash /clinvar_vcf_and_txt.sh $snv_pathogenic ${out_prefix}_phased.vcf $out_prefix
 
-	/longphase_linux-x64 haplotag -r $ref_fa_full/$ref_fa -s $output_directory_full/${out_prefix}.vcf --sv-file $output_directory_full/${out_prefix}_SV.vcf -b $bam_directory/$bam_path -t 4 -o $output_directory_full/${out_prefix}_haplotag
+        bash /phenosv_vcf_and_tsv.sh $sv_pathogenic ${out_prefix}_phased_SV.vcf $out_prefix
+
+        bash /rankscore_vcf_and_txt.sh $snv_rankscore ${out_prefix}_phased.vcf $out_prefix
+
+        bash /rankvar_vcf_and_tsv.sh $snv_rankvar ${out_prefix}_phased.vcf $out_prefix
+
+	python3 /assign_dom_or_rec.py ${out_prefix}.clinvar.vcf ${out_prefix}.phenosv.vcf ${out_prefix}.rankscore.vcf ${out_prefix}.rankvar.vcf OMIM ${out_prefix}.assigned.vcf
+
+	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio.vcf
+
 
 
 

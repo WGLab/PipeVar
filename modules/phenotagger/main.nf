@@ -1,30 +1,43 @@
 
 process phenotagger {
+	
 	container ='beoungl/docker_test:phenotagger'
 
 
         input:
         path phenotagger_input
-	val phenotagger_directory
-	path output_directory
-	val output_directory_full
 	val output_prefix
 
 
 	output:
-	val "$output_directory_full/${output_prefix}_phenotagger_patient_hpo.txt"
+	path "${output_prefix}_phenotagger_patient_hpo.txt"
 
 	"""
+	#Need to do this because it seems like tensorflow thinks we need to be at home directory for some reason
+	export HOME=\$PWD
 
-	python3 /PhenoTagger_py/generate_input.py -i $phenotagger_directory/$phenotagger_input -t $output_directory_full/${output_prefix}_phenotagger/phenotagger_temp -o $output_directory_full/${output_prefix}_phenotagger
+	curr_dir=\$PWD
 
- 	cd /opt/PhenoTagger/src
+	temp_dir="\${curr_dir}/${output_prefix}_phenotagger"
 
-	python3 PhenoTagger_tagging.py -i $output_directory_full/${output_prefix}_phenotagger/phenotagger_temp/phenotagger_input/input0/ -o $output_directory_full/${output_prefix}_phenotagger/phenotagger_output/output0/
-
-	awk -F'\t' '\$6 ~ /HP:/ {print \$6}' $output_directory_full/${output_prefix}_phenotagger/phenotagger_output/output0/patient_note.PubTator > $output_directory_full/${output_prefix}_phenotagger_patient_hpo.txt
+	mv $phenotagger_input ${output_prefix}_phenotagger_input.txt
 
 
+	python3 /PhenoTagger_py/generate_input.py \
+   	-i ${output_prefix}_phenotagger_input.txt \
+        -t \${temp_dir}/phenotagger_temp \
+        -o \${temp_dir}
+
+
+	cd /opt/PhenoTagger/src
+
+
+	python3 PhenoTagger_tagging.py \
+        -i \${temp_dir}/phenotagger_temp/phenotagger_input/input0/ \
+        -o \${temp_dir}/phenotagger_output/output0/
+
+	awk -F'\t' '\$6 ~ /HP:/ {print \$6}' \
+        \${temp_dir}/phenotagger_output/output0/${output_prefix}_phenotagger_input.PubTator > \${curr_dir}/${output_prefix}_phenotagger_patient_hpo.txt
 
 	"""
 

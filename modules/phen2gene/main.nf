@@ -5,13 +5,10 @@ process Phen2gene {
 
         input:
         path hpo
-	val hpo_directory
         val out_prefix
-	path input_directory_path
-	val input_directory
 
 	output:
-	val "$input_directory/${out_prefix}_phen2gene/output_file.associated_gene_list"
+	path "${out_prefix}.phen2gene.txt"
 
 	script:
 
@@ -19,9 +16,11 @@ process Phen2gene {
 	source /conda/etc/profile.d/conda.sh
         conda activate phen2gene
 
-	mkdir -p $input_directory/${out_prefix}_phen2gene
+	mkdir -p ${out_prefix}_phen2gene
 
-	python3 /opt/Phen2Gene/phen2gene.py -f $hpo_directory/$hpo -out $input_directory/${out_prefix}_phen2gene
+	python3 /opt/Phen2Gene/phen2gene.py -f $hpo -out ${out_prefix}_phen2gene
+
+	mv ${out_prefix}_phen2gene/output_file.associated_gene_list ${out_prefix}.phen2gene.txt
 
 	"""
 

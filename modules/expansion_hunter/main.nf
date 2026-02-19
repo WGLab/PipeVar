@@ -4,19 +4,21 @@ process ExpansionHunter {
 
 
         input:
-        path bam
-        val input_directory
+        tuple path(bam), path(index)
 	val out_prefix
-	path ref_fa
-	val ref_fa_directory
-	path output_directory
-	val output_directory_full
+	tuple path(ref_fa), path(fa_index)
 
+	output:
+	path "${out_prefix}.json"
 
 	script:
+	def args = task.ext.args ?: ''
 
 	"""
-	ExpansionHunter --reads $input_directory/$bam --reference $ref_fa_directory/$ref_fa --variant-catalog /hg38/variant_catalog.json --output-prefix $output_directory_full/$out_prefix
+	ExpansionHunter --reads $bam --reference $ref_fa --variant-catalog $args --output-prefix $out_prefix
+
+		
+	
 	"""
 
 

@@ -1,17 +1,15 @@
 
 process ANNOVAR_SV {
-	container ='beoungl/docker_test:truvari'
+	container ='beoungl/docker_test:truvari_0.1'
 
 
         input:
         path vcf
 	val out_prefix
-	val input_directory
-	path output_directory
-	val output_directory_full
+	path phen2gene
 
 	output:
-	val "$input_directory/${out_prefix}.exonic.vcf"
+	path "${out_prefix}.exonic.vcf"
 
 	script:
 	"""
@@ -20,12 +18,15 @@ process ANNOVAR_SV {
 
 
 
-        perl /annovar/table_annovar.pl $input_directory/$vcf /annovar/humandb/ -buildver hg38 -out $output_directory/${out_prefix}_sv -remove -protocol refGene -operation gx -nastring . -vcfinput -polish
+        perl /annovar/table_annovar.pl $vcf /annovar/humandb/ -buildver hg38 -out ${out_prefix}_sv -remove -protocol refGene -operation gx -nastring . -vcfinput -polish
 
-	bcftools view -h $output_directory/${out_prefix}_sv.hg38_multianno.vcf > $output_directory/${out_prefix}.exonic.vcf
+	#Filter with Phen2gene score here
+	bash /phen2gene_filter.sh $phen2gene ${out_prefix}_sv.hg38_multianno.vcf $out_prefix
 
-	grep -wi 'exonic' $output_directory/${out_prefix}_sv.hg38_multianno.vcf >> $output_directory/${out_prefix}.exonic.vcf
 
+	bcftools view -h ${out_prefix}_sv.hg38_multianno.vcf > ${out_prefix}.exonic.vcf
+
+	grep -wi 'exonic' ${out_prefix}_sv.phen2gene.vcf >> ${out_prefix}.exonic.vcf
 
 
 	"""

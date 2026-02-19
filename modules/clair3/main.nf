@@ -4,16 +4,13 @@ process clair3 {
 
 
         input:
-        path bam
-	val input_directory
+        tuple path(bam), path(index)
         val out_prefix
-	path ref_fa
-	val ref_fa_directory
-	path output_directory
-	val output_directory_full
+	tuple path(ref_fa), path(fa_index)
+	val bed_file
 
 	output:
-	path "$output_directory/${out_prefix}.clair3.vcf.gz"
+	path "${out_prefix}.clair3.vcf.gz"
 
 	script:
 	def args   = task.ext.args ?: ''
@@ -22,11 +19,18 @@ process clair3 {
         source /opt/conda/etc/profile.d/conda.sh
 	conda activate clair3
 
-	run_clair3.sh --bam_fn=$input_directory/$bam --ref_fn=$ref_fa_directory/$ref_fa --threads=4 $args --output=$output_directory_full/${out_prefix}_clair3
+	curr_dir=\$PWD
 	
-	mv $output_directory_full/${out_prefix}_clair3/merge_output.vcf.gz $output_directory_full/${out_prefix}_clair3/${out_prefix}.clair3.vcf.gz
 
-	mv $output_directory_full/${out_prefix}_clair3/${out_prefix}.clair3.vcf.gz $output_directory_full
+	if [ $bed_file != "null" ]; then
+		run_clair3.sh --bam_fn=$bam --ref_fn=$ref_fa --threads=4 $args --output=${out_prefix}_clair3 --bed_fn=$bed_file
+	else 
+		run_clair3.sh --bam_fn=$bam --ref_fn=$ref_fa --threads=4 $args --output=${out_prefix}_clair3
+	fi
+	
+	mv ${out_prefix}_clair3/merge_output.vcf.gz ${out_prefix}_clair3/${out_prefix}.clair3.vcf.gz
+
+	mv ${out_prefix}_clair3/${out_prefix}.clair3.vcf.gz \$curr_dir
 
 
 	"""

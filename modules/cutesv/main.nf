@@ -3,16 +3,12 @@ process cuteSV {
 	container ='beoungl/docker_test:cutesv'
 
         input:
-        path bam
-	val input_directory
+	tuple path(bam), path(index)
         val out_prefix
-	path ref_fa
-	val ref_fa_directory
-	path output_directory
-	val output_directory_full
+	tuple path(ref_fa), path(fa_index)
 
 	output:
-	val "$output_directory_full/${out_prefix}.cutesv.vcf"
+	path "${out_prefix}.cutesv.vcf"
 
 	script:
 	def args   = task.ext.args ?: ''
@@ -20,7 +16,7 @@ process cuteSV {
 	"""
 	source /conda/etc/profile.d/conda.sh
 	conda activate cutesv 
-	cuteSV $args --sample $out_prefix $input_directory/$bam $ref_fa_directory/$ref_fa $output_directory_full/${out_prefix}.cutesv.vcf .
+	cuteSV $args --sample $out_prefix $bam $ref_fa ${out_prefix}.cutesv.vcf .
 	"""
 
 

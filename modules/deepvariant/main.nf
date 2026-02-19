@@ -3,22 +3,23 @@ process deepvariant {
 	container='google/deepvariant:1.9.0'
 
         input:
-        path bam
-	val input_directory
+	tuple path(bam), path(index)
         val out_prefix
-	path ref_fa
-	val ref_fa_directory
-	path output_directory
-	val output_directory_full
+	tuple path(ref_fa), path(index)
+	val bed_file
 
 	output:
-	path "$output_directory/${out_prefix}.deepvariant.vcf.gz"
+	path "${out_prefix}.deepvariant.vcf.gz"
 
 	script:
 
 	"""
-
-	/opt/deepvariant/bin/run_deepvariant --model_type=WGS --ref=$ref_fa_directory/$ref_fa --reads=$input_directory/$bam --output_vcf=$output_directory_full/${out_prefix}.deepvariant.vcf.gz
+	
+	if [ $bed_file != "null" ]; then
+		/opt/deepvariant/bin/run_deepvariant --model_type=WGS --ref=$ref_fa --reads=$bam --output_vcf=${out_prefix}.deepvariant.vcf.gz --regions=$bed_file
+	else
+		/opt/deepvariant/bin/run_deepvariant --model_type=WGS --ref=$ref_fa --reads=$bam --output_vcf=${out_prefix}.deepvariant.vcf.gz
+	fi
 
 
 

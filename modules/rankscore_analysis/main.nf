@@ -1,22 +1,22 @@
 
 process Rankscore_analysis {
-	container ='beoungl/docker_test:rankscore_0.1'
+	container ='beoungl/docker_test:rankscore_0.2.11'
 
 
 	input:
 	path annovar_output
-	val phen2_gene
+	path phen2_gene
 	val out_prefix
-	path input_directory_path
-	val input_directory
+	val rankscore_filter
+	val gnomad_af
 
 	output:
-	val "${out_prefix}.rankscore_filtered.tsv" , emit: rankscore
-	val "${out_prefix}.clinvar.txt" , emit: clinvar
+	path "${out_prefix}.rankscore_filtered.tsv" , emit: rankscore
+	path "${out_prefix}.clinvar.txt" , emit: clinvar
 
 	"""
 
-	sh /rankscore/clinvar.sh $input_directory/$annovar_output $phen2_gene $input_directory/$out_prefix
+	sh /rankscore/clinvar.sh $annovar_output $phen2_gene $out_prefix $gnomad_af $rankscore_filter
 
 	"""
 }

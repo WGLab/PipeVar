@@ -4,29 +4,25 @@ process Manta {
 
 
         input:
-        path bam
-        val input_directory
+        tuple path(bam), path(index)
 	val out_prefix
-	path ref_fa
-	val ref_fa_directory
-	path output_directory
-	val output_directory_full
+	tuple path(ref_fa), path(fa_index)
 
 
 	output:
-	val "$output_directory_full/${out_prefix}_manta.vcf"
+	path "${out_prefix}_manta.vcf"
 
 	script:
 
 	"""
 
-	/manta/bin/configManta.py --bam=$input_directory/$bam --referenceFasta=$ref_fa_directory/$ref_fa --runDir $output_directory_full/${out_prefix}_manta
+	/manta/bin/configManta.py --bam=$bam --referenceFasta=$ref_fa --runDir ${out_prefix}_manta
 	
-	$output_directory_full/${out_prefix}_manta/runWorkflow.py -j 4 -g 64 -m local
+	${out_prefix}_manta/runWorkflow.py -j 4 -g 64 -m local
 	
-	gunzip $output_directory_full/${out_prefix}_manta/results/variants/diploidSV.vcf.gz
+	gunzip ${out_prefix}_manta/results/variants/diploidSV.vcf.gz
 
-	mv $output_directory_full/${out_prefix}_manta/results/variants/diploidSV.vcf $output_directory_full/${out_prefix}_manta.vcf
+	mv ${out_prefix}_manta/results/variants/diploidSV.vcf ${out_prefix}_manta.vcf
 
 	"""
 

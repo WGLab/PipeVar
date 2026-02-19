@@ -4,15 +4,12 @@ process NanoRepeat {
 
 
         input:
-        path bam
-	val input_directory
+	tuple path(bam), path(index)
         val out_prefix
-	path ref_fa
-	val ref_fa_directory
-	path output_directory
-	val output_directory_full
+	tuple path(ref_fa), path(fa_index)
 
-
+	output:
+	path "${out_prefix}_nanorepeat_result.tsv"
 
 
 	script:
@@ -20,9 +17,9 @@ process NanoRepeat {
 
 	"""
 
-	python3 /usr/local/lib/python3.10/dist-packages/NanoRepeat/nanoRepeat.py -i $input_directory/$bam -t bam -d $args -r $ref_fa_directory/$ref_fa -b /Nanorepeat_bed/nanorepeat.input.bed -o $output_directory_full/${out_prefix}_nanoRepeat_output
+	python3 /usr/local/lib/python3.10/dist-packages/NanoRepeat/nanoRepeat.py -i $bam -t bam -d $args -r $ref_fa -b /Nanorepeat_bed/nanorepeat.input.bed -o ${out_prefix}_nanoRepeat_output
 
-	sh /Nanorepeat_bed/compare_nanorepeat.sh $output_directory_full/${out_prefix}_nanoRepeat_output.NanoRepeat_output.tsv > $output_directory_full/${out_prefix}_nanorepeat_result.tsv
+	sh /Nanorepeat_bed/compare_nanorepeat.sh ${out_prefix}_nanoRepeat_output.NanoRepeat_output.tsv > ${out_prefix}_nanorepeat_result.tsv
 
 
 
