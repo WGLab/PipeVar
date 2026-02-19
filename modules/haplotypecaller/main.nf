@@ -1,6 +1,7 @@
 
+// Call and recalibrate SNP/indel variants using GATK HaplotypeCaller.
 process haplotypecaller {
-	container='broadinstitute/gatk:4.5.0.0'
+	container ='broadinstitute/gatk:4.5.0.0'
 
         input:
         tuple path(bam), path(index_file)

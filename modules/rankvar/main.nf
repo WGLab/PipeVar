@@ -1,4 +1,5 @@
 
+// Run RankVar to prioritize small variants with phenotype-aware evidence.
 process RankVar {
         container ='beoungl/docker_test:rankvar'
 	

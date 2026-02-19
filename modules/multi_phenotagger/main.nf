@@ -1,4 +1,5 @@
 
+// Batch extraction of HPO terms from clinical notes using PhenoTagger.
 process multi_phenotagger {
 	container ='beoungl/docker_test:phenotagger'
 

@@ -1,4 +1,5 @@
 
+// Batch long-read SNP/indel calling with Clair3.
 process multi_clair3 {
 	container ='hkubal/clair3:v1.2.0'
 

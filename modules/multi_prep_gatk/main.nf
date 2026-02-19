@@ -1,6 +1,7 @@
 
+// Prepare batch GATK resource files and bundle inputs for HaplotypeCaller.
 process multi_prep_gatk {
-	container='broadinstitute/gatk:4.5.0.0'
+	container ='broadinstitute/gatk:4.5.0.0'
 
         input:
 	tuple val(out_prefix), path(bam), path(index_file)

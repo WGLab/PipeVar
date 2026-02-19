@@ -1,4 +1,5 @@
 
+// Batch structural-variant calling from long-read BAM inputs with Sniffles.
 process multi_sniffles {
         container ='beoungl/docker_test:sniffles'
 

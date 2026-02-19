@@ -1,367 +1,345 @@
 # PipeVar
 
-PipeVar is a pathogenic variant prioritization workflow for undiagnosed, rare diseases. It utilizes various tools developed from WGLab and other softwares to call structural variants, singule-nucleotide variants, indels and repeat expansions, and prioritize potential pathogenic variants and existing pathogenic variants as well.
+PipeVar is a Nextflow DSL2 workflow for rare-disease variant prioritization from short-read and long-read data.
+It supports SNP/indel, SV, and repeat expansion analysis, and integrates phenotype-aware ranking.
 
-PipeVar is implenmetned in Nextflow, and can be ran using Docker or Singularity. We are in the development of utilizing Conda for running, but for the best consistency, use either Docker or Singularity for running PipeVar. We currently only have support for Slurm, but are working on other cluster system as well.
+## What PipeVar does
 
-<img width="3840" height="2182" alt="Untitled diagram _ Mermaid Chart-2025-08-29-153706" src="https://github.com/user-attachments/assets/d0c1b7d2-0dc8-49ef-8da5-b86b3b51aa01" />
+- Calls and prioritizes SNP/indel variants.
+- Calls and prioritizes structural variants (SV).
+- Runs repeat expansion analysis (short-read and long-read paths).
+- Uses phenotype inputs (`--hpo` or clinical note via `--note`) for phenotype-guided ranking.
+- Supports single-sample mode and CSV batch mode.
 
+## Runtime model
 
-# Requirements
+PipeVar is designed for containerized execution.
 
-PipeVar requires either Docker or Singularity to run. If your system do not have Singularity installed as a module, you can try to install Singularity using conda with
+- Supported container backends:
+  - Singularity
+  - Docker
+- Tested/primary scheduler profile:
+  - SLURM (`standard` / `slurm_singularity`)
+- Also available:
+  - local executor with Singularity
+  - local executor with Docker
 
-```
-conda create -n singularity singularity
-```
-  or install singualrity in your conda environment by
-```
-conda install conda-forge::singularity
-```
+## Execution profiles
 
-Currently, PipeVar is only tested to run in SLURM environment. It can be ran in other environment by changing executor paramemter in nextflow.config, but it has not been tested yet. We plan to test PipeVar in different environments.
+Defined in `nextflow.config`:
 
-# Set up
+- `standard`
+  - SLURM + Singularity (default profile behavior)
+- `slurm_singularity`
+  - Explicit SLURM + Singularity
+- `local_singularity`
+  - Local executor + Singularity
+- `local_docker`
+  - Local executor + Docker
 
-First, download the git repo using:
+All Singularity/Docker profiles mount:
 
-```
-#Download PipeVar
+- `--annovar_host_path` -> `/annovar`
+- `--phenosv_host_path` -> `/PhenoSV/train_data`
+
+## Setup
+
+### 1) Clone repository
+
+```bash
 git clone https://github.com/WGLab/PipeVar.git
+cd PipeVar
 ```
 
-To use PipeVar, there is a set up stage required for two software, ANNOVAR and PhenoSV.
+### 2) External data/software prerequisites
 
-To download ANNOVAR, go to this link https://www.openbioinformatics.org/annovar/annovar_download_form.php , and follow the instruction in the format. Make sure to have ANNOVAR in the PipeVar folder for setup script to run properly.
+PipeVar expects ANNOVAR and PhenoSV resources to be available (mounted via profile runtime options).
 
-Once ANNOVAR is downloaded, run setup.sh in the directory you cloned PipeVar to download the necessary files for ANNOVAR and PhenoSV using
-```
-#Install full PhenoSV.
-./setup.sh 
-```
-or
-```
-#Install lighter version of PhenoSV.
+ANNOVAR registration/download:
+
+- https://www.openbioinformatics.org/annovar/annovar_download_form.php
+
+Then run setup script:
+
+```bash
+# Full setup
+./setup.sh
+
+# Light PhenoSV setup
 ./setup.sh light
 ```
-If you want to download a lighter version of PhenoSV. PhenoSV light is about ~50GB in size, while full PhenoSV is about ~150GB in size. The setup script will also modify the nextflow.config to annovar/PhenoSV directory location to necessary location to run the pipeline.
 
-# Usage
-```
-#BAM version.
-nextflow run main.nf --bam <FILE> --ref_fa <FILE> --out_prefix <FOLDER> --note <FILE> or hpo <FILE>
+The setup script prepares required assets and updates host-path references used by runtime mounts.
+It now also writes a local override file, `.pipevar.user.config`, with:
 
-#VCF version. Requires either SV or SNV option.
-nextflow run main.nf --vcf <FILE> --mode sv or snv --ref_fa <FILE> --out_prefix <FOLDER> --note <FILE> or hpo <FILE> 
-```
+- a persisted default execution profile (`manifest.defaultProfile`)
+- persisted bind source paths:
+  - `params.annovar_host_path`
+  - `params.phenosv_host_path`
 
-```
-REQUIRED PARAMETERS:
-  
-  --bam <FILE> Path to input BAM file. Cannot be used with VCF option. Must be full path. Requires .bai index file.
-  
-  --vcf <FILE> Path to input VCF file. Cannot be used with BAM option. Must be full path.
-  
-  --ref_fa <FILE> Reference genome in FASTA format. Must be full path.
-  
-  --out_prefix <STRING> Prefix for output files
-  
-  --note <FILE> Clinical note text file, in a format of VCF. used for HPO term extraction. Only neded if HPO terms are not available.
-  
-  --hpo <FILE> HPO ID file; note file can be used instead.
+So after setup, users can run without repeatedly passing `-profile` and bind-path params.
 
-  --mode <sv|snv>. Option run either SV mode or SNV mode. Required for VCF mode. Optional for BAM.
+Non-interactive setup example:
 
-OPTIONAL PARAMETERS:
-    --output_directory <DIR>  Path to output directory (default: current directory)
-    --type <ont|pacbio|short>       Input data type: short/long reads(either Pac-Bio or ONT) (default is ONT).
-    --light <yes|no>          Use lightweight PhenoSV model, NanoCaller (faster, lower memory, but with lower accuracy)
-    --gq <INT>                Minimum genotype quality [default: 20] used for filtering for RankVar and RankScore analysis.
-    --ad <INT>                Minimum allelic depth [default: 15] used for filtering for RankVar and RankScore analysis.
-    --gnomad <FLOAT>          Max gnomAD allele frequency [default: 0.0001] used for filtering for RankVar and RankScore analysis.
-    --help                    Print this help message and exit
+```bash
+./setup.sh --non-interactive --profile=local_docker \\
+  --annovar-bind=/data/annovar \\
+  --phenosv-bind=/data/PhenoSV_model
 ```
 
-EXAMPLES:
+## Input modes
 
-```
-    1. Long-read full pipeline (SV + SNP + STR):
-        nextflow run main.nf \
-          --bam /data/sample.bam \
-          --ref_fa /refs/hg38.fa \
-          --out_prefix patient1 \
-          --hpo /data/hpo.txt \
-          --type long
+## Single-sample BAM/CRAM mode
 
-    2. Short-read full pipeline:
-        nextflow run main.nf \
-          --bam /data/sample.bam \
-          --ref_fa /refs/hg38.fa \
-          --out_prefix patient1 \
-          --hpo /data/hpo.txt \
-          --type short
+Required:
 
-    3. Short-read with lightweight model:
-        nextflow run main.nf \
-          --bam /data/sample.bam \
-          --ref_fa /refs/hg38.fa \
-          --out_prefix patient1 \
-          --hpo /data/hpo.txt \
-          --type short \
-          --light yes
+- `--bam <FILE>`
+- `--ref_fa <FILE>`
+- one phenotype source:
+  - `--note <FILE>` (clinical note; PipeVar runs PhenoTagger)
+  - `--hpo <FILE>` (HPO term file)
 
-    4. Variant re-annotation using VCF (SV mode):
-        nextflow run main.nf \
-          --vcf /data/sample.vcf \
-          --ref_fa /refs/hg38.fa \
-          --out_prefix patient_sv \
-          --hpo /data/hpo.txt \
-          --mode sv
+Optional:
 
-    5. Auto-extract HPO from clinical notes:
-        nextflow run main.nf \
-          --bam /data/sample.bam \
-          --ref_fa /refs/hg38.fa \
-          --out_prefix patient1 \
-          --note /data/note.txt \
-          --type ont
-```
+- `--mode <snp|sv>` to run only one branch
 
-Ideally, the job would be the best ran using the job submission since variant calling process can take long depending on your job. Following is aa simple example for SLURM job submission for default setting for 48 hour job submission.
+## Single-sample VCF mode
 
-```
+Required:
 
-#!/bin/bash
+- `--vcf <FILE>`
+- `--ref_fa <FILE>`
+- `--mode <snp|sv>`
+- one phenotype source (`--note` or `--hpo`)
 
-#SBATCH --time=47:59:59
-#SBATCH --cpus-per-task=1
-#SBATCH --mem=4G
+## CSV batch mode (BAM/CRAM)
 
+Required:
+
+- `--input_csv <FILE>`
+- `--bam true`
+- `--ref_fa <FILE>`
+
+Expected CSV columns:
+
+- `sample,file_path,note_path`
+
+Phenotype handling in CSV mode:
+
+- default: `note_path` is treated as clinical note (PhenoTagger ON)
+- if `--note no`: `note_path` is treated as HPO file (PhenoTagger OFF)
+
+## CSV batch mode (VCF)
+
+Required:
+
+- `--input_csv <FILE>`
+- `--vcf true`
+- `--ref_fa <FILE>`
+- `--mode <snp|sv>`
+
+Expected CSV columns:
+
+- `sample,file_path,note_path`
+
+## Core parameters
+
+- `--bam <FILE>`: single BAM/CRAM input (mutually exclusive with `--vcf` in single-file mode)
+- `--vcf <FILE>`: single VCF input
+- `--input_csv <FILE>`: manifest for batch processing
+- `--ref_fa <FILE>`: reference FASTA
+- `--out_prefix <STRING>`: output prefix (single-sample mode)
+- `--output_directory <DIR>`: publish directory (default: launch directory)
+- `--mode <snp|sv>`: restrict to SNP or SV branch
+- `--type <ont|pacbio|short>`: sequencing type for BAM/CRAM flows
+- `--light <yes|no>`: enable lightweight models/callers where supported
+- `--genome <hg38|grch38>`: genome build for ExpansionHunter catalog selection
+- `--target <yes|no>`: restrict SNP calling to phenotype-derived gene BED
+- `--phen2gene_filter <INT>`: top-N genes retained for targeted mode (default: 500)
+- `--rankscore <FLOAT>`: RankScore threshold (default: 0.50)
+- `--gnomad <FLOAT>`: max AF threshold for SNP prioritization (default: 0.0001)
+- `--gq <INT>`: genotype quality threshold (default: 20)
+- `--ad <INT>`: allele depth threshold (default: 15)
+- `--note <FILE|no>`: phenotype note input, or `no` in CSV mode to interpret `note_path` as HPO file
+- `--hpo <FILE>`: phenotype HPO file
+- `--help`: print help
+
+## Important behavior updates
+
+### Unified light behavior for SNP/all workflows
+
+`--light yes` no longer requires separate SNP/all workflow selection in `main.nf`.
+The workflow now uses unified subworkflows and switches SNP caller internally by mode:
+
+- short-read SNP caller:
+  - default: `deepvariant`
+  - `--light yes`: `haplotypecaller`
+- long-read SNP caller:
+  - default: `clair3`
+  - `--light yes`: `nanocaller`
+
+`--light yes` also enables PhenoSV-light model through config (`ext.args`).
+
+### ExpansionHunter catalog selection
+
+Catalog path is selected from `--genome` for both single and batch modes:
+
+- `hg38` -> `/hg38/variant_catalog.json`
+- `grch38` -> `/EH_grch38/variant_catalog.json`
+
+## Example commands
+
+### Single-sample long-read full analysis
+
+```bash
 nextflow run main.nf \
-          --bam /data/sample.bam \
-          --ref_fa /refs/hg38.fa \
-          --out_prefix patient1 \
-          --note /data/note.txt \
-
-
-
+  -profile standard \
+  --bam /data/p1.bam \
+  --ref_fa /refs/hg38.fa \
+  --note /data/p1_note.txt \
+  --out_prefix p1 \
+  --type ont
 ```
 
+### Single-sample short-read full analysis (light)
 
-NOTES:
-
-    - At least one of `--hpo` or `--note` must be provided.
-    
-    - If `--note` is used, `--hpo` is auto-generated via phenotagger.
-    
-    - `--mode` must be specified for VCF input, and helps direct SNV vs SV flow.
-    
-    - `--type` is required for BAM input to specify sequencing technology.
-    
-    - All file paths must be absolute or relative to `--input_directory`.
-    
-    - `--light yes` uses faster, resource-friendly software such as haplotypecaller, NanoCaller and PhenoSV-light.
-
-# Parameter details
-
-
-***Reference genome***
-```
---ref_fa
+```bash
+nextflow run main.nf \
+  -profile standard \
+  --bam /data/p2.bam \
+  --ref_fa /refs/hg38.fa \
+  --hpo /data/p2_hpo.txt \
+  --out_prefix p2 \
+  --type short \
+  --light yes
 ```
 
-Used to specifcy the reference genome FASTA file. It must be indexed.
+### Single-sample VCF SNP re-annotation/prioritization
 
-FASTA file can be indexed using samtools with following command if needed:
-
-```
-samtools faidx file.fa
-``` 
-
-
-***BAM file***
-```
---bam
+```bash
+nextflow run main.nf \
+  -profile local_docker \
+  --vcf /data/p3.vcf \
+  --mode snp \
+  --ref_fa /refs/hg38.fa \
+  --hpo /data/p3_hpo.txt \
+  --out_prefix p3
 ```
 
-BAM file needed to run the workflow. Must be indexed and sorted. SAM/CRAM are not accepted for now, but will be in future. If bam files is not indexed or sorted, use following example command
+### CSV batch BAM mode with HPO file in `note_path`
 
-```
-#Sorting bam
-samtools sort -o your.sorted.bam your.bam
-
-#Index bam
-samtools index -b your.bam (or your.sorted.bam if you sorted).
-```
-
-***VCF file***
-```
---vcf
-```
-VCF file can be used if you want to run PipeVar on SV or SNV. Does not require indexing or sorting.
-
-***Out prefix***
-
-```
---out_prefix
-```
-String for the prefix for the output and processing. Makes sure to not include any special characters or space in between.
-
-***Medical Note***
-```
---note
-```
-Medical notes that can be in csv, tsv or txt format. Make sure to input one medical not for one patient.
-
-***HPO file***
-```
---hpo
-
-#Example
-HP:0031647
-HP:0031647
-
-```
-Text file with list of HPO terms. Make sure each HPO term is in new line, and only contain HPO terms. 
-
-***Mode selection***
-
-```
---mode
+```bash
+nextflow run main.nf \
+  -profile slurm_singularity \
+  --input_csv /data/samples.csv \
+  --bam true \
+  --note no \
+  --ref_fa /refs/hg38.fa \
+  --type short
 ```
 
-Option for either SV or SNV. Required for VCF option, but optional for BAM option. Only 'sv' or 'snv' is accepted.
+### CSV batch VCF mode (SV only)
 
-***Sequencing type***
-
-```
---type
-```
-
-Option for sequencing type. The default is 'ONT' for now, and has 'short' for NGS and 'pacbio' for Pac-Bio option. For long-read sequencing, they are used in repeat and SV process.
-
-***Output direcrtory***
-```
---output_directory
-```
-Option for output directory location. Must provide full path. The default is current directory where the script is submitted.
-
-
-***Gnomad frequency***
-```
----gnomad
-```
-Option for gnomad allele frequency filtering for SNV Rankscore and SV score. The default is 0.0001, but may be lowered for autosomal recessive variant priortization. SV filtering in progress.
-
-
-# Output
-
-All the output will be stored in output directory, or the launch folder based on --output_directory parameter. The list of outputs are as followed:
-
-For Long-read sequencing option (pacbio/ont) -
-
-***SNV analysis output***
-```
-out_prefix.clair.vcf.gz - Clair3 output in VCF format for SNV variant calling. Available when used with default option.
-out_prefix.nanocaller.vcf.gz - NanoCaller output in VCF for SNV variant calling. Available when used with light option
-__out_prefix.clinvar.txt__ - List of variants that are listed as pathogenic by ClinVar and has a related phenotype gene based on Phen2Gene score. Threshold is top 500.
-out_prefix.rank_var.tsv - List of variants that are scored using RankVar. The usual filter is 0.1 for pathogenicity score.
-out_prefix.rankscore_filtered.tsv - List of variants that are scored as pathogenic based on RankScore analysis (takes average of 10 different popular software). 0.50 as a filter, and filtered based on top 500 genes that are related with phenotype based on Phen2Gene.
-out_prefix.(ref_genome)_multianno.txt/vcf- Temp output file from ANNOVAR with annotations on SNV variant calling files.
+```bash
+nextflow run main.nf \
+  -profile local_singularity \
+  --input_csv /data/sv_samples.csv \
+  --vcf true \
+  --mode sv \
+  --ref_fa /refs/hg38.fa
 ```
 
-***SV analaysis output***
-```
-out_prefix.cutesv.vcf.gz - CuteSV output in VCF format for SV calling.
-out_prefix.sniffles.vcf.gz - Sniffles output in VCF format for SV calling.
-out_preifx_truvari* - Filtering process using cuteSV and Sniffles, only using common SVs found in cuteSV and Sniffles.
-out_prefix.bed - Bed file used as the input for PhenoSV with information of exnoic SVs.
-out_prefix.phenosv.filtered.tsv - List of SVs that are scored as pathogenic based on PhenoSV results, with pathogenicty score higher than 0.5.
-```
+## Expected outputs (high-level)
 
-***Repeat expansion analysis output***
-```
-out_prefix_nanoRepeat_output.tsv - Summary of all repeat expansion analysis, includes ~60 known repeat regions that are known to cause diseases.
-out_prefix_nanorepeat_result.tsv - Summary results that show repeat regions that are greater than disease threshold.
-```
+Outputs are published to `--output_directory`.
+Exact files depend on `--mode`, `--type`, and input type.
 
-For Short-Read sequencing option
+### SNP-related outputs
 
+- caller output (depends on type/light):
+  - `*.deepvariant.vcf.gz` (short default)
+  - `*.recal.vcf.gz` (short light / HaplotypeCaller path)
+  - `*.clair3.vcf.gz` (long default)
+  - `*.nanocaller.vcf.gz` (long light)
+- annotation/prioritization:
+  - `*.clinvar.txt`
+  - `*.rank_var.tsv`
+  - `*.rankscore_filtered.tsv`
+  - ANNOVAR intermediate/final files (`*.hg38_multianno.*`)
 
-***SNV analysis output***
-```
-out_prefix.deepvariant.vcf.gz - Deepvariant output in VCF format for SNV variant calling. Available when used with default option.
-out_prefix.recal.vcf.gz - HaplotypeCaller output in VCF for SNV variant calling. Available when used with light option.
-out_prefix.clinvar.txt - List of variants that are listed as pathogenic by ClinVar and has a related phenotype gene based on Phen2Gene score. Threshold is top 500.
-out_prefix.rank_var.tsv - List of variants that are scored using RankVar. The usual filter is 0.1 for pathogenicity score.
-out_prefix.rankscore_filtered.tsv - List of variants that are scored as pathogenic based on RankScore analysis (takes average of 10 different popular software). 0.50 as a filter, and filtered based on top 500 genes that are related with phenotype based on Phen2Gene.
-out_prefix.(ref_genome)_multianno.txt/vcf- Temp output file from ANNOVAR with annotations on SNV variant calling files.
-```
+### SV-related outputs
 
+- short-read SV:
+  - `*.manta.vcf.gz`
+- long-read SV:
+  - `*.sniffles.vcf.gz`
+- downstream SV prioritization:
+  - `*.exonic.vcf`
+  - `*.phenosv.filtered.tsv` (or corresponding filtered artifacts)
 
-***SV analaysis output***
-```
-out_prefix.manta.vcf.gz - Manta output in VCF format for SV calling.
-out_prefix.bed - Bed file used as the input for PhenoSV with information of exnoic SVs.
-out_prefix.phenosv.filtered.tsv - List of SVs that are scored as pathogenic based on PhenoSV results, with pathogenicty score higher than 0.5.
-```
-***Repeat expansion analysis output***
-```
-out_prefix.json - ExpansionHunter result including repeat expansion information in selected regions.
-out_prefix.eh.tsv - Output results including repeats that passes diseases threshold. 
-```
+### Repeat expansion outputs
 
-In both analysis :
+- short-read:
+  - `*.json` (ExpansionHunter raw output)
+  - `*.eh.tsv` (filtered disease-threshold loci)
+- long-read:
+  - NanoRepeat result files (`*_nanoRepeat_output.tsv`, related summary files)
 
-***Phenotype analysis ouptut***
+### Phenotype intermediate outputs
 
-These outputs are mostly temp outputs that are used to process the downstream analysis for SV/SNV, but are kept for the record keeping.
-```
-out_prefix_phenotagger_patient_hpo.txt - Resulting HPO ID term based on patient medical notes.
-out_prefix_phen2gene - Phen2Gene results converitng HPO ID term into score, showing how much gene is related with phenotype.
-```
+- `*_phenotagger_patient_hpo.txt`
+- Phen2Gene ranking outputs (`*_phen2gene*`)
 
-The output will be cleaned up for better readability as the pipeline gets updated.
+## Resource/retry behavior
 
+Configured in `nextflow.config`:
 
+- global process retry strategy:
+  - `errorStrategy = 'retry'`
+  - `maxRetries = 3`
+- CPU/memory/time vary by process via `withName` blocks.
 
-# Softwares used
+## Notes and pitfalls
 
-PIPELINE MODULES:
+- `--input_csv` requires either `--bam true` or `--vcf true`.
+- In single-file mode, at least one of `--note <FILE>` or `--hpo <FILE>` is required.
+- For single VCF mode, `--mode` must be provided.
+- Reference index (`.fai`) must exist.
+- BAM/CRAM index must exist (`.bai`/`.crai`) for alignment-driven paths.
+- If using Singularity/Docker profiles, ensure `--annovar_host_path` and `--phenosv_host_path` point to valid host locations.
 
-    SNV CALLING
-      - clair3         : Deep learning SNP caller (long-read)
-      - nanocaller     : Lightweight long-read SNP caller
-      - haplotypecaller: Short-read SNP caller (GATK)
-      - deepvariant    : Deep learning short-read SNP caller
+## Software/components used
 
-    SV CALLING
-      - cuteSV         : Long-read SV caller
-      - sniffles       : Long-read SV caller
-      - Manta          : Short-read SV caller
-      - truvari        : SV comparison/benchmarking
-      - SURVIVOR       : SV merging
+### SNP calling
 
-    STR DETECTION
-      - NanoRepeat     : Long-read STR caller
-      - ExpansionHunter: Short-read STR detection
+- DeepVariant
+- GATK HaplotypeCaller (+ VQSR flow in relevant path)
+- Clair3
+- NanoCaller
 
-    PHENOTYPING
-      - Phen2gene      : HPO-to-gene mapping
-      - phenotagger    : NLP-based clinical note to HPO term conversion
-      - PhenoGpt2      : To be implemented
+### SV calling/prioritization
 
-    VARIANT RANKING
-      - ANNOVAR        : SNV/SV annotation
-      - RankVar        : Final SNV ranking
-      - Rankscore_analysis: Additional ranking analysis
+- Sniffles
+- Manta
+- SURVIVOR
+- PhenoSV
+- ANNOVAR SV annotation module
 
+### Repeat expansion
 
+- ExpansionHunter
+- NanoRepeat
 
-# Update that needs to be done.
+### Annotation/ranking/phenotype
 
-Add LongPhase process, and ACMG Guideline, and PhenoGPT2 for note direction. Clean up the output results as well.
+- ANNOVAR
+- RankVar
+- RankScore filtering path
+- Phen2Gene
+- PhenoTagger
+- Longphase prioritization helpers
 
-We are also working on version so reference genome may not be previously downloaded, but can be ran with hg38 or grch38 option.
+## Status
 
-SAM/CRAM support will be included in future as well. Add parallel processing to allow multi-sample option.
+PipeVar is under active development. If behavior seems inconsistent with this README,
+`main.nf` help output and `nextflow.config` are the source of truth.

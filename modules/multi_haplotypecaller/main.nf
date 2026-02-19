@@ -1,6 +1,7 @@
 
+// Batch GATK HaplotypeCaller variant calling and recalibration.
 process multi_haplotypecaller {
-	container='broadinstitute/gatk:4.5.0.0'
+	container ='broadinstitute/gatk:4.5.0.0'
 
         input:
 	tuple val(out_prefix), path(bam), path(index_file), path(omni_vcf), path(omni_vcf_tabix), path(phase_snp_vcf), path(phase_snp_vcf_tbi), path(dbsnp_vcf), path(dbsnp_vcf_tbi), path(hapmap_vcf), path(hapmap_vcf_tbi)

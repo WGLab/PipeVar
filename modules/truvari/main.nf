@@ -1,4 +1,5 @@
 
+// Compare/merge long-read SV calls with Truvari before downstream SV prioritization.
 process truvari {
         container ='beoungl/docker_test:truvari'
 

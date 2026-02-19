@@ -1,4 +1,5 @@
 
+// Batch structural-variant calling from short-read BAM inputs with Manta.
 process multi_manta {
 	container ='beoungl/docker_test:manta'
 

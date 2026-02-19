@@ -1,4 +1,5 @@
 
+// Call structural variants from short-read alignments using Manta.
 process Manta {
 	container ='beoungl/docker_test:manta'
 

@@ -1,6 +1,7 @@
 
+// Batch integration of SNV/SV evidence into final prioritized VCF for NGS.
 process multi_ngs_prio {
-	container='beoungl/docker_test:longphase_0.2.8'
+	container ='beoungl/docker_test:longphase_0.2.8'
 
 	input:
 	tuple val(out_prefix), path(snv_rankvar), path(snv_rankscore), path(snv_pathogenic), path(sv_pathogenic), path(sv_vcf_path), path(snv_vcf_path)

@@ -1,4 +1,5 @@
 
+// Annotate SV VCF with ANNOVAR and filter to phenotype-relevant genes.
 process ANNOVAR_SV {
 	container ='beoungl/docker_test:truvari_0.1'
 
@@ -35,5 +36,4 @@ process ANNOVAR_SV {
 
 
 }
-
 

@@ -1,4 +1,5 @@
 
+// Batch ANNOVAR annotation for per-sample small-variant VCFs.
 process multi_annovar {
 	container ='beoungl/docker_test:annovar'
 

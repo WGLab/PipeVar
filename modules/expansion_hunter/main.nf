@@ -1,4 +1,5 @@
 
+// Genotype repeat expansion loci with ExpansionHunter.
 process ExpansionHunter {
 	container ='beoungl/docker_test:eh'
 

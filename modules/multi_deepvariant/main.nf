@@ -1,6 +1,7 @@
 
+// Batch short-read SNP/indel calling with DeepVariant.
 process multi_deepvariant {
-	container='google/deepvariant:1.9.0'
+	container ='google/deepvariant:1.9.0'
 
         input:
 	tuple val(out_prefix), path(bam), path(index_file)

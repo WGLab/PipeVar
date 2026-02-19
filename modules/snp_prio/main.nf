@@ -1,6 +1,7 @@
 
+// Merge SNV evidence sources into a final prioritized SNP VCF.
 process snp_prio {
-	container='beoungl/docker_test:longphase_0.2.7'
+	container ='beoungl/docker_test:longphase_0.2.8'
 
 	input:
 	val(out_prefix)

@@ -1,4 +1,5 @@
 
+// Call structural variants from long-read alignments using cuteSV.
 process cuteSV {
 	container ='beoungl/docker_test:cutesv'
 

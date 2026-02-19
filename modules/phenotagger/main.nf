@@ -1,4 +1,5 @@
 
+// Extract HPO terms from unstructured clinical notes using PhenoTagger.
 process phenotagger {
 	
 	container ='beoungl/docker_test:phenotagger'

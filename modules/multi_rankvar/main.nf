@@ -1,4 +1,5 @@
 
+// Batch RankVar prioritization combining annotation, phenotype genes, and HPO.
 process multi_rankvar {
         container ='beoungl/docker_test:rankvar'
 	

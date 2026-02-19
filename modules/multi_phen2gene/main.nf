@@ -1,4 +1,5 @@
 
+// Batch phenotype-to-gene scoring from HPO/clinical-note-derived inputs.
 process multi_phen2gene {
 	container ='beoungl/docker_test:rankvar'
 

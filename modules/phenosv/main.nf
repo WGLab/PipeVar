@@ -1,4 +1,5 @@
 
+// Score and prioritize structural variants with phenotype-aware PhenoSV model.
 process PhenoSV {
         container ='beoungl/docker_test:phenosv'
 

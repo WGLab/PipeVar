@@ -1,4 +1,5 @@
 
+// Filter ExpansionHunter JSON output to loci above pathogenic repeat thresholds.
 process eh_filter {
 	container ='beoungl/docker_test:eh_filter'
 

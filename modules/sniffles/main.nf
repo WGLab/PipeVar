@@ -1,4 +1,5 @@
 
+// Call structural variants from long-read alignments using Sniffles.
 process sniffles {
         container ='beoungl/docker_test:sniffles'
 

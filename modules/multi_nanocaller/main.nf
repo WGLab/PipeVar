@@ -1,4 +1,5 @@
 
+// Batch long-read SNP/indel calling with NanoCaller.
 process multi_nanocaller {
         container ='beoungl/docker_test:nanocaller'
 

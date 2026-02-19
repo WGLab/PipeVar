@@ -1,45 +1,140 @@
+def pipelineVersion = params.pipeline_version ?: "0.3.0"
 
 def helpMessage = """
 ================================================================================
   P i p e V a r   P i p e l i n e
+  Version: ${pipelineVersion}
 ================================================================================
-Usage:
-  nextflow run main.nf --input_csv samples.csv [options]
+QUICK USAGE
+  Single sample mode:
+    nextflow run main.nf [--bam sample.bam | --vcf sample.vcf] [options]
+
+  CSV batch mode:
+    nextflow run main.nf --input_csv samples.csv --bam true [options]
+    nextflow run main.nf --input_csv samples.csv --vcf true [options]
 
 --------------------------------------------------------------------------------
-  MANDATORY INPUTS (Choose One Method)
+EXECUTION PROFILES (nextflow.config)
 --------------------------------------------------------------------------------
-  --input_csv <path>       CSV manifest file containing sample information.
-                           Columns required: sample, file_path, note_path
-                           (Must use with --bam true OR --vcf true)
+  -profile standard
+      Default. SLURM executor + Singularity backend.
 
-  --bam <path>             Path to a single BAM or CRAM file.
-  
-  --vcf <path>             Path to a single VCF file.
+  -profile slurm_singularity
+      Explicit SLURM + Singularity.
 
-  --ref_fa <path>          Path to the reference FASTA file. 
-                           (Required for all alignment/calling steps)
+  -profile local_singularity
+      Local executor + Singularity.
 
---------------------------------------------------------------------------------
-  ANALYSIS MODE (Optional)
---------------------------------------------------------------------------------
-  --mode <string>          Specific analysis to run.
-                           Available: 'snp', 'sv'
-                           Default: Runs BOTH SNP and SV analysis if omitted.
-  
-  --type <string>          Sequencing data type.
-                           Available: 'ont' (default), 'pacbio', 'short'
+  -profile local_docker
+      Local executor + Docker.
+
+  Container mount paths (used by Singularity/Docker profiles):
+    --annovar_host_path <DIR>   Host path mounted to /annovar
+    --phenosv_host_path <DIR>   Host path mounted to /PhenoSV/train_data
 
 --------------------------------------------------------------------------------
-  FILTERING & TUNING
+INPUT MODES
 --------------------------------------------------------------------------------
-  --genome <string>        Genome build (hg38, grch38). Default: hg38
-  --light <yes|no>         'Light' mode (faster/lighter models). Default: no
-  --gnomad <float>         Max gnomAD frequency. Default: 0.0001
-  --rankscore <float>      Min RankScore. Default: 0.50
-  --gq <int>               Min Genotype Quality. Default: 20
-  --ad <int>               Min Allelic Depth. Default: 15
-  --phen2gene_filter <int> Phen2Gene score threshold. Default: 500
+  1) Single sample BAM/CRAM mode
+     Required:
+       --bam <FILE>
+       --ref_fa <FILE>
+       One phenotype source:
+         --note <FILE>   (clinical note; pipeline runs PhenoTagger)
+         --hpo  <FILE>   (HPO IDs; pipeline skips PhenoTagger)
+
+  2) Single sample VCF mode
+     Required:
+       --vcf <FILE>
+       --ref_fa <FILE>
+       --mode <snp|sv>
+       One phenotype source:
+         --note <FILE> or --hpo <FILE>
+
+  3) CSV batch BAM mode
+     Required:
+       --input_csv <FILE> --bam true --ref_fa <FILE>
+     CSV columns:
+       sample,file_path,note_path
+     Note handling:
+       default            -> note_path treated as clinical note (PhenoTagger ON)
+       --note no          -> note_path treated as HPO file (PhenoTagger OFF)
+
+  4) CSV batch VCF mode
+     Required:
+       --input_csv <FILE> --vcf true --ref_fa <FILE> --mode <snp|sv>
+     CSV columns:
+       sample,file_path,note_path
+
+--------------------------------------------------------------------------------
+CORE OPTIONS
+--------------------------------------------------------------------------------
+  --mode <snp|sv>          Run only SNP or SV branch. Omit to run both where applicable.
+  --type <ont|pacbio|short>
+                           Sequencing type for BAM/CRAM flows. Default: ont
+  --light <yes|no>         Use lightweight SNP/SV models where supported. Default: no
+  --genome <hg38|grch38>   Genome build for ExpansionHunter catalog. Default: hg38
+
+--------------------------------------------------------------------------------
+FILTERING OPTIONS
+--------------------------------------------------------------------------------
+  --gnomad <FLOAT>         Max gnomAD AF filter for SNP prioritization. Default: 0.0001
+  --rankscore <FLOAT>      Minimum RankScore cutoff. Default: 0.50
+  --gq <INT>               Minimum genotype quality. Default: 20
+  --ad <INT>               Minimum allele depth. Default: 15
+  --phen2gene_filter <INT> Number of top Phen2Gene genes used for targeted mode. Default: 500
+  --target <yes|no>        If yes, run targeted calling in phenotype-derived gene regions.
+
+--------------------------------------------------------------------------------
+OUTPUT / GENERAL
+--------------------------------------------------------------------------------
+  --out_prefix <STRING>    Output prefix. Default: PipeVar
+  --output_directory <DIR> Output directory. Default: launch directory
+  --help                   Print this help text and exit
+
+--------------------------------------------------------------------------------
+EXAMPLES
+--------------------------------------------------------------------------------
+  1) SLURM + Singularity (default), single long-read BAM, full path:
+     nextflow run main.nf \\
+       -profile standard \\
+       --bam /data/sample.bam \\
+       --ref_fa /refs/hg38.fa \\
+       --note /data/note.txt \\
+       --out_prefix patient1 \\
+       --type ont
+
+  2) Local + Docker, single VCF SNP re-annotation:
+     nextflow run main.nf \\
+       -profile local_docker \\
+       --vcf /data/sample.vcf \\
+       --ref_fa /refs/hg38.fa \\
+       --mode snp \\
+       --hpo /data/hpo.txt \\
+       --out_prefix patient_vcf_snp
+
+  3) CSV batch BAM with HPO inputs in note_path (PhenoTagger off):
+     nextflow run main.nf \\
+       -profile slurm_singularity \\
+       --input_csv /data/samples.csv \\
+       --bam true \\
+       --ref_fa /refs/hg38.fa \\
+       --note no
+
+  4) Local + Singularity with custom mount sources:
+     nextflow run main.nf \\
+       -profile local_singularity \\
+       --annovar_host_path /project/annovar \\
+       --phenosv_host_path /project/train_data \\
+       --bam /data/sample.bam \\
+       --ref_fa /refs/hg38.fa \\
+       --note /data/note.txt
+
+NOTES
+  - BAM mode requires index files (.bai for BAM, .crai for CRAM).
+  - Reference FASTA index (.fai) must exist.
+  - For VCF single-file mode, provide --mode snp or --mode sv.
+  - For single-file mode, at least one of --note <FILE> or --hpo <FILE> is required.
   
 ================================================================================
 """
@@ -73,7 +168,6 @@ def clean_note   = params.note   ? params.note.trim().toLowerCase()   : 'no'
 def valid_modes   = ['snp', 'sv']
 def valid_types   = ['ont', 'pacbio', 'short']
 def valid_genomes = ['hg38', 'grch38']
-def valid_bools   = ['yes', 'no', 'true', 'false', null] // Allow null for safety
 
 // CHECK 1: Validate Mode
 if (clean_mode && !valid_modes.contains(clean_mode)) {
@@ -175,25 +269,17 @@ if (params.ref_fa) {
 
 include { SINGLE_ALIGNMENT_ALL_LONGPHASE } from './subworkflows/single_alignment_all_longphase' 
 include { SINGLE_ALIGNMENT_ALL_NGS } from './subworkflows/single_alignment_all_ngs'
-include { SINGLE_ALIGNMENT_ALL_LIGHT_LONGPHASE } from './subworkflows/single_alignment_all_light_longphase'
-include { SINGLE_ALIGNMENT_ALL_NGS_LIGHT } from './subworkflows/single_alignment_all_ngs_light'
 include { SINGLE_ALIGNMENT_LONG_SNP } from './subworkflows/single_alignment_long_snp'
 include { SINGLE_ALIGNMENT_LONG_SV } from './subworkflows/single_alignment_long_sv'
-include { SINGLE_ALIGNMENT_LONG_SNP_LIGHT } from './subworkflows/single_alignment_long_snp_light'
 include { SINGLE_ALIGNMENT_NGS_SNP } from './subworkflows/single_alignment_ngs_snp'
 include { SINGLE_ALIGNMENT_NGS_SV } from './subworkflows/single_alignment_ngs_sv'
-include { SINGLE_ALIGNMENT_NGS_SNP_LIGHT } from './subworkflows/single_alignment_ngs_snp_light'
 include { SINGLE_ALIGNMENT_VCF_SNP } from './subworkflows/single_alignment_vcf_snp'
 include { SINGLE_ALIGNMENT_VCF_SV } from './subworkflows/single_alignment_vcf_sv'
 
 include { INPUT_CSV_ALIGNMENT_ALL_LONGPHASE } from './subworkflows/input_csv_alignment_all_longphase'
-include { INPUT_CSV_ALIGNMENT_ALL_LIGHT_LONGPHASE } from './subworkflows/input_csv_alignment_all_light_longphase'
 include { INPUT_CSV_ALIGNMENT_ALL_NGS } from './subworkflows/input_csv_alignment_all_ngs'
-include { INPUT_CSV_ALIGNMENT_ALL_NGS_LIGHT } from './subworkflows/input_csv_alignment_all_ngs_light'
-include { INPUT_CSV_ALIGNMENT_LONG_SNP_LIGHT } from './subworkflows/input_csv_alignment_long_snp_light'
 include { INPUT_CSV_ALIGNMENT_LONG_SNP } from './subworkflows/input_csv_alignment_long_snp'
 include { INPUT_CSV_ALIGNMENT_LONG_SV } from './subworkflows/input_csv_alignment_long_sv'
-include { INPUT_CSV_ALIGNMENT_NGS_SNP_LIGHT } from './subworkflows/input_csv_alignment_ngs_snp_light'
 include { INPUT_CSV_ALIGNMENT_NGS_SV } from './subworkflows/input_csv_alignment_ngs_sv'
 include { INPUT_CSV_NGS_SNP } from './subworkflows/input_csv_alignment_ngs_snp'
 include { INPUT_CSV_ALIGNMENT_VCF_SNP } from './subworkflows/input_csv_alignment_vcf_snp'
@@ -307,18 +393,30 @@ ref_fa = Channel
     }
     .first()
         }
-	//Logic is bit confusing, but if there is note present, just use the note and store is_note to indiciate is_note for run phenotagger in later step.
+	// `is_note` controls whether subworkflows run phenotagger ("yes") or treat the input as HPO IDs ("no").
 	def is_note = "no"
-	if ( params.note == 'yes' ) {
-		is_note = "yes"
+	if ( params.input_csv ) {
+		// CSV mode default: note_path is treated as clinical notes unless user explicitly sets --note no.
+		is_note = (clean_note == 'no') ? "no" : "yes"
 	}
-	else if ( params.note != null && params.note != 'yes' ) {
-		note=Channel.value(params.note)
-		is_note = "yes"
-	}
-	//In case if there is hpo, then we assign note as HPO term directly, then skip phenotagger in later subworkflows. Use same variable name, but it's HPO in reality.
-	if ( params.hpo != null && is_note == "no" ) { 
-		note=Channel.value(params.hpo)
+	else {
+		// Single-file mode: `note` must be a file path; `hpo` is used directly as HPO input.
+		if ( params.note != null && clean_note != 'yes' && clean_note != 'no' ) {
+			note=Channel.value(params.note)
+			is_note = "yes"
+		}
+		else if ( params.hpo != null ) {
+			note=Channel.value(params.hpo)
+			is_note = "no"
+		}
+		else {
+			error """
+			ERROR: Missing phenotype input for single-file mode.
+			Provide one of:
+			  --note <clinical_note_file>
+			  --hpo  <hpo_id_file>
+			"""
+		}
 	}
 	output_directory_check=file(params.output_directory)
         if ( !output_directory_check.exists() ) {
@@ -327,8 +425,11 @@ ref_fa = Channel
 	type=Channel.value(params.type)
 	gnomad=Channel.value(params.gnomad)
         rankscore_filter=Channel.value(params.rankscore)
+	phen2gene_top_n=Channel.value(params.phen2gene_filter)
 	gq=Channel.value(params.gq)
 	ad=Channel.value(params.ad)
+	short_snp_caller = Channel.value(clean_light == 'yes' ? 'haplotypecaller' : 'deepvariant')
+	long_snp_caller = Channel.value(clean_light == 'yes' ? 'nanocaller' : 'clair3')
 	def target="null"
 	if ( params.target == 'yes' ) {
 		target = "yes"
@@ -339,110 +440,68 @@ ref_fa = Channel
                 INPUT_CSV_ALIGNMENT_VCF_SV(input_vcf, ref_fa, is_note)
             }
             else if ( params.mode == 'snp' ) {
-                INPUT_CSV_ALIGNMENT_VCF_SNP(input_vcf, ref_fa, rankscore_filter, gnomad, gq, ad, is_note)
+                INPUT_CSV_ALIGNMENT_VCF_SNP(input_vcf, ref_fa, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, is_note)
             }
         }
         else if ( input_bam != null ) {
-            if ( params.type == 'short' ) {
-                if ( params.light == 'yes' ) {
-                    if ( params.mode == 'snp' ) {
-                        INPUT_CSV_ALIGNMENT_NGS_SNP_LIGHT(input_bam, ref_fa, rankscore_filter, gnomad, gq, ad, is_note, target)
-                    }
-                    else {
-                        INPUT_CSV_ALIGNMENT_ALL_NGS_LIGHT(input_bam, ref_fa, rankscore_filter, gnomad, gq, ad, is_note, target)
-                    }
-                }
-                else { // Not light
-                    if ( params.mode == 'sv' ) {
-                        INPUT_CSV_ALIGNMENT_NGS_SV(input_bam, ref_fa,  is_note)
-                    }
-                    else if ( params.mode == 'snp' ) {
-                        INPUT_CSV_NGS_SNP(input_bam, ref_fa,  rankscore_filter, gnomad, gq, ad, is_note, target)
-			}
-			else {
-			INPUT_CSV_ALIGNMENT_ALL_NGS(input_bam, ref_fa,  rankscore_filter, gnomad, gq, ad, is_note, target)
-                    }
-                }
-            }
-            else { // Long reads
-                if ( params.light == 'yes' ) {
-                    if ( params.mode == 'snp' ) {
-                        INPUT_CSV_ALIGNMENT_LONG_SNP_LIGHT(input_bam, ref_fa,  rankscore_filter, gnomad, gq, ad, is_note, target)
-                    }
-                    else {
-                        INPUT_CSV_ALIGNMENT_ALL_LIGHT_LONGPHASE(input_bam, ref_fa,  rankscore_filter, gnomad, gq, ad, is_note, target)
-                    }
-                } // You were missing this closing brace
-                else { // Not light
-                    if ( params.mode == 'sv' ) {
-                        INPUT_CSV_ALIGNMENT_LONG_SV(input_bam, ref_fa,  is_note)
-                    }
-                    else if ( params.mode == 'snp' ) { // Fixed missing quote here
-                        INPUT_CSV_ALIGNMENT_LONG_SNP(input_bam, ref_fa,  rankscore_filter, gnomad, gq, ad, is_note, target)
-                    }
-                    else {
-                        INPUT_CSV_ALIGNMENT_ALL_LONGPHASE(input_bam, ref_fa,  rankscore_filter, gnomad, gq, ad, is_note, target)
-                    }
-                }
-            }
-        }
-    }
+	            if ( params.type == 'short' ) {
+	                    if ( params.mode == 'sv' ) {
+	                        INPUT_CSV_ALIGNMENT_NGS_SV(input_bam, ref_fa,  is_note)
+	                    }
+	                    else if ( params.mode == 'snp' ) {
+	                        INPUT_CSV_NGS_SNP(input_bam, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, is_note, target, short_snp_caller)
+				}
+				else {
+	                                INPUT_CSV_ALIGNMENT_ALL_NGS(input_bam, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, is_note, target, short_snp_caller)
+	                        }
+	            }
+	            else { // Long reads
+	                    if ( params.mode == 'sv' ) {
+	                        INPUT_CSV_ALIGNMENT_LONG_SV(input_bam, ref_fa,  is_note)
+	                    }
+	                    else if ( params.mode == 'snp' ) {
+	                        INPUT_CSV_ALIGNMENT_LONG_SNP(input_bam, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, is_note, target, long_snp_caller)
+	                    }
+	                    else {
+	                        INPUT_CSV_ALIGNMENT_ALL_LONGPHASE(input_bam, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, is_note, target, long_snp_caller)
+	                    }
+	            }
+	        }
+	    }
     else { // Single File Mode
         if ( params.vcf ) {
             if ( params.mode == 'sv' ) {
                 SINGLE_ALIGNMENT_VCF_SV(vcf, out_prefix, ref_fa,  note, is_note)
             }
             else if ( params.mode == 'snp' ) {
-                SINGLE_ALIGNMENT_VCF_SNP(vcf, out_prefix, ref_fa,  note, rankscore_filter, gnomad, gq, ad, is_note)
+                SINGLE_ALIGNMENT_VCF_SNP(vcf, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, is_note)
             }
         }
         else if ( params.bam != null ) {
-            if ( params.type == 'short' ) {
-                if ( params.light == 'yes' ) {
-                    if ( params.mode == 'snp' ) {
-                        SINGLE_ALIGNMENT_NGS_SNP_LIGHT(bam, out_prefix, ref_fa,  note, rankscore_filter, gnomad, gq, ad, is_note, target)
-                    }
-                    else {
-                        SINGLE_ALIGNMENT_ALL_NGS_LIGHT(bam, out_prefix, ref_fa,  note, rankscore_filter, gnomad, gq, ad, is_note, target)
-                    }
-                }
-                else {
-                    if ( params.mode == 'sv' ) {
-                        SINGLE_ALIGNMENT_NGS_SV(bam, out_prefix, ref_fa,  note, is_note)
-                    }
-                    else if ( params.mode == 'snp' ) {
-                        SINGLE_ALIGNMENT_NGS_SNP(bam, out_prefix, ref_fa,  note, rankscore_filter, gnomad, gq, ad, is_note, target)
-                    }
-		else {
-		SINGLE_ALIGNMENT_ALL_NGS(bam, out_prefix, ref_fa,  note, rankscore_filter, gnomad, gq, ad, is_note, target)
-		}
-                }
-            }
-            else { // Long reads
-                if ( params.light == 'yes' ) {
-                    if ( params.mode == 'snp' ) {
-                        // Fixed is_not typo below
-                        SINGLE_ALIGNMENT_LONG_SNP_LIGHT(bam, out_prefix, ref_fa,  note, rankscore_filter, gnomad, gq, ad, is_note, target)
-                    }
-                    else {
-                        SINGLE_ALIGNMENT_ALL_LIGHT_LONGPHASE(bam, out_prefix, ref_fa,  note, rankscore_filter, gnomad, gq, ad, is_note, target)
-                    }
-                } // Missing brace fixed here
-                else {
-                    if ( params.mode == 'sv' ) {
-                        SINGLE_ALIGNMENT_LONG_SV(bam, out_prefix, ref_fa,  note, is_note)
-                    }
-                    else if ( params.mode == 'snp' ) { // Fixed missing quote here
-                        // Fixed is_not typo below
-                        SINGLE_ALIGNMENT_LONG_SNP(bam, out_prefix, ref_fa,  note, rankscore_filter, gnomad, gq, ad, is_note, target)
-                    }
-                    else {
-                        SINGLE_ALIGNMENT_ALL_LONGPHASE(bam, out_prefix, ref_fa,  note, rankscore_filter, gnomad, gq, ad, is_note, target)
-                    }
-                }
-            }
-        }
-    }
+	            if ( params.type == 'short' ) {
+	                    if ( params.mode == 'sv' ) {
+	                        SINGLE_ALIGNMENT_NGS_SV(bam, out_prefix, ref_fa,  note, is_note)
+	                    }
+	                    else if ( params.mode == 'snp' ) {
+	                        SINGLE_ALIGNMENT_NGS_SNP(bam, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, is_note, target, short_snp_caller)
+	                    }
+			    else {
+			                SINGLE_ALIGNMENT_ALL_NGS(bam, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, is_note, target, short_snp_caller)
+			    }
+	            }
+	            else { // Long reads
+	                    if ( params.mode == 'sv' ) {
+	                        SINGLE_ALIGNMENT_LONG_SV(bam, out_prefix, ref_fa,  note, is_note)
+	                    }
+	                    else if ( params.mode == 'snp' ) {
+	                        SINGLE_ALIGNMENT_LONG_SNP(bam, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, is_note, target, long_snp_caller)
+	                    }
+	                    else {
+	                        SINGLE_ALIGNMENT_ALL_LONGPHASE(bam, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, is_note, target, long_snp_caller)
+	                    }
+	            }
+	        }
+	    }
 }
 
 
@@ -455,4 +514,3 @@ workflow.onComplete {
 workflow.onError {
         println "Error: Pipeline execution stopped with the following message: ${workflow.errorMessage}"
 }
-

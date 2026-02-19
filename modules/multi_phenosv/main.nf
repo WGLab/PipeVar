@@ -1,4 +1,5 @@
 
+// Batch phenotype-aware SV scoring with PhenoSV.
 process multi_phenosv {
         container ='beoungl/docker_test:phenosv'
 

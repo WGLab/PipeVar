@@ -1,6 +1,7 @@
 
+// Call SNP/indel variants from short-read alignments using DeepVariant.
 process deepvariant {
-	container='google/deepvariant:1.9.0'
+	container ='google/deepvariant:1.9.0'
 
         input:
 	tuple path(bam), path(index)
