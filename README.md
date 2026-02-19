@@ -69,7 +69,18 @@ Then run setup script:
 ./setup.sh light
 ```
 
-The setup script prepares required assets and updates host-path references used by runtime mounts.
+By default, setup expects:
+
+- ANNOVAR at `./annovar`
+- PhenoSV resources downloaded under `./PhenoSV_model`
+
+You can override both locations (recommended for HPC/shared filesystems):
+
+```bash
+./setup.sh --annovar-dir=/shared/apps/annovar --phenosv-dir=/shared/data/PhenoSV_model
+```
+
+The setup script prepares required assets and writes host-path references used by runtime mounts.
 It now also writes a local override file, `.pipevar.user.config`, with:
 
 - a persisted default execution profile (`manifest.defaultProfile`)
@@ -83,6 +94,8 @@ Non-interactive setup example:
 
 ```bash
 ./setup.sh --non-interactive --profile=local_docker \\
+  --annovar-dir=/data/annovar \\
+  --phenosv-dir=/data/PhenoSV_model \\
   --annovar-bind=/data/annovar \\
   --phenosv-bind=/data/PhenoSV_model
 ```
