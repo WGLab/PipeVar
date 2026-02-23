@@ -33,7 +33,7 @@ update_nextflow_config() {
     local profile="$1"
     local annovar_path="$2"
     local phenosv_path="$3"
-    local profile_escaped annovar_escaped phenosv_escaped tmp_file
+    local annovar_escaped phenosv_escaped tmp_file
 
     config_file="${current_folder}/nextflow.config"
     if [[ ! -f "$config_file" ]]; then
@@ -41,7 +41,6 @@ update_nextflow_config() {
         exit 1
     fi
 
-    profile_escaped="$(escape_groovy_single_quote "$profile")"
     annovar_escaped="$(escape_groovy_single_quote "$annovar_path")"
     phenosv_escaped="$(escape_groovy_single_quote "$phenosv_path")"
 
@@ -76,30 +75,60 @@ update_nextflow_config() {
     mv "$tmp_file" "$config_file"
 
     tmp_file="$(mktemp /tmp/pipevar-nextflow-config.XXXXXX)"
-    if grep -Eq '^[[:space:]]*defaultProfile[[:space:]]*=' "$config_file"; then
-        awk -v profile="$profile_escaped" '
-            BEGIN { done=0 }
-            {
-                if (!done && $0 ~ /^[[:space:]]*defaultProfile[[:space:]]*=/) {
-                    match($0, /^[[:space:]]*/)
-                    indent = substr($0, RSTART, RLENGTH)
-                    print indent "defaultProfile = \047" profile "\047"
-                    done=1
-                    next
-                }
-                print
+    if ! awk -v profile="$profile" '
+        function emit_standard(indent, inner) {
+            inner = indent "    "
+            print indent "standard {"
+            if (profile == "standard" || profile == "slurm_singularity") {
+                print inner "process.executor = \047slurm\047"
+                print inner "singularity.enabled = true"
+                print inner "singularity.autoMounts = true"
+                print inner "singularity.runOptions = \"--bind ${params.annovar_host_path}:/annovar,${params.phenosv_host_path}:/PhenoSV/train_data\""
+                print inner "docker.enabled = false"
+            } else if (profile == "local_singularity") {
+                print inner "process.executor = \047local\047"
+                print inner "singularity.enabled = true"
+                print inner "singularity.autoMounts = true"
+                print inner "singularity.runOptions = \"--bind ${params.annovar_host_path}:/annovar,${params.phenosv_host_path}:/PhenoSV/train_data\""
+                print inner "docker.enabled = false"
+            } else if (profile == "local_docker") {
+                print inner "process.executor = \047local\047"
+                print inner "docker.enabled = true"
+                print inner "docker.runOptions = \"-v ${params.annovar_host_path}:/annovar -v ${params.phenosv_host_path}:/PhenoSV/train_data\""
+                print inner "singularity.enabled = false"
+            } else {
+                return 1
             }
-        ' "$config_file" > "$tmp_file"
-        mv "$tmp_file" "$config_file"
-    else
+            print indent "}"
+            return 0
+        }
+        BEGIN { in_standard=0; replaced=0 }
         {
-            printf "manifest {\n"
-            printf "    defaultProfile = '%s'\n" "$profile_escaped"
-            printf "}\n\n"
-            cat "$config_file"
-        } > "$tmp_file"
-        mv "$tmp_file" "$config_file"
+            if (!replaced && $0 ~ /^[[:space:]]*standard[[:space:]]*\{[[:space:]]*$/) {
+                match($0, /^[[:space:]]*/)
+                indent = substr($0, RSTART, RLENGTH)
+                if (emit_standard(indent) != 0) exit 3
+                in_standard=1
+                replaced=1
+                next
+            }
+            if (in_standard) {
+                if ($0 ~ /^[[:space:]]*\}[[:space:]]*$/) {
+                    in_standard=0
+                }
+                next
+            }
+            print
+        }
+        END {
+            if (!replaced) exit 4
+        }
+    ' "$config_file" > "$tmp_file"; then
+        rm -f "$tmp_file"
+        echo "Error: failed to update profiles.standard in nextflow.config" >&2
+        exit 1
     fi
+    mv "$tmp_file" "$config_file"
 }
 
 for arg in "$@"; do
@@ -263,8 +292,8 @@ update_nextflow_config "$selected_profile" "$annovar_bind_path" "$phenosv_bind_p
 
 echo
 echo "Updated config: ${current_folder}/nextflow.config"
-echo "  defaultProfile   = ${selected_profile}"
+echo "  profiles.standard backend = ${selected_profile}"
 echo "  annovar_host_path= ${annovar_bind_path}"
 echo "  phenosv_host_path= ${phenosv_bind_path}"
 echo
-echo "PipeVar will now use these defaults directly from nextflow.config."
+echo "PipeVar will now use these defaults directly from nextflow.config (via profiles.standard)."
