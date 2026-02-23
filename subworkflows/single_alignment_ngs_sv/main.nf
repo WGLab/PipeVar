@@ -34,7 +34,6 @@ workflow SINGLE_ALIGNMENT_NGS_SV {
 	PhenoSV(SURVIVOR.out,out_prefix,hpo)
 	ExpansionHunter(bam,out_prefix,ref_fa)
 	eh_filter(out_prefix,ExpansionHunter.out)
-		sv_prio(out_prefix,PhenoSV.out,ANNOVAR_SV.out)
+		sv_prio(out_prefix,PhenoSV.out,ANNOVAR_SV.out,hpo)
 }
-
 

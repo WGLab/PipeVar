@@ -1,10 +1,10 @@
 
 // Batch SNP evidence merging (ClinVar/RankScore/RankVar) to prioritized VCF.
 process multi_snp_prio {
-	container ='beoungl/docker_test:longphase_0.2.8'
+	container ='beoungl/docker_test:longphase_0.2.9'
 
 	input:
-	tuple val(out_prefix), path(snv_rankscore), path(snv_pathogenic), path(snv_rankvar), path(annovar_vcf)
+	tuple val(out_prefix), path(snv_rankscore), path(snv_pathogenic), path(snv_rankvar), path(annovar_vcf), path(hpo_path)
 
 
 	output:
@@ -25,7 +25,7 @@ process multi_snp_prio {
 
 	#Get SNP from RankScore + RankVar + ClinVar, and based on score + homozygosity, rank them.
 
-	python3 /assign_dom_or_rec_snp_only.py ${out_prefix}.clinvar.vcf ${out_prefix}.rankscore.vcf ${out_prefix}.rankvar.vcf OMIM ${out_prefix}.assigned.vcf
+	python3 /assign_dom_or_rec_snp_only.py ${out_prefix}.clinvar.vcf ${out_prefix}.rankscore.vcf ${out_prefix}.rankvar.vcf $hpo_path OMIM ${out_prefix}.assigned.vcf
 
 	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio.vcf
 	
@@ -39,4 +39,3 @@ process multi_snp_prio {
 	"""
 
 }
-

@@ -27,8 +27,8 @@ workflow INPUT_CSV_ALIGNMENT_VCF_SV {
         phenosv_input=survivor_result.join(input_vcf_no_vcf)
         phenosv_result=multi_phenosv(phenosv_input)
 	sv_prio_input=phenosv_result.join(annovar_sv_result)
-	multi_sv_prio(sv_prio_input)
+	sv_prio_input_hpo=sv_prio_input.join(input_vcf_no_vcf)
+	multi_sv_prio(sv_prio_input_hpo)
 }	
-
 
 

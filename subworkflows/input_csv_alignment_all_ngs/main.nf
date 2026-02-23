@@ -79,7 +79,7 @@ workflow INPUT_CSV_ALIGNMENT_ALL_NGS {
 	sv_join=phenosv_annovar_snv.join(annovar_sv_result)
 	rankscore_join=sv_join.join(rankscore_result)
 	rankvar_join=rankscore_join.join(rankvar_result)
-	multi_ngs_prio(rankvar_join)
+	rankvar_join_hpo=rankvar_join.join(input_bam_no_bam)
+	multi_ngs_prio(rankvar_join_hpo)
 
 }	
-

@@ -28,7 +28,6 @@ workflow SINGLE_ALIGNMENT_VCF_SV {
 		ANNOVAR_SV(vcf,out_prefix,Phen2gene.out)
 		SURVIVOR(ANNOVAR_SV.out,out_prefix)
 		PhenoSV(SURVIVOR.out,out_prefix,hpo)
-		sv_prio(out_prefix,PhenoSV.out,ANNOVAR_SV.out)
+		sv_prio(out_prefix,PhenoSV.out,ANNOVAR_SV.out,hpo)
 }
-
 

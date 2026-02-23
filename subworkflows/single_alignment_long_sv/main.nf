@@ -32,6 +32,5 @@ workflow SINGLE_ALIGNMENT_LONG_SV {
 	SURVIVOR(ANNOVAR_SV.out,out_prefix)
 	PhenoSV(SURVIVOR.out,out_prefix,hpo)
 	NanoRepeat(bam,out_prefix,ref_fa)
-	sv_prio(out_prefix,PhenoSV.out,ANNOVAR_SV.out)
+	sv_prio(out_prefix,PhenoSV.out,ANNOVAR_SV.out,hpo)
 }
-
