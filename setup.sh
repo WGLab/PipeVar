@@ -29,6 +29,14 @@ escape_groovy_single_quote() {
     printf "%s" "$1" | sed "s/'/\\\\'/g"
 }
 
+make_tmpfile() {
+    local config_dir tmp_base
+    config_dir="$(cd "$(dirname "$config_file")" && pwd -P)"
+    tmp_base="${TMPDIR:-$config_dir}"
+    mkdir -p "$tmp_base"
+    mktemp "$tmp_base/pipevar-nextflow-config.XXXXXX"
+}
+
 update_nextflow_config() {
     local profile="$1"
     local annovar_path="$2"
@@ -44,7 +52,7 @@ update_nextflow_config() {
     annovar_escaped="$(escape_groovy_single_quote "$annovar_path")"
     phenosv_escaped="$(escape_groovy_single_quote "$phenosv_path")"
 
-    tmp_file="$(mktemp /tmp/pipevar-nextflow-config.XXXXXX)"
+    tmp_file="$(make_tmpfile)"
     if ! awk -v annovar="$annovar_escaped" -v phenosv="$phenosv_escaped" '
         BEGIN { annovar_done=0; phenosv_done=0 }
         {
@@ -74,7 +82,7 @@ update_nextflow_config() {
     fi
     mv "$tmp_file" "$config_file"
 
-    tmp_file="$(mktemp /tmp/pipevar-nextflow-config.XXXXXX)"
+    tmp_file="$(make_tmpfile)"
     if ! awk -v profile="$profile" '
         function emit_standard(indent, inner) {
             inner = indent "    "

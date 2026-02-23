@@ -34,6 +34,14 @@ escape_groovy_single_quote() {
     printf "%s" "$1" | sed "s/'/\\\\'/g"
 }
 
+make_tmpfile() {
+    local config_dir tmp_base
+    config_dir="$(cd "$(dirname "$config_file")" && pwd -P)"
+    tmp_base="${TMPDIR:-$config_dir}"
+    mkdir -p "$tmp_base"
+    mktemp "$tmp_base/pipevar-bind-config.XXXXXX"
+}
+
 update_nextflow_bind_paths() {
     local annovar_path="$1"
     local phenosv_path="$2"
@@ -47,7 +55,7 @@ update_nextflow_bind_paths() {
     annovar_escaped="$(escape_groovy_single_quote "$annovar_path")"
     phenosv_escaped="$(escape_groovy_single_quote "$phenosv_path")"
 
-    tmp_file="$(mktemp /tmp/pipevar-bind-config.XXXXXX)"
+    tmp_file="$(make_tmpfile)"
     if ! awk -v annovar="$annovar_escaped" -v phenosv="$phenosv_escaped" '
         BEGIN { annovar_done=0; phenosv_done=0 }
         {
