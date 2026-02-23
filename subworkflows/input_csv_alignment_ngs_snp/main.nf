@@ -24,6 +24,8 @@ workflow INPUT_CSV_NGS_SNP {
 	gnomad
 	gq
 	ad
+
+	rankvar_filter
 	is_note
 	target
 	caller_mode
@@ -62,8 +64,8 @@ workflow INPUT_CSV_NGS_SNP {
         join_annovar_hpo=join_annovar_phen2gene.join(input_bam_no_bam)
         multi_eh_result=multi_expansionhunter(input_bam_with_bam,ref_fa)
         multi_eh_filter(multi_eh_result)
-	rankscore_result=multi_rankscore(join_annovar_phen2gene,gnomad,rankscore_filter,phen2gene_top_n)
-        rankvar_result=multi_rankvar(join_annovar_hpo,gnomad,gq,ad)
+	rankscore_result=multi_rankscore(join_annovar_phen2gene,gnomad,rankscore_filter,gq,phen2gene_top_n)
+        rankvar_result=multi_rankvar(join_annovar_hpo,gnomad,gq,ad,rankvar_filter)
         rankscore_rankvar_join=rankvar_result.join(rankscore_result)
         annovar_result_vcf=annovar_result.map { item -> tuple(item[0], item[2]) }
         snp_prio_input=rankscore_rankvar_join.join(annovar_result_vcf)

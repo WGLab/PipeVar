@@ -80,6 +80,7 @@ FILTERING OPTIONS
 --------------------------------------------------------------------------------
   --gnomad <FLOAT>         Max gnomAD AF filter for SNP prioritization. Default: 0.0001
   --rankscore <FLOAT>      Minimum RankScore cutoff. Default: 0.50
+  --rankvar <FLOAT>        Minimum RankVar score cutoff. Default: 0.05
   --gq <INT>               Minimum genotype quality. Default: 20
   --ad <INT>               Minimum allele depth. Default: 15
   --phen2gene_filter <INT> Number of top Phen2Gene genes used for targeted mode. Default: 500
@@ -425,6 +426,7 @@ ref_fa = Channel
 	type=Channel.value(params.type)
 	gnomad=Channel.value(params.gnomad)
         rankscore_filter=Channel.value(params.rankscore)
+	rankvar_filter=Channel.value(params.rankvar)
 	phen2gene_top_n=Channel.value(params.phen2gene_filter)
 	gq=Channel.value(params.gq)
 	ad=Channel.value(params.ad)
@@ -440,7 +442,7 @@ ref_fa = Channel
                 INPUT_CSV_ALIGNMENT_VCF_SV(input_vcf, ref_fa, is_note)
             }
             else if ( params.mode == 'snp' ) {
-                INPUT_CSV_ALIGNMENT_VCF_SNP(input_vcf, ref_fa, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, is_note)
+                INPUT_CSV_ALIGNMENT_VCF_SNP(input_vcf, ref_fa, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note)
             }
         }
         else if ( input_bam != null ) {
@@ -449,10 +451,10 @@ ref_fa = Channel
 	                        INPUT_CSV_ALIGNMENT_NGS_SV(input_bam, ref_fa,  is_note)
 	                    }
 	                    else if ( params.mode == 'snp' ) {
-	                        INPUT_CSV_NGS_SNP(input_bam, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, is_note, target, short_snp_caller)
+                        INPUT_CSV_NGS_SNP(input_bam, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller)
 				}
 				else {
-	                                INPUT_CSV_ALIGNMENT_ALL_NGS(input_bam, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, is_note, target, short_snp_caller)
+                                INPUT_CSV_ALIGNMENT_ALL_NGS(input_bam, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller)
 	                        }
 	            }
 	            else { // Long reads
@@ -460,10 +462,10 @@ ref_fa = Channel
 	                        INPUT_CSV_ALIGNMENT_LONG_SV(input_bam, ref_fa,  is_note)
 	                    }
 	                    else if ( params.mode == 'snp' ) {
-	                        INPUT_CSV_ALIGNMENT_LONG_SNP(input_bam, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, is_note, target, long_snp_caller)
+                        INPUT_CSV_ALIGNMENT_LONG_SNP(input_bam, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller)
 	                    }
 	                    else {
-	                        INPUT_CSV_ALIGNMENT_ALL_LONGPHASE(input_bam, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, is_note, target, long_snp_caller)
+                        INPUT_CSV_ALIGNMENT_ALL_LONGPHASE(input_bam, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller)
 	                    }
 	            }
 	        }
@@ -474,7 +476,7 @@ ref_fa = Channel
                 SINGLE_ALIGNMENT_VCF_SV(vcf, out_prefix, ref_fa,  note, is_note)
             }
             else if ( params.mode == 'snp' ) {
-                SINGLE_ALIGNMENT_VCF_SNP(vcf, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, is_note)
+                SINGLE_ALIGNMENT_VCF_SNP(vcf, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note)
             }
         }
         else if ( params.bam != null ) {
@@ -483,10 +485,10 @@ ref_fa = Channel
 	                        SINGLE_ALIGNMENT_NGS_SV(bam, out_prefix, ref_fa,  note, is_note)
 	                    }
 	                    else if ( params.mode == 'snp' ) {
-	                        SINGLE_ALIGNMENT_NGS_SNP(bam, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, is_note, target, short_snp_caller)
+                        SINGLE_ALIGNMENT_NGS_SNP(bam, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller)
 	                    }
 			    else {
-			                SINGLE_ALIGNMENT_ALL_NGS(bam, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, is_note, target, short_snp_caller)
+			                SINGLE_ALIGNMENT_ALL_NGS(bam, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller)
 			    }
 	            }
 	            else { // Long reads
@@ -494,10 +496,10 @@ ref_fa = Channel
 	                        SINGLE_ALIGNMENT_LONG_SV(bam, out_prefix, ref_fa,  note, is_note)
 	                    }
 	                    else if ( params.mode == 'snp' ) {
-	                        SINGLE_ALIGNMENT_LONG_SNP(bam, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, is_note, target, long_snp_caller)
+                        SINGLE_ALIGNMENT_LONG_SNP(bam, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller)
 	                    }
 	                    else {
-	                        SINGLE_ALIGNMENT_ALL_LONGPHASE(bam, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, is_note, target, long_snp_caller)
+                        SINGLE_ALIGNMENT_ALL_LONGPHASE(bam, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller)
 	                    }
 	            }
 	        }

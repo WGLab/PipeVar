@@ -26,6 +26,8 @@ workflow SINGLE_ALIGNMENT_ALL_NGS_LIGHT {
 	gnomad
 	gq
 	ad
+
+	rankvar_filter
 	is_note
 	target
 
@@ -45,8 +47,8 @@ workflow SINGLE_ALIGNMENT_ALL_NGS_LIGHT {
 		haplotypecaller(bam,out_prefix,ref_fa,target)
 	}
 	ANNOVAR(haplotypecaller.out,out_prefix)
-	RankVar(ANNOVAR.out.txt_output,Phen2gene.out,hpo,out_prefix,gnomad,gq,ad)
-	rankscore_result=Rankscore_analysis(ANNOVAR.out.txt_output,Phen2gene.out,out_prefix,gnomad,rankscore_filter,phen2gene_top_n)
+	RankVar(ANNOVAR.out.txt_output,Phen2gene.out,hpo,out_prefix,gnomad,gq,ad,rankvar_filter)
+	rankscore_result=Rankscore_analysis(ANNOVAR.out.txt_output,Phen2gene.out,out_prefix,gnomad,rankscore_filter,gq,phen2gene_top_n)
 	Manta(bam,out_prefix,ref_fa)
 	SURVIVOR(Manta.out,out_prefix)
 	PhenoSV(SURVIVOR.out,out_prefix,hpo)

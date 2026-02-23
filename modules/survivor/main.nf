@@ -20,19 +20,19 @@ process SURVIVOR {
 	
 	SURVIVOR vcftobed $vcf 0 -1 ${out_prefix}.int.bed
 
-        {
-            echo -e "#chrom\tstart\tend\tsvtype\tgene"
-            awk -F'\t' -v OFS='\t' '{print \$1,\$2,\$5,\$7,\$11}' ${out_prefix}.int.bed | \
-            sed -e 's/\\bINS\\b/insertion/g' \
-                -e 's/\\bDEL\\b/deletion/g' \
-                -e 's/\\bINV\\b/inversion/g' \
-                -e 's/\\bDUP\\b/duplication/g' \
-                -e 's/\\bBND\\b/translocation/g' | \
-            awk 'BEGIN{IGNORECASE=1} \$0 !~ /(^|[[:space:]])TRA([[:space:]]|\$)/ && \$0 !~ /(^|[[:space:]])INS([[:space:]]|\$)/ {print}'
-        } > ${out_prefix}.bed
+	# Always emit a BED output. If no SV rows pass filters, keep header-only file.
+	{
+	    echo -e "#chrom\tstart\tend\tsvtype\tgene"
+	    awk -F'\t' -v OFS='\t' '{print \$1,\$2,\$5,\$7,\$11}' ${out_prefix}.int.bed | \
+	    sed -e 's/\\bINS\\b/insertion/g' \
+	        -e 's/\\bDEL\\b/deletion/g' \
+	        -e 's/\\bINV\\b/inversion/g' \
+	        -e 's/\\bDUP\\b/duplication/g' \
+	        -e 's/\\bBND\\b/translocation/g' | \
+	    awk 'BEGIN{IGNORECASE=1} \$0 !~ /(^|[[:space:]])TRA([[:space:]]|$)/ && \$0 !~ /(^|[[:space:]])INS([[:space:]]|$)/ {print}'
+	} > ${out_prefix}.bed
 
-
-	rm ${out_prefix}.int.bed
+	rm -f ${out_prefix}.int.bed
 
 	"""
 

@@ -27,6 +27,8 @@ workflow SINGLE_ALIGNMENT_ALL_LIGHT_LONGPHASE {
 	gnomad
 	gq
 	ad
+
+	rankvar_filter
 	is_note
 	target
 
@@ -46,8 +48,8 @@ workflow SINGLE_ALIGNMENT_ALL_LIGHT_LONGPHASE {
                 nanocaller(bam,out_prefix,ref_fa,target)
         }
 	ANNOVAR(nanocaller.out,out_prefix)
-	RankVar(ANNOVAR.out.txt_output,Phen2gene.out,hpo,out_prefix,gnomad,gq,ad)
-	rankscore_result=Rankscore_analysis(ANNOVAR.out.txt_output,Phen2gene.out,out_prefix,gnomad,rankscore_filter,phen2gene_top_n)
+	RankVar(ANNOVAR.out.txt_output,Phen2gene.out,hpo,out_prefix,gnomad,gq,ad,rankvar_filter)
+	rankscore_result=Rankscore_analysis(ANNOVAR.out.txt_output,Phen2gene.out,out_prefix,gnomad,rankscore_filter,gq,phen2gene_top_n)
 	sniffles(bam,out_prefix,ref_fa)
 	ANNOVAR_SV(sniffles.out,out_prefix,Phen2gene.out)
 	SURVIVOR(ANNOVAR_SV.out,out_prefix)

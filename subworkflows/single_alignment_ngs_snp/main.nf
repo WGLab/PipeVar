@@ -25,6 +25,8 @@ workflow SINGLE_ALIGNMENT_NGS_SNP {
 	gnomad
 	gq
 	ad
+
+	rankvar_filter
 	is_note
 	target
 	caller_mode
@@ -56,8 +58,8 @@ workflow SINGLE_ALIGNMENT_NGS_SNP {
 	}
 	snp_vcf = (caller_mode == "haplotypecaller") ? haplotypecaller.out : deepvariant.out
 	ANNOVAR(snp_vcf,out_prefix)
-	RankVar(ANNOVAR.out.txt_output,Phen2gene.out,hpo,out_prefix,gnomad,gq,ad)
-	Rankscore_analysis(ANNOVAR.out.txt_output,Phen2gene.out,out_prefix,gnomad,rankscore_filter,phen2gene_top_n)
+	RankVar(ANNOVAR.out.txt_output,Phen2gene.out,hpo,out_prefix,gnomad,gq,ad,rankvar_filter)
+	Rankscore_analysis(ANNOVAR.out.txt_output,Phen2gene.out,out_prefix,gnomad,rankscore_filter,gq,phen2gene_top_n)
 	ExpansionHunter(bam,out_prefix,ref_fa)
 	eh_filter(out_prefix,ExpansionHunter.out)
 	snp_prio(out_prefix,Rankscore_analysis.out.rankscore,Rankscore_analysis.out.clinvar,RankVar.out,ANNOVAR.out.vcf_output)

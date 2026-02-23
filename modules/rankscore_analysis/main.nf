@@ -10,6 +10,7 @@ process Rankscore_analysis {
 	val out_prefix
 	val gnomad_af
 	val rankscore_filter
+	val gq
 	val phen2gene_top_n
 
 	output:
@@ -18,7 +19,7 @@ process Rankscore_analysis {
 
 	"""
 
-	sh /rankscore/clinvar.sh $annovar_output $phen2_gene $out_prefix $gnomad_af $rankscore_filter $phen2gene_top_n
+	sh /rankscore/clinvar.sh $annovar_output $phen2_gene $out_prefix $gnomad_af $rankscore_filter $phen2gene_top_n $gq
 
 	"""
 }

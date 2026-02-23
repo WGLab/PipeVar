@@ -8,6 +8,7 @@ process multi_rankscore {
 	tuple val(out_prefix), path(annovar_output), path(phen2_gene)
 	val gnomad_af
 	val rankscore_filter
+	val gq
 	val phen2gene_top_n
 
 	output:
@@ -16,7 +17,7 @@ process multi_rankscore {
 	"""
 
 
-	sh /rankscore/clinvar.sh $annovar_output $phen2_gene $out_prefix $gnomad_af $rankscore_filter $phen2gene_top_n
+	sh /rankscore/clinvar.sh $annovar_output $phen2_gene $out_prefix $gnomad_af $rankscore_filter $phen2gene_top_n $gq
 
 	"""
 }
