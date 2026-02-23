@@ -28,7 +28,7 @@ process RankVar {
 	
 	#mv ${out_prefix}_rankvar/rank_var.tsv ${out_prefix}.rank_var.tsv
 	#This pathogenicity score can change, so is the phen2gene score.
-	awk -F'\t' 'NR==1 || \$12 > 0.1' ${out_prefix}_rankvar/rank_var.tsv > ${out_prefix}.rank_var.tsv
+	awk -F'\t' 'NR==1 || \$12 > 0.05' ${out_prefix}_rankvar/rank_var.tsv > ${out_prefix}.rank_var.tsv
 
 	rm ${out_prefix}.rankvar_temp.txt
 	"""

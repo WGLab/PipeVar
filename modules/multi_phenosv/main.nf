@@ -16,29 +16,44 @@ process multi_phenosv {
 
 	"""
 
-	source /conda/etc/profile.d/conda.sh
-	conda activate phenosv
+        source /conda/etc/profile.d/conda.sh
+        conda activate phenosv
 
-	HPO_STRING=\$(paste -sd, $hpo)
+        HPO_STRING=\$(paste -sd, $hpo)
 
-	curr_dir=\$PWD
+        curr_dir=\$PWD
 
-	phenosv_dir="\${curr_dir}/${out_prefix}_phenosv"
+        phenosv_dir="\${curr_dir}/${out_prefix}_phenosv"
 
-	mkdir -p \$phenosv_dir
+        mkdir -p \$phenosv_dir
+
+        # If upstream SV filtering produced no records, emit an empty output and continue.
+        if [[ ! -s $bed ]] || [[ \$(wc -l < $bed) -eq 1 ]]; then
+            : > ${out_prefix}.phenosv.filtered.tsv
+            exit 0
+        fi
 
 
-	python3 /opt/PhenoSV/phenosv/model/phenosv.py --sv_file $bed $args --target_folder ${out_prefix}_phenosv --target_file_name  \$phenosv_dir/phenosv_out --HPO "\$HPO_STRING"
+        python3 /opt/PhenoSV/phenosv/model/phenosv.py --sv_file $bed $args --target_folder ${out_prefix}_phenosv --target_file_name  \$phenosv_dir/phenosv_out --HPO "\$HPO_STRING"
 
-	awk -F',' '\$6 > 0.5' \$phenosv_dir/${out_prefix}_phenosv/phenosv_out.csv | awk -F',' '\$2 == "SV" ' | awk -F',' '{print \$7"\t"\$0}' | sort -k1,1 > ${out_prefix}_phenosv_top.join.tsv
+        awk -F',' '\$6 > 0.5' \$phenosv_dir/phenosv_out.csv | awk -F',' '\$2 == "SV" ' | awk -F',' '{print \$7"\t"\$0}' | sort -k1,1 > ${out_prefix}_phenosv_top.join.tsv || true
 
-	sort -k4,4 ${out_prefix}.bed > ${out_prefix}.sorted.bed
+        sort -k4,4 $bed > ${out_prefix}.sorted.bed
 
+        if [[ ! -s ${out_prefix}_phenosv_top.join.tsv ]]; then
+            : > ${out_prefix}.phenosv.filtered.tsv
+        else
 
-	join -t\$'\t' -1 1 -2 4 ${out_prefix}_phenosv_top.join.tsv ${out_prefix}.sorted.bed | awk -F'\t' 'BEGIN{OFS="\t"} { id=\$1; \$1=""; sub(/^\t/, ""); print \$0, id}' > ${out_prefix}.phenosv.filtered.tsv
+        join -t\$'\t' -1 1 -2 4 ${out_prefix}_phenosv_top.join.tsv ${out_prefix}.sorted.bed | awk -F'\t' 'BEGIN{OFS="\t"} { id=\$1; \$1=""; sub(/^\t/, ""); print \$0, id}' > ${out_prefix}.phenosv.filtered.tsv || true
 
-	rm ${out_prefix}_phenosv_top.join.tsv
-	rm ${out_prefix}.sorted.bed
+        # `join` returns non-zero when there are no overlaps; keep pipeline alive with empty output.
+        if [[ ! -s ${out_prefix}.phenosv.filtered.tsv ]]; then
+            : > ${out_prefix}.phenosv.filtered.tsv
+        fi
+        fi
+
+        rm -f ${out_prefix}_phenosv_top.join.tsv
+        rm -f ${out_prefix}.sorted.bed
 
 
 	
