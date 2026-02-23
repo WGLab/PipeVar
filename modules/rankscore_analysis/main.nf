@@ -1,7 +1,7 @@
 
 // Filter annotated variants by RankScore and emit ClinVar/RankScore subsets.
 process Rankscore_analysis {
-	container ='beoungl/docker_test:rankscore_0.2.11'
+	container ='beoungl/docker_test:rankscore_0.2.12'
 
 
 	input:

@@ -21,7 +21,7 @@ process multi_rankvar {
 	# Prefilter ANNOVAR table before RankVar to reduce input size:
 	# exonic/splicing only + non-reference GT + GQ threshold from Otherinfo12/Otherinfo13.
 	awk -F'\t' -v OFS='\t' -v min_gq="$gq" '
-	function trim(x) { gsub(/^[ \t]+|[ \t]+$/, "", x); return x }
+	function trim(x) { gsub(/^[ \t]+|[ \t]+\$/, "", x); return x }
 	function pass_gt_gq(fmt, sample,   fmt_a,smp_a,nf,ns,i,gt_i,gq_i,gt,gqv) {
 	    gt_i=0; gq_i=0; gt=""; gqv=""
 	    nf=split(fmt, fmt_a, ":"); ns=split(sample, smp_a, ":")
@@ -36,15 +36,15 @@ process multi_rankvar {
 	    return 1
 	}
 	NR==1 {
-	    for (i=1; i<=NF; i++) h[$i]=i
+	    for (i=1; i<=NF; i++) h[\$i]=i
 	    fmt_idx = (("Otherinfo12" in h) ? h["Otherinfo12"] : 0)
 	    smp_idx = (("Otherinfo13" in h) ? h["Otherinfo13"] : 0)
 	    print
 	    next
 	}
-	($6=="exonic" || $6=="splicing") {
+	(\$6=="exonic" || \$6=="splicing") {
 	    pass_qc = 1
-	    if (fmt_idx>0 && smp_idx>0) pass_qc = pass_gt_gq($(fmt_idx), $(smp_idx))
+	    if (fmt_idx>0 && smp_idx>0) pass_qc = pass_gt_gq(\$(fmt_idx), \$(smp_idx))
 	    if (pass_qc) print
 	}' $vcf > ${out_prefix}.rankvar_temp.txt
 
@@ -61,4 +61,3 @@ process multi_rankvar {
 
 	"""
 }
-
