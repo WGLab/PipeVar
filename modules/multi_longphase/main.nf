@@ -1,7 +1,7 @@
 
 // Batch longphase phasing and evidence aggregation into prioritized VCFs.
 process multi_longphase {
-	container ='beoungl/docker_test:longphase_0.2.9'
+	container ='beoungl/docker_test:longphase_0.2.11'
 
 	input:
 	tuple val(out_prefix), path(snv_rankvar), path(snv_rankscore), path(snv_pathogenic), path(sv_pathogenic), path(sv_vcf_path), path(snv_vcf_path), path(bam_path), path(bam_index), path(hpo_path)
@@ -9,7 +9,7 @@ process multi_longphase {
 
 
 	output:
-	tuple path("${out_prefix}.prio.vcf"), path("${out_prefix}_haplotag.bam")
+	tuple path("${out_prefix}.prio.vcf"), path("${out_prefix}.prio_gene.vcf"), path("${out_prefix}_haplotag.bam")
 	
 	script:
 
@@ -34,7 +34,8 @@ process multi_longphase {
 
 	python3 /assign_dom_or_rec.py ${out_prefix}.clinvar.vcf ${out_prefix}.phenosv.vcf ${out_prefix}.rankscore.vcf ${out_prefix}.rankvar.vcf $hpo_path OMIM ${out_prefix}.assigned.vcf
 
-	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio.vcf
+	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio_gene.vcf gene
+	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio.vcf variant
 
 
 	"""

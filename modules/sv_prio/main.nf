@@ -1,7 +1,7 @@
 
 // Merge SV evidence sources into a final prioritized SV VCF.
 process sv_prio {
-	container ='beoungl/docker_test:longphase_0.2.9'
+	container ='beoungl/docker_test:longphase_0.2.11'
 
 	input:
 	val(out_prefix) 
@@ -12,6 +12,7 @@ process sv_prio {
 
 	output:
 	path "${out_prefix}.prio.vcf"
+	path "${out_prefix}.prio_gene.vcf"
 	
 	script:
 
@@ -26,7 +27,8 @@ process sv_prio {
 
 	python3 /assign_dom_or_rec_sv_only.py ${out_prefix}.phenosv.vcf $hpo_path OMIM ${out_prefix}.assigned.vcf
 
-	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio.vcf
+	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio_gene.vcf gene
+	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio.vcf variant
 	
 
 	#Potential homozygotes are ranked higher than single heterozygotes, but nothing conclusive.
