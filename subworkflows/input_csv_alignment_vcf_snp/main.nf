@@ -20,6 +20,7 @@ workflow INPUT_CSV_ALIGNMENT_VCF_SNP {
 
 	rankvar_filter
 	is_note
+	inheritance_mode
 
 	main:
 
@@ -40,7 +41,7 @@ workflow INPUT_CSV_ALIGNMENT_VCF_SNP {
 	annovar_result_vcf=annovar_result.map { item -> tuple(item[0], item[2]) }
 	snp_prio_input=rankscore_rankvar_join.join(annovar_result_vcf)
 	snp_prio_input_hpo=snp_prio_input.join(input_vcf_no_vcf)
-	multi_snp_prio(snp_prio_input_hpo)
+	multi_snp_prio(snp_prio_input_hpo,inheritance_mode)
 }	
 
 

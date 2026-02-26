@@ -1,7 +1,7 @@
 
 // Merge SNV evidence sources into a final prioritized SNP VCF.
 process snp_prio {
-	container ='beoungl/docker_test:longphase_0.2.11'
+	container ='beoungl/docker_test:longphase_0.2.12'
 
 	input:
 	val(out_prefix)
@@ -11,6 +11,7 @@ process snp_prio {
 	path(annovar_vcf)
 	path(hpo_path)
 
+	val(inheritance_mode)
 
 	output:
 	path "${out_prefix}.prio.vcf"
@@ -31,7 +32,7 @@ process snp_prio {
 
 	#Get SNP from RankScore + RankVar + ClinVar, and based on score + homozygosity, rank them.
 
-	python3 /assign_dom_or_rec_snp_only.py ${out_prefix}.clinvar.vcf ${out_prefix}.rankscore.vcf ${out_prefix}.rankvar.vcf $hpo_path OMIM ${out_prefix}.assigned.vcf
+	python3 /assign_dom_or_rec_snp_only.py ${out_prefix}.clinvar.vcf ${out_prefix}.rankscore.vcf ${out_prefix}.rankvar.vcf $hpo_path $inheritance_mode ${out_prefix}.assigned.vcf
 
 	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio_gene.vcf gene
 	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio.vcf variant

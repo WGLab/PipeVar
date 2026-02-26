@@ -32,6 +32,7 @@ workflow SINGLE_ALIGNMENT_ALL_NGS {
 	is_note
 	target
 	caller_mode
+	inheritance_mode
 
 	main:
 

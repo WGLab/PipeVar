@@ -1,7 +1,7 @@
 
 // Integrate NGS SNV/SV evidence and produce a prioritized VCF.
 process ngs_prio {
-	container ='beoungl/docker_test:longphase_0.2.11'
+	container ='beoungl/docker_test:longphase_0.2.12'
 
 	input:
 	val(out_prefix)
@@ -12,6 +12,7 @@ process ngs_prio {
 	path(sv_vcf_path)
 	path(snv_vcf_path)
 	path(hpo_path)
+	val(inheritance_mode)
 
 	output:
 	path "${out_prefix}.prio.vcf"
@@ -33,7 +34,7 @@ process ngs_prio {
 
         bash /rankvar_vcf_and_tsv.sh $snv_rankvar $snv_vcf_path $out_prefix
 
-	python3 /assign_dom_or_rec.py ${out_prefix}.clinvar.vcf ${out_prefix}.phenosv.vcf ${out_prefix}.rankscore.vcf ${out_prefix}.rankvar.vcf $hpo_path OMIM ${out_prefix}.assigned.vcf
+	python3 /assign_dom_or_rec.py ${out_prefix}.clinvar.vcf ${out_prefix}.phenosv.vcf ${out_prefix}.rankscore.vcf ${out_prefix}.rankvar.vcf $hpo_path $inheritance_mode ${out_prefix}.assigned.vcf
 
 	# Keep the ranked gene-level report and also emit a ranked variant-level VCF.
 	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio_gene.vcf gene

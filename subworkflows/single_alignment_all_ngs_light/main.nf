@@ -30,6 +30,7 @@ workflow SINGLE_ALIGNMENT_ALL_NGS_LIGHT {
 	rankvar_filter
 	is_note
 	target
+	inheritance_mode
 
 	main:
 

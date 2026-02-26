@@ -16,6 +16,7 @@ workflow SINGLE_ALIGNMENT_VCF_SV {
 	ref_fa
 	note
 	is_note
+	inheritance_mode
 
 	main:
 	
@@ -28,6 +29,6 @@ workflow SINGLE_ALIGNMENT_VCF_SV {
 		ANNOVAR_SV(vcf,out_prefix,Phen2gene.out)
 		SURVIVOR(ANNOVAR_SV.out,out_prefix)
 		PhenoSV(SURVIVOR.out,out_prefix,hpo)
-		sv_prio(out_prefix,PhenoSV.out,ANNOVAR_SV.out,hpo)
+		sv_prio(out_prefix,PhenoSV.out,ANNOVAR_SV.out,hpo,inheritance_mode)
 }
 

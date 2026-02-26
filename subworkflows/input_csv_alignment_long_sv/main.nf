@@ -15,6 +15,7 @@ workflow INPUT_CSV_ALIGNMENT_LONG_SV {
 	input_bam
 	ref_fa
 	is_note
+	inheritance_mode
 
 	main:
 
@@ -33,7 +34,7 @@ workflow INPUT_CSV_ALIGNMENT_LONG_SV {
 	multi_nanorepeat(input_bam_with_bam,ref_fa)
         sv_prio_input=phenosv_result.join(annovar_sv_result)
         sv_prio_input_hpo=sv_prio_input.join(input_bam_no_bam)
-        multi_sv_prio(sv_prio_input_hpo)
+        multi_sv_prio(sv_prio_input_hpo,inheritance_mode)
 
 }	
 

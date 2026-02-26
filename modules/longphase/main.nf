@@ -1,7 +1,7 @@
 
 // Phase SNV/SV evidence and aggregate ranked evidence into final prioritized VCF.
 process longphase {
-	container ='beoungl/docker_test:longphase_0.2.11'
+	container ='beoungl/docker_test:longphase_0.2.12'
 
 	input:
 	tuple path(bam_path), path(index)
@@ -14,6 +14,7 @@ process longphase {
 	path hpo_path
 	val out_prefix
 	tuple path(ref_fa), path(fa_index)
+	val(inheritance_mode)
 
 	output:
 	path "${out_prefix}.prio.vcf"
@@ -36,7 +37,7 @@ process longphase {
 
 	        bash /rankvar_vcf_and_tsv.sh $snv_rankvar ${out_prefix}_phased.vcf $out_prefix
 
-	python3 /assign_dom_or_rec.py ${out_prefix}.clinvar.vcf ${out_prefix}.phenosv.vcf ${out_prefix}.rankscore.vcf ${out_prefix}.rankvar.vcf $hpo_path OMIM ${out_prefix}.assigned.vcf
+	python3 /assign_dom_or_rec.py ${out_prefix}.clinvar.vcf ${out_prefix}.phenosv.vcf ${out_prefix}.rankscore.vcf ${out_prefix}.rankvar.vcf $hpo_path $inheritance_mode ${out_prefix}.assigned.vcf
 
 	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio_gene.vcf gene
 	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio.vcf variant

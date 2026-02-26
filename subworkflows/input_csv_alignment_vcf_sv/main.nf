@@ -13,6 +13,7 @@ workflow INPUT_CSV_ALIGNMENT_VCF_SV {
 	input_vcf
 	ref_fa
 	is_note
+	inheritance_mode
 
 	main:
 
@@ -28,7 +29,7 @@ workflow INPUT_CSV_ALIGNMENT_VCF_SV {
         phenosv_result=multi_phenosv(phenosv_input)
 	sv_prio_input=phenosv_result.join(annovar_sv_result)
 	sv_prio_input_hpo=sv_prio_input.join(input_vcf_no_vcf)
-	multi_sv_prio(sv_prio_input_hpo)
+	multi_sv_prio(sv_prio_input_hpo,inheritance_mode)
 }	
 
 

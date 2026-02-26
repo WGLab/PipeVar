@@ -79,6 +79,9 @@ CORE OPTIONS
 FILTERING OPTIONS
 --------------------------------------------------------------------------------
   --gnomad <FLOAT>         Max gnomAD AF filter for SNP prioritization. Default: 0.0001
+  --inheritance_mode <ml|omim|gnomad>
+                           Dominant/recessive assignment mode. Default: ml (ML-first, OMIM fallback)
+                           Note: gnomad uses gnomAD constraint (LOEUF) fallback lists.
   --rankscore <FLOAT>      Minimum RankScore cutoff. Default: 0.50
   --rankvar <FLOAT>        Minimum RankVar score cutoff. Default: 0.05
   --gq <INT>               Minimum genotype quality. Default: 20
@@ -160,6 +163,7 @@ def clean_light  = params.light  ? params.light.trim().toLowerCase()  : 'no'
 def clean_genome = params.genome ? params.genome.trim().toLowerCase() : 'hg38'
 def clean_target = params.target ? params.target.trim().toLowerCase() : 'no'
 def clean_note   = params.note   ? params.note.trim().toLowerCase()   : 'no'
+def clean_inheritance_mode = params.inheritance_mode ? params.inheritance_mode.trim().toLowerCase() : 'ml'
 
 // ------------------------------------------------------------------
 // 1. INPUT VALIDATION (Catching Typos)
@@ -169,6 +173,7 @@ def clean_note   = params.note   ? params.note.trim().toLowerCase()   : 'no'
 def valid_modes   = ['snp', 'sv']
 def valid_types   = ['ont', 'pacbio', 'short']
 def valid_genomes = ['hg38', 'grch38']
+def valid_inheritance_modes = ['ml', 'omim', 'gnomad']
 
 // CHECK 1: Validate Mode
 if (clean_mode && !valid_modes.contains(clean_mode)) {
@@ -214,6 +219,26 @@ if (!valid_genomes.contains(clean_genome)) {
     This pipeline currently supports:
       --genome hg38
       --genome grch38
+    ================================================================
+    """
+}
+
+// CHECK 4: Validate Inheritance Assignment Mode
+if (!valid_inheritance_modes.contains(clean_inheritance_mode)) {
+    error """
+    ================================================================
+    ERROR: Invalid Inheritance Assignment Mode
+    ================================================================
+    You provided: --inheritance_mode "${params.inheritance_mode}"
+
+    Valid options are:
+      --inheritance_mode ml
+      --inheritance_mode omim
+      --inheritance_mode gnomad
+
+    Notes:
+      - ml    = ML-first with OMIM fallback (current script behavior)
+      - gnomad maps to LOEUF fallback lists
     ================================================================
     """
 }
@@ -421,9 +446,11 @@ ref_fa = Channel
 	}
 	output_directory_check=file(params.output_directory)
         if ( !output_directory_check.exists() ) {
-                output_directory_check.mkdirs()
+	output_directory_check.mkdirs()
         }
 	type=Channel.value(params.type)
+	def inheritance_mode_script = (clean_inheritance_mode == 'gnomad') ? 'LOEUF' : 'OMIM'
+	inheritance_mode=Channel.value(inheritance_mode_script)
 	gnomad=Channel.value(params.gnomad)
         rankscore_filter=Channel.value(params.rankscore)
 	rankvar_filter=Channel.value(params.rankvar)
@@ -439,33 +466,33 @@ ref_fa = Channel
 	if ( params.input_csv ) {
         if ( input_vcf != null ) {
             if ( params.mode == 'sv' ) {
-                INPUT_CSV_ALIGNMENT_VCF_SV(input_vcf, ref_fa, is_note)
+                INPUT_CSV_ALIGNMENT_VCF_SV(input_vcf, ref_fa, is_note, inheritance_mode)
             }
             else if ( params.mode == 'snp' ) {
-                INPUT_CSV_ALIGNMENT_VCF_SNP(input_vcf, ref_fa, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note)
+                INPUT_CSV_ALIGNMENT_VCF_SNP(input_vcf, ref_fa, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, inheritance_mode)
             }
         }
         else if ( input_bam != null ) {
 	            if ( params.type == 'short' ) {
 	                    if ( params.mode == 'sv' ) {
-	                        INPUT_CSV_ALIGNMENT_NGS_SV(input_bam, ref_fa,  is_note)
+	                        INPUT_CSV_ALIGNMENT_NGS_SV(input_bam, ref_fa,  is_note, inheritance_mode)
 	                    }
 	                    else if ( params.mode == 'snp' ) {
-                        INPUT_CSV_NGS_SNP(input_bam, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller)
+                        INPUT_CSV_NGS_SNP(input_bam, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode)
 				}
 				else {
-                                INPUT_CSV_ALIGNMENT_ALL_NGS(input_bam, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller)
+                                INPUT_CSV_ALIGNMENT_ALL_NGS(input_bam, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode)
 	                        }
 	            }
 	            else { // Long reads
 	                    if ( params.mode == 'sv' ) {
-	                        INPUT_CSV_ALIGNMENT_LONG_SV(input_bam, ref_fa,  is_note)
+	                        INPUT_CSV_ALIGNMENT_LONG_SV(input_bam, ref_fa,  is_note, inheritance_mode)
 	                    }
 	                    else if ( params.mode == 'snp' ) {
-                        INPUT_CSV_ALIGNMENT_LONG_SNP(input_bam, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller)
+                        INPUT_CSV_ALIGNMENT_LONG_SNP(input_bam, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller, inheritance_mode)
 	                    }
 	                    else {
-                        INPUT_CSV_ALIGNMENT_ALL_LONGPHASE(input_bam, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller)
+                        INPUT_CSV_ALIGNMENT_ALL_LONGPHASE(input_bam, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller, inheritance_mode)
 	                    }
 	            }
 	        }
@@ -473,33 +500,33 @@ ref_fa = Channel
     else { // Single File Mode
         if ( params.vcf ) {
             if ( params.mode == 'sv' ) {
-                SINGLE_ALIGNMENT_VCF_SV(vcf, out_prefix, ref_fa,  note, is_note)
+                SINGLE_ALIGNMENT_VCF_SV(vcf, out_prefix, ref_fa,  note, is_note, inheritance_mode)
             }
             else if ( params.mode == 'snp' ) {
-                SINGLE_ALIGNMENT_VCF_SNP(vcf, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note)
+                SINGLE_ALIGNMENT_VCF_SNP(vcf, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, inheritance_mode)
             }
         }
         else if ( params.bam != null ) {
 	            if ( params.type == 'short' ) {
 	                    if ( params.mode == 'sv' ) {
-	                        SINGLE_ALIGNMENT_NGS_SV(bam, out_prefix, ref_fa,  note, is_note)
+	                        SINGLE_ALIGNMENT_NGS_SV(bam, out_prefix, ref_fa,  note, is_note, inheritance_mode)
 	                    }
 	                    else if ( params.mode == 'snp' ) {
-                        SINGLE_ALIGNMENT_NGS_SNP(bam, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller)
+                        SINGLE_ALIGNMENT_NGS_SNP(bam, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode)
 	                    }
 			    else {
-			                SINGLE_ALIGNMENT_ALL_NGS(bam, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller)
+			                SINGLE_ALIGNMENT_ALL_NGS(bam, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode)
 			    }
 	            }
 	            else { // Long reads
 	                    if ( params.mode == 'sv' ) {
-	                        SINGLE_ALIGNMENT_LONG_SV(bam, out_prefix, ref_fa,  note, is_note)
+	                        SINGLE_ALIGNMENT_LONG_SV(bam, out_prefix, ref_fa,  note, is_note, inheritance_mode)
 	                    }
 	                    else if ( params.mode == 'snp' ) {
-                        SINGLE_ALIGNMENT_LONG_SNP(bam, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller)
+                        SINGLE_ALIGNMENT_LONG_SNP(bam, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller, inheritance_mode)
 	                    }
 	                    else {
-                        SINGLE_ALIGNMENT_ALL_LONGPHASE(bam, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller)
+                        SINGLE_ALIGNMENT_ALL_LONGPHASE(bam, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller, inheritance_mode)
 	                    }
 	            }
 	        }

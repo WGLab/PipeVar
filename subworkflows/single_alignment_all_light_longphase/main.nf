@@ -31,6 +31,7 @@ workflow SINGLE_ALIGNMENT_ALL_LIGHT_LONGPHASE {
 	rankvar_filter
 	is_note
 	target
+	inheritance_mode
 
 	main:
 	
@@ -55,7 +56,7 @@ workflow SINGLE_ALIGNMENT_ALL_LIGHT_LONGPHASE {
 	SURVIVOR(ANNOVAR_SV.out,out_prefix)
 	PhenoSV(SURVIVOR.out,out_prefix,hpo)
 	NanoRepeat(bam,out_prefix,ref_fa)
-	longphase(bam,ANNOVAR.out.vcf_output,ANNOVAR_SV.out,PhenoSV.out,rankscore_result.rankscore,rankscore_result.clinvar,RankVar.out,hpo,out_prefix,ref_fa)
+	longphase(bam,ANNOVAR.out.vcf_output,ANNOVAR_SV.out,PhenoSV.out,rankscore_result.rankscore,rankscore_result.clinvar,RankVar.out,hpo,out_prefix,ref_fa,inheritance_mode)
 
 }
 

@@ -57,6 +57,43 @@ process multi_rankvar {
 	# This pathogenicity score cutoff is configurable via workflow param.
 	awk -F'\t' -v cutoff="$rankvar_filter" 'NR==1 || \$12 > cutoff' ${out_prefix}_rankvar/rank_var.tsv > ${out_prefix}.rank_var.tsv
 
+	# Replace ANNOVAR-normalized coordinates with VCF-origin coordinates (Otherinfo4/5/7/8)
+	# to preserve matching with phased VCF records in splicing variants.
+	awk -F'\t' -v OFS='\t' '
+	function fail(msg) { print "ERROR: " msg > "/dev/stderr"; exit 2 }
+	FNR==NR {
+	    if (FNR == 1) {
+	        for (i=1; i<=NF; i++) h[\$i]=i
+	        chr_i = h["Chr"]; start_i = h["Start"]; ref_i = h["Ref"]; alt_i = h["Alt"]
+	        o4_i = h["Otherinfo4"]; o5_i = h["Otherinfo5"]; o7_i = h["Otherinfo7"]; o8_i = h["Otherinfo8"]
+	        if (!chr_i || !start_i || !ref_i || !alt_i) fail("ANNOVAR TXT missing Chr/Start/Ref/Alt columns for RankVar remap")
+	        if (!o4_i || !o5_i || !o7_i || !o8_i) fail("ANNOVAR TXT missing Otherinfo4/5/7/8 columns for RankVar remap")
+	        next
+	    }
+	    key = \$(chr_i) SUBSEP \$(start_i) SUBSEP \$(ref_i) SUBSEP \$(alt_i)
+	    val = \$(o4_i) SUBSEP \$(o5_i) SUBSEP \$(o7_i) SUBSEP \$(o8_i)
+	    if ((key in map) && map[key] != val) fail("Conflicting ANNOVAR->VCF coordinate mapping for key: " key)
+	    map[key] = val
+	    next
+	}
+	FNR==1 {
+	    delete h2
+	    for (i=1; i<=NF; i++) h2[\$i]=i
+	    r_chr = h2["Chr"]; r_start = h2["Start"]; r_ref = h2["Ref"]; r_alt = h2["Alt"]
+	    if (!r_chr || !r_start || !r_ref || !r_alt) fail("rank_var.tsv missing required header(s): Chr, Start, Ref, Alt")
+	    print
+	    next
+	}
+	{
+	    key = \$(r_chr) SUBSEP \$(r_start) SUBSEP \$(r_ref) SUBSEP \$(r_alt)
+	    if (key in map) {
+	        n = split(map[key], a, SUBSEP)
+	        \$(r_chr)=a[1]; \$(r_start)=a[2]; \$(r_ref)=a[3]; \$(r_alt)=a[4]
+	    }
+	    print
+	}
+	' $vcf ${out_prefix}.rank_var.tsv > ${out_prefix}.rank_var.tsv.tmp && mv ${out_prefix}.rank_var.tsv.tmp ${out_prefix}.rank_var.tsv
+
 	rm ${out_prefix}.rankvar_temp.txt
 
 	"""

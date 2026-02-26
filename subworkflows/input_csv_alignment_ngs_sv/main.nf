@@ -17,6 +17,7 @@ workflow INPUT_CSV_ALIGNMENT_NGS_SV {
 	input_bam
 	ref_fa
 	is_note
+	inheritance_mode
 
 	main:
 
@@ -36,7 +37,7 @@ workflow INPUT_CSV_ALIGNMENT_NGS_SV {
         phenosv_result=multi_phenosv(phenosv_input)
 	sv_prio_input=phenosv_result.join(annovar_sv_result)
         sv_prio_input_hpo=sv_prio_input.join(input_bam_no_bam)
-        multi_sv_prio(sv_prio_input_hpo)
+        multi_sv_prio(sv_prio_input_hpo,inheritance_mode)
 
 }	
 
