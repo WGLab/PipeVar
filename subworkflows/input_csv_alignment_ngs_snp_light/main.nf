@@ -49,7 +49,7 @@ workflow INPUT_CSV_ALIGNMENT_NGS_SNP_LIGHT {
         join_annovar_hpo=join_annovar_phen2gene.join(input_bam_no_bam)
         rankscore_result=multi_rankscore(join_annovar_phen2gene,gnomad,rankscore_filter,gq,phen2gene_top_n)
         rankvar_result=multi_rankvar(join_annovar_hpo,gnomad,gq,ad,rankvar_filter)
-        rankscore_rankvar_join=rankvar_result.join(rankscore_result)
+        rankscore_rankvar_join=rankscore_result.join(rankvar_result)
         annovar_result_vcf=annovar_result.map { item -> tuple(item[0], item[2]) }
         snp_prio_input=rankscore_rankvar_join.join(annovar_result_vcf)
         snp_prio_input_hpo=snp_prio_input.join(input_bam_no_bam)
