@@ -58,8 +58,13 @@ workflow INPUT_CSV_NGS_SNP {
                         snp_result=multi_deepvariant(input_bam_with_bam,ref_fa,target)
                 }
         }
-        snp_result_annovar=snp_result.join(input_bam_no_bam)
-        annovar_result=multi_annovar(snp_result_annovar)
+        if ( target == "yes" ) {
+                annovar_input=snp_result.join(phen2_gene_bed).map { out_prefix, vcf_file, bed_file -> tuple(out_prefix, vcf_file, bed_file) }
+        }
+        else {
+                annovar_input=snp_result.map { out_prefix, vcf_file -> tuple(out_prefix, vcf_file, target) }
+        }
+        annovar_result=multi_annovar(annovar_input)
 	annovar_result_txt=annovar_result.map { item -> tuple(item[0], item[1]) }
         join_annovar_phen2gene=annovar_result_txt.join(phen2gene_result)
         join_annovar_hpo=join_annovar_phen2gene.join(input_bam_no_bam)
@@ -74,4 +79,3 @@ workflow INPUT_CSV_NGS_SNP {
         multi_snp_prio(snp_prio_input_hpo,inheritance_mode)
 
 }	
-

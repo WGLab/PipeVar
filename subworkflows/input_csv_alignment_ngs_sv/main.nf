@@ -30,7 +30,7 @@ workflow INPUT_CSV_ALIGNMENT_NGS_SV {
         multi_eh_result=multi_expansionhunter(input_bam_with_bam,ref_fa)
         multi_eh_filter(multi_eh_result)
         manta_result=multi_manta(input_bam_with_bam,ref_fa)
-        manta_result_annovar=manta_result.join(input_bam_no_bam)
+	manta_result_annovar=manta_result.join(phen2gene_result).map { out_prefix, vcf_file, phen2gene_file -> tuple(out_prefix, vcf_file, phen2gene_file, "null") }
 	annovar_sv_result=multi_annovar_sv(manta_result_annovar)
 	survivor_result=multi_survivor(annovar_sv_result)
         phenosv_input=survivor_result.join(input_bam_no_bam)
@@ -40,5 +40,4 @@ workflow INPUT_CSV_ALIGNMENT_NGS_SV {
         multi_sv_prio(sv_prio_input_hpo,inheritance_mode)
 
 }	
-
 

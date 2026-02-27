@@ -64,14 +64,25 @@ workflow INPUT_CSV_ALIGNMENT_ALL_LONGPHASE {
                         snp_result=multi_clair3(input_bam_with_bam,ref_fa,target)
                 }
         }
-	annovar_result=multi_annovar(snp_result)
+        if ( target == "yes" ) {
+                annovar_input=snp_result.join(phen2_gene_bed).map { out_prefix, vcf_file, bed_file -> tuple(out_prefix, vcf_file, bed_file) }
+        }
+        else {
+                annovar_input=snp_result.map { out_prefix, vcf_file -> tuple(out_prefix, vcf_file, target) }
+        }
+	annovar_result=multi_annovar(annovar_input)
 	annovar_result_txt=annovar_result.map { item -> tuple(item[0], item[1]) }
 	join_annovar_phen2gene=annovar_result_txt.join(phen2gene_result)
 	join_annovar_hpo=join_annovar_phen2gene.join(input_bam_no_bam)
 	rankscore_result=multi_rankscore(join_annovar_phen2gene,gnomad,rankscore_filter,gq,phen2gene_top_n)
 	rankvar_result=multi_rankvar(join_annovar_hpo,gnomad,gq,ad,rankvar_filter)
 	sniffles_result=multi_sniffles(input_bam_with_bam,ref_fa)
-	sniffles_result_annovar=sniffles_result.join(phen2gene_result)
+        if ( target == "yes" ) {
+	        sniffles_result_annovar=sniffles_result.join(phen2gene_result).join(phen2_gene_bed).map { out_prefix, vcf_file, phen2gene_file, bed_file -> tuple(out_prefix, vcf_file, phen2gene_file, bed_file) }
+        }
+        else {
+	        sniffles_result_annovar=sniffles_result.join(phen2gene_result).map { out_prefix, vcf_file, phen2gene_file -> tuple(out_prefix, vcf_file, phen2gene_file, target) }
+        }
 	annovar_sv_result=multi_annovar_sv(sniffles_result_annovar)
 	survivor_result=multi_survivor(annovar_sv_result)
 	phenosv_input=survivor_result.join(input_bam_no_bam)
@@ -88,4 +99,3 @@ workflow INPUT_CSV_ALIGNMENT_ALL_LONGPHASE {
 	multi_longphase(join_vcf_bam_rankvar_hpo,ref_fa,inheritance_mode)
 
 }	
-

@@ -47,7 +47,8 @@ workflow SINGLE_ALIGNMENT_ALL_NGS_LIGHT {
 	else {
 		haplotypecaller(bam,out_prefix,ref_fa,target)
 	}
-	ANNOVAR(haplotypecaller.out,out_prefix)
+	annovar_bed = (target == "yes") ? phen2_gene_bed : target
+	ANNOVAR(haplotypecaller.out,out_prefix,annovar_bed)
 	RankVar(ANNOVAR.out.txt_output,Phen2gene.out,hpo,out_prefix,gnomad,gq,ad,rankvar_filter)
 	rankscore_result=Rankscore_analysis(ANNOVAR.out.txt_output,Phen2gene.out,out_prefix,gnomad,rankscore_filter,gq,phen2gene_top_n)
 	Manta(bam,out_prefix,ref_fa)
@@ -57,6 +58,5 @@ workflow SINGLE_ALIGNMENT_ALL_NGS_LIGHT {
 	eh_filter(out_prefix,ExpansionHunter.out)
 
 }
-
 
 

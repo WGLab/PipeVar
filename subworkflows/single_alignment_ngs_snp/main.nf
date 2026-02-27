@@ -58,7 +58,8 @@ workflow SINGLE_ALIGNMENT_NGS_SNP {
 		}
 	}
 	snp_vcf = (caller_mode == "haplotypecaller") ? haplotypecaller.out : deepvariant.out
-	ANNOVAR(snp_vcf,out_prefix)
+	annovar_bed = (target == "yes") ? phen2_gene_bed : target
+	ANNOVAR(snp_vcf,out_prefix,annovar_bed)
 	RankVar(ANNOVAR.out.txt_output,Phen2gene.out,hpo,out_prefix,gnomad,gq,ad,rankvar_filter)
 	Rankscore_analysis(ANNOVAR.out.txt_output,Phen2gene.out,out_prefix,gnomad,rankscore_filter,gq,phen2gene_top_n)
 	ExpansionHunter(bam,out_prefix,ref_fa)

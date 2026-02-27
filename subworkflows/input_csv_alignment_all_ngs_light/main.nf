@@ -49,8 +49,13 @@ workflow INPUT_CSV_ALIGNMENT_ALL_NGS_LIGHT {
         else {
                 haplotypecaller_result=multi_haplotypecaller(multi_prep_gatk_result,ref_fa,target)
         }
-        haplotypecaller_result_annovar=haplotypecaller_result.join(input_bam_no_bam)
-        annovar_result=multi_annovar(haplotypecaller_result_annovar)
+        if ( target == "yes" ) {
+                annovar_input=haplotypecaller_result.join(phen2_gene_bed).map { out_prefix, vcf_file, bed_file -> tuple(out_prefix, vcf_file, bed_file) }
+        }
+        else {
+                annovar_input=haplotypecaller_result.map { out_prefix, vcf_file -> tuple(out_prefix, vcf_file, target) }
+        }
+        annovar_result=multi_annovar(annovar_input)
 	annovar_result_txt=annovar_result.map { item -> tuple(item[0], item[1]) }
         join_annovar_phen2gene=annovar_result_txt.join(phen2gene_result)
         join_annovar_hpo=join_annovar_phen2gene.join(input_bam_no_bam)
@@ -59,7 +64,12 @@ workflow INPUT_CSV_ALIGNMENT_ALL_NGS_LIGHT {
         multi_eh_result=multi_expansionhunter(input_bam_with_bam,ref_fa_no_dict)
         multi_eh_filter(multi_eh_result)
         manta_result=multi_manta(input_bam_with_bam,ref_fa_no_dict)
-	manta_result_annovar=manta_result.join(input_bam_no_bam)
+        if ( target == "yes" ) {
+	        manta_result_annovar=manta_result.join(phen2gene_result).join(phen2_gene_bed).map { out_prefix, vcf_file, phen2gene_file, bed_file -> tuple(out_prefix, vcf_file, phen2gene_file, bed_file) }
+        }
+        else {
+	        manta_result_annovar=manta_result.join(phen2gene_result).map { out_prefix, vcf_file, phen2gene_file -> tuple(out_prefix, vcf_file, phen2gene_file, target) }
+        }
 	annovar_sv_result=multi_annovar_sv(manta_result_annovar)
         survivor_result=multi_survivor(annovar_sv_result)
         phenosv_input=survivor_result.join(input_bam_no_bam)

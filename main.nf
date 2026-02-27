@@ -161,7 +161,8 @@ def clean_mode   = params.mode   ? params.mode.trim().toLowerCase()   : null
 def clean_type   = params.type   ? params.type.trim().toLowerCase()   : 'ont' // Default from params
 def clean_light  = params.light  ? params.light.trim().toLowerCase()  : 'no'
 def clean_genome = params.genome ? params.genome.trim().toLowerCase() : 'hg38'
-def clean_target = params.target ? params.target.trim().toLowerCase() : 'no'
+def raw_target_param = params.target ?: params.targeted
+def clean_target = raw_target_param ? raw_target_param.trim().toLowerCase() : 'no'
 def clean_note   = params.note   ? params.note.trim().toLowerCase()   : 'no'
 def clean_inheritance_mode = params.inheritance_mode ? params.inheritance_mode.trim().toLowerCase() : 'ml'
 
@@ -460,16 +461,16 @@ ref_fa = Channel
 	short_snp_caller = Channel.value(clean_light == 'yes' ? 'haplotypecaller' : 'deepvariant')
 	long_snp_caller = Channel.value(clean_light == 'yes' ? 'nanocaller' : 'clair3')
 	def target="null"
-	if ( params.target == 'yes' ) {
+	if ( clean_target == 'yes' ) {
 		target = "yes"
 	}
 	if ( params.input_csv ) {
         if ( input_vcf != null ) {
             if ( params.mode == 'sv' ) {
-                INPUT_CSV_ALIGNMENT_VCF_SV(input_vcf, ref_fa, is_note, inheritance_mode)
+                INPUT_CSV_ALIGNMENT_VCF_SV(input_vcf, ref_fa, phen2gene_top_n, is_note, target, inheritance_mode)
             }
             else if ( params.mode == 'snp' ) {
-                INPUT_CSV_ALIGNMENT_VCF_SNP(input_vcf, ref_fa, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, inheritance_mode)
+                INPUT_CSV_ALIGNMENT_VCF_SNP(input_vcf, ref_fa, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, inheritance_mode)
             }
         }
         else if ( input_bam != null ) {
@@ -500,10 +501,10 @@ ref_fa = Channel
     else { // Single File Mode
         if ( params.vcf ) {
             if ( params.mode == 'sv' ) {
-                SINGLE_ALIGNMENT_VCF_SV(vcf, out_prefix, ref_fa,  note, is_note, inheritance_mode)
+                SINGLE_ALIGNMENT_VCF_SV(vcf, out_prefix, ref_fa,  note, phen2gene_top_n, is_note, target, inheritance_mode)
             }
             else if ( params.mode == 'snp' ) {
-                SINGLE_ALIGNMENT_VCF_SNP(vcf, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, inheritance_mode)
+                SINGLE_ALIGNMENT_VCF_SNP(vcf, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, inheritance_mode)
             }
         }
         else if ( params.bam != null ) {

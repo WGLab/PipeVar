@@ -60,11 +60,13 @@ workflow SINGLE_ALIGNMENT_ALL_LONGPHASE {
 		}
 	}
 	snp_vcf = (caller_mode == "nanocaller") ? nanocaller.out : clair3.out
-	ANNOVAR(snp_vcf,out_prefix)
+	annovar_bed = (target == "yes") ? phen2_gene_bed : target
+	ANNOVAR(snp_vcf,out_prefix,annovar_bed)
 	RankVar(ANNOVAR.out.txt_output,Phen2gene.out,hpo,out_prefix,gnomad,gq,ad,rankvar_filter)
 	rankscore_result=Rankscore_analysis(ANNOVAR.out.txt_output,Phen2gene.out,out_prefix,gnomad,rankscore_filter,gq,phen2gene_top_n)
 	sniffles(bam,out_prefix,ref_fa)
-	ANNOVAR_SV(sniffles.out,out_prefix,Phen2gene.out)
+	annovar_sv_bed = (target == "yes") ? phen2_gene_bed : target
+	ANNOVAR_SV(sniffles.out,out_prefix,Phen2gene.out,annovar_sv_bed)
 	SURVIVOR(ANNOVAR_SV.out,out_prefix)
 	PhenoSV(SURVIVOR.out,out_prefix,hpo)
 	NanoRepeat(bam,out_prefix,ref_fa)
