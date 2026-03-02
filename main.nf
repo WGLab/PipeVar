@@ -56,6 +56,15 @@ INPUT MODES
        --input_csv <FILE> --bam true --ref_fa <FILE>
      CSV columns:
        sample,file_path,note_path
+       Optional age field for CSV prioritization flows:
+         sample,file_path,note_path,age_of_onset
+         sample,file_path,note_path,age
+       Notes:
+         age_of_onset is preferred if both columns exist
+         age is interpreted per CSV row (per sample), not globally
+         empty age is allowed (treated as not provided)
+         non-empty age must be xd/xm/xy or integer years
+         examples: 10d, 9m, 7y, 7 (normalized to 7y)
      Note handling:
        default            -> note_path treated as clinical note (PhenoTagger ON)
        --note no          -> note_path treated as HPO file (PhenoTagger OFF)
@@ -65,6 +74,15 @@ INPUT MODES
        --input_csv <FILE> --vcf true --ref_fa <FILE> --mode <snp|sv>
      CSV columns:
        sample,file_path,note_path
+       Optional age field for CSV prioritization flows:
+         sample,file_path,note_path,age_of_onset
+         sample,file_path,note_path,age
+       Notes:
+         age_of_onset is preferred if both columns exist
+         age is interpreted per CSV row (per sample), not globally
+         empty age is allowed (treated as not provided)
+         non-empty age must be xd/xm/xy or integer years
+         examples: 10d, 9m, 7y, 7 (normalized to 7y)
 
 --------------------------------------------------------------------------------
 CORE OPTIONS
@@ -316,7 +334,38 @@ include { INPUT_CSV_ALIGNMENT_VCF_SV } from './subworkflows/input_csv_alignment_
 
 
 workflow {
+	def input_age = null
 	if ( params.input_csv ) {
+		input_age = Channel
+    .fromPath( params.input_csv )
+    .splitCsv( header:true )
+    .map { row ->
+        def out_prefix = row.sample
+        def has_age_of_onset = row.containsKey('age_of_onset')
+        def has_age = row.containsKey('age')
+        def age_source = has_age_of_onset ? 'age_of_onset' : (has_age ? 'age' : null)
+        def age_value = ''
+
+        if (age_source != null) {
+            def raw_age = row[age_source]
+            age_value = raw_age == null ? '' : raw_age.toString().trim().toLowerCase()
+            def age_match = (age_value =~ /^(\d+)([dmy])?$/)
+            if (age_value && !age_match.matches()) {
+                error """
+                ERROR: Invalid age value in input CSV for sample '${out_prefix}'.
+                Column '${age_source}' must be empty or match one of:
+                  - <integer>
+                  - <integer><unit> where unit is d/m/y
+                Received: '${age_value}'
+                """
+            }
+            if (age_value && !age_match.group(2)) {
+                age_value = "${age_match.group(1)}y"
+            }
+        }
+
+        return tuple(out_prefix, age_value)
+    }
 		if ( params.vcf ) {
 		input_vcf = Channel
     .fromPath( params.input_csv )
@@ -467,33 +516,33 @@ ref_fa = Channel
 	if ( params.input_csv ) {
         if ( input_vcf != null ) {
             if ( params.mode == 'sv' ) {
-                INPUT_CSV_ALIGNMENT_VCF_SV(input_vcf, ref_fa, phen2gene_top_n, is_note, target, inheritance_mode)
+                INPUT_CSV_ALIGNMENT_VCF_SV(input_vcf, input_age, ref_fa, phen2gene_top_n, is_note, target, inheritance_mode)
             }
             else if ( params.mode == 'snp' ) {
-                INPUT_CSV_ALIGNMENT_VCF_SNP(input_vcf, ref_fa, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, inheritance_mode)
+                INPUT_CSV_ALIGNMENT_VCF_SNP(input_vcf, input_age, ref_fa, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, inheritance_mode)
             }
         }
         else if ( input_bam != null ) {
 	            if ( params.type == 'short' ) {
 	                    if ( params.mode == 'sv' ) {
-	                        INPUT_CSV_ALIGNMENT_NGS_SV(input_bam, ref_fa,  is_note, inheritance_mode)
+	                        INPUT_CSV_ALIGNMENT_NGS_SV(input_bam, input_age, ref_fa,  is_note, inheritance_mode)
 	                    }
 	                    else if ( params.mode == 'snp' ) {
-                        INPUT_CSV_NGS_SNP(input_bam, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode)
+                        INPUT_CSV_NGS_SNP(input_bam, input_age, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode)
 				}
 				else {
-                                INPUT_CSV_ALIGNMENT_ALL_NGS(input_bam, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode)
+                                INPUT_CSV_ALIGNMENT_ALL_NGS(input_bam, input_age, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode)
 	                        }
 	            }
 	            else { // Long reads
 	                    if ( params.mode == 'sv' ) {
-	                        INPUT_CSV_ALIGNMENT_LONG_SV(input_bam, ref_fa,  is_note, inheritance_mode)
+	                        INPUT_CSV_ALIGNMENT_LONG_SV(input_bam, input_age, ref_fa,  is_note, inheritance_mode)
 	                    }
 	                    else if ( params.mode == 'snp' ) {
-                        INPUT_CSV_ALIGNMENT_LONG_SNP(input_bam, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller, inheritance_mode)
+                        INPUT_CSV_ALIGNMENT_LONG_SNP(input_bam, input_age, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller, inheritance_mode)
 	                    }
 	                    else {
-                        INPUT_CSV_ALIGNMENT_ALL_LONGPHASE(input_bam, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller, inheritance_mode)
+                        INPUT_CSV_ALIGNMENT_ALL_LONGPHASE(input_bam, input_age, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller, inheritance_mode)
 	                    }
 	            }
 	        }

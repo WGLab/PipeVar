@@ -37,6 +37,30 @@ trim_spaces() {
   echo "$s"
 }
 
+normalize_compact_age() {
+  local age="$1"
+  age="$(trim_spaces "$age")"
+  age="${age,,}"
+  if [[ -z "$age" ]]; then
+    echo ""
+    return
+  fi
+  if [[ "$age" =~ ^[0-9]+$ ]]; then
+    echo "${age}y"
+    return
+  fi
+  echo "$age"
+}
+
+is_valid_compact_age() {
+  local age="$1"
+  age="$(trim_spaces "$age")"
+  if [[ -z "$age" ]]; then
+    return 0
+  fi
+  [[ "$age" =~ ^[0-9]+([dDmMyY])?$ ]]
+}
+
 collect_data_files() {
   case "$DATA_FORMAT" in
     vcf.gz)
@@ -241,6 +265,31 @@ main() {
   OUT_CSV="$(trim_spaces "$OUT_CSV")"
   OUT_CSV="${OUT_CSV:-input_csv_generated.csv}"
 
+  read -r -p "Include optional age_of_onset column for prioritization flows? (values: xd/xm/xy or integer years) [y/N]: " INCLUDE_AGE
+  INCLUDE_AGE="$(trim_spaces "$INCLUDE_AGE")"
+  INCLUDE_AGE="${INCLUDE_AGE,,}"
+  if [[ "$INCLUDE_AGE" == "y" || "$INCLUDE_AGE" == "yes" ]]; then
+    INCLUDE_AGE="yes"
+  else
+    INCLUDE_AGE="no"
+  fi
+
+  PROMPT_AGE_PER_SAMPLE="no"
+  if [[ "$INCLUDE_AGE" == "yes" ]]; then
+    read -r -p "Prompt for age per sample while building CSV? [y/N]: " PROMPT_AGE_PER_SAMPLE
+    PROMPT_AGE_PER_SAMPLE="$(trim_spaces "$PROMPT_AGE_PER_SAMPLE")"
+    PROMPT_AGE_PER_SAMPLE="${PROMPT_AGE_PER_SAMPLE,,}"
+    if [[ "$PROMPT_AGE_PER_SAMPLE" == "y" || "$PROMPT_AGE_PER_SAMPLE" == "yes" ]]; then
+      PROMPT_AGE_PER_SAMPLE="yes"
+    else
+      PROMPT_AGE_PER_SAMPLE="no"
+    fi
+    if [[ "$PROMPT_AGE_PER_SAMPLE" == "yes" && ! -r /dev/tty ]]; then
+      echo "WARNING: no interactive TTY available; disabling per-sample age prompts." >&2
+      PROMPT_AGE_PER_SAMPLE="no"
+    fi
+  fi
+
   # Build note prefix -> full path map
   declare -A note_map
   note_prefixes=()
@@ -271,7 +320,11 @@ main() {
   missing_note_count=0
 
   {
-    echo "sample,file_path,note_path"
+    if [[ "$INCLUDE_AGE" == "yes" ]]; then
+      echo "sample,file_path,note_path,age_of_onset"
+    else
+      echo "sample,file_path,note_path"
+    fi
 
     while IFS= read -r data_path; do
       data_count=$((data_count + 1))
@@ -280,7 +333,24 @@ main() {
 
       if [[ -n "${note_map[$sample]:-}" ]]; then
         match_count=$((match_count + 1))
-        echo "${sample},${data_path},${note_map[$sample]}"
+        if [[ "$INCLUDE_AGE" == "yes" ]]; then
+          age_out=""
+          if [[ "$PROMPT_AGE_PER_SAMPLE" == "yes" ]]; then
+            while true; do
+              printf "Age for sample '%s' [empty|e.g. 10d,9m,7y,7]: " "$sample" > /dev/tty
+              read -r age_in < /dev/tty
+              age_in="$(trim_spaces "$age_in")"
+              if is_valid_compact_age "$age_in"; then
+                age_out="$(normalize_compact_age "$age_in")"
+                break
+              fi
+              echo "Invalid age format. Use empty, <int>, or <int><d|m|y>." > /dev/tty
+            done
+          fi
+          echo "${sample},${data_path},${note_map[$sample]},${age_out}"
+        else
+          echo "${sample},${data_path},${note_map[$sample]}"
+        fi
       else
         matched_prefix="$(find_best_note_match "$sample")"
         if [[ "$matched_prefix" == AMBIGUOUS:* ]]; then
@@ -290,7 +360,24 @@ main() {
         elif [[ -n "$matched_prefix" && -n "${note_map[$matched_prefix]:-}" ]]; then
           match_count=$((match_count + 1))
           echo "INFO: rough matched '$sample' -> '$matched_prefix'" >&2
-          echo "${sample},${data_path},${note_map[$matched_prefix]}"
+          if [[ "$INCLUDE_AGE" == "yes" ]]; then
+            age_out=""
+            if [[ "$PROMPT_AGE_PER_SAMPLE" == "yes" ]]; then
+              while true; do
+                printf "Age for sample '%s' [empty|e.g. 10d,9m,7y,7]: " "$sample" > /dev/tty
+                read -r age_in < /dev/tty
+                age_in="$(trim_spaces "$age_in")"
+                if is_valid_compact_age "$age_in"; then
+                  age_out="$(normalize_compact_age "$age_in")"
+                  break
+                fi
+                echo "Invalid age format. Use empty, <int>, or <int><d|m|y>." > /dev/tty
+              done
+            fi
+            echo "${sample},${data_path},${note_map[$matched_prefix]},${age_out}"
+          else
+            echo "${sample},${data_path},${note_map[$matched_prefix]}"
+          fi
         else
           missing_note_count=$((missing_note_count + 1))
           echo "WARNING: no note match for sample prefix '$sample' (${data_name})" >&2

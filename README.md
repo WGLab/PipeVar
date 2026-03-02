@@ -136,6 +136,14 @@ Required:
 Expected CSV columns:
 
 - `sample,file_path,note_path`
+- Optional age column for CSV prioritization flows:
+  - `sample,file_path,note_path,age_of_onset`
+  - `sample,file_path,note_path,age`
+  - If both are present, `age_of_onset` is used.
+  - Age is interpreted per row (per sample), not globally.
+  - Empty age is allowed and treated as not provided.
+  - Non-empty age must be `xd`/`xm`/`xy` or integer years.
+  - Examples: `10d`, `9m`, `7y`, `7` (`7` is normalized to `7y`).
 
 Phenotype handling in CSV mode:
 
@@ -154,6 +162,14 @@ Required:
 Expected CSV columns:
 
 - `sample,file_path,note_path`
+- Optional age column for CSV prioritization flows:
+  - `sample,file_path,note_path,age_of_onset`
+  - `sample,file_path,note_path,age`
+  - If both are present, `age_of_onset` is used.
+  - Age is interpreted per row (per sample), not globally.
+  - Empty age is allowed and treated as not provided.
+  - Non-empty age must be `xd`/`xm`/`xy` or integer years.
+  - Examples: `10d`, `9m`, `7y`, `7` (`7` is normalized to `7y`).
 
 ## Core parameters
 

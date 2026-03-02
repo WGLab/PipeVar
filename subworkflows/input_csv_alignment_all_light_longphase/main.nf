@@ -19,6 +19,7 @@ include { multi_phen2gene_filter } from '../../modules/multi_reduce_region_phen2
 workflow INPUT_CSV_ALIGNMENT_ALL_LIGHT_LONGPHASE {
 	take:
 	input_bam
+	input_age
 	ref_fa
 	rankscore_filter
 	phen2gene_top_n
@@ -77,7 +78,8 @@ workflow INPUT_CSV_ALIGNMENT_ALL_LIGHT_LONGPHASE {
 	join_vcf_bam_phenosv=phenosv_result.join(join_vcf_bam_sv)
 	join_vcf_bam_rankscore=rankscore_result.join(join_vcf_bam_phenosv)
 	join_vcf_bam_rankvar=rankvar_result.join(join_vcf_bam_rankscore)
-	join_vcf_bam_rankvar_hpo=join_vcf_bam_rankvar.join(input_bam_no_bam)
+	input_bam_hpo_age=input_bam_no_bam.join(input_age).map { out_prefix, hpo_path, age_of_onset -> tuple(out_prefix, hpo_path, age_of_onset) }
+	join_vcf_bam_rankvar_hpo=join_vcf_bam_rankvar.join(input_bam_hpo_age)
 	multi_longphase(join_vcf_bam_rankvar_hpo,ref_fa,inheritance_mode)
 
 }	

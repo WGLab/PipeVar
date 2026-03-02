@@ -1,10 +1,10 @@
 
 // Batch SV evidence merging (PhenoSV + SV annotation) to prioritized VCF.
 process multi_sv_prio {
-	container ='beoungl/docker_test:longphase_0.2.14'
+	container ='beoungl/docker_test:longphase_0.2.18'
 
 	input:
-	tuple val(out_prefix), path(sv_pathogenic), path(annovar_sv_vcf), path(hpo_path)
+	tuple val(out_prefix), path(sv_pathogenic), path(annovar_sv_vcf), path(hpo_path), val(age_of_onset)
 
 	val(inheritance_mode)
 
@@ -23,7 +23,7 @@ process multi_sv_prio {
 
 	#Get SNP from RankScore + RankVar + ClinVar, and based on score + homozygosity, rank them.
 
-	python3 /assign_dom_or_rec_sv_only.py ${out_prefix}.phenosv.vcf $hpo_path $inheritance_mode ${out_prefix}.assigned.vcf
+	python3 /assign_dom_or_rec_sv_only.py ${out_prefix}.phenosv.vcf $hpo_path $age_of_onset $inheritance_mode ${out_prefix}.assigned.vcf
 
 	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio_gene.vcf gene
 	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio.vcf variant

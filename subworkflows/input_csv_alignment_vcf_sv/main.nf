@@ -13,6 +13,7 @@ include { multi_sv_prio } from '../../modules/multi_sv_prio/'
 workflow INPUT_CSV_ALIGNMENT_VCF_SV {
 	take:
 	input_vcf
+	input_age
 	ref_fa
 	phen2gene_top_n
 	is_note
@@ -39,6 +40,7 @@ workflow INPUT_CSV_ALIGNMENT_VCF_SV {
         phenosv_input=survivor_result.join(input_vcf_no_vcf)
         phenosv_result=multi_phenosv(phenosv_input)
 	sv_prio_input=phenosv_result.join(annovar_sv_result)
-	sv_prio_input_hpo=sv_prio_input.join(input_vcf_no_vcf)
+	input_vcf_hpo_age=input_vcf_no_vcf.join(input_age).map { out_prefix, hpo_path, age_of_onset -> tuple(out_prefix, hpo_path, age_of_onset) }
+	sv_prio_input_hpo=sv_prio_input.join(input_vcf_hpo_age)
 	multi_sv_prio(sv_prio_input_hpo,inheritance_mode)
 }	

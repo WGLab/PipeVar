@@ -15,6 +15,7 @@ include { multi_snp_prio } from '../../modules/multi_snp_prio/'
 workflow INPUT_CSV_ALIGNMENT_LONG_SNP {
 	take:
 	input_bam
+	input_age
 	ref_fa
 	rankscore_filter
 	phen2gene_top_n
@@ -68,7 +69,8 @@ workflow INPUT_CSV_ALIGNMENT_LONG_SNP {
         rankscore_rankvar_join=rankscore_result.join(rankvar_result)
         annovar_result_vcf=annovar_result.map { item -> tuple(item[0], item[2]) }
         snp_prio_input=rankscore_rankvar_join.join(annovar_result_vcf)
-        snp_prio_input_hpo=snp_prio_input.join(input_bam_no_bam)
+        input_bam_hpo_age=input_bam_no_bam.join(input_age).map { out_prefix, hpo_path, age_of_onset -> tuple(out_prefix, hpo_path, age_of_onset) }
+        snp_prio_input_hpo=snp_prio_input.join(input_bam_hpo_age)
         multi_snp_prio(snp_prio_input_hpo,inheritance_mode)
 
 }	

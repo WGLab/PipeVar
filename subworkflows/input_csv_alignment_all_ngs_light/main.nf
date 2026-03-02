@@ -20,6 +20,7 @@ include { multi_ngs_prio } from '../../modules/multi_ngs_prio/'
 workflow INPUT_CSV_ALIGNMENT_ALL_NGS_LIGHT {
 	take:
 	input_bam
+	input_age
 	ref_fa
 	rankscore_filter
 	phen2gene_top_n
@@ -79,9 +80,10 @@ workflow INPUT_CSV_ALIGNMENT_ALL_NGS_LIGHT {
         sv_join=phenosv_annovar_snv.join(annovar_sv_result)
         rankscore_join=sv_join.join(rankscore_result)
 	        rankvar_join=rankscore_join.join(rankvar_result)
-	        rankvar_join_hpo=rankvar_join.join(input_bam_no_bam)
-	        rankvar_join_hpo_ordered=rankvar_join_hpo.map { out_prefix, sv_pathogenic, snv_vcf_path, sv_vcf_path, snv_rankscore, snv_pathogenic, snv_rankvar, hpo_path ->
-	            tuple(out_prefix, snv_rankvar, snv_rankscore, snv_pathogenic, sv_pathogenic, sv_vcf_path, snv_vcf_path, hpo_path)
+	        input_bam_hpo_age=input_bam_no_bam.join(input_age).map { out_prefix, hpo_path, age_of_onset -> tuple(out_prefix, hpo_path, age_of_onset) }
+	        rankvar_join_hpo=rankvar_join.join(input_bam_hpo_age)
+	        rankvar_join_hpo_ordered=rankvar_join_hpo.map { out_prefix, sv_pathogenic, snv_vcf_path, sv_vcf_path, snv_rankscore, snv_pathogenic, snv_rankvar, hpo_path, age_of_onset ->
+	            tuple(out_prefix, snv_rankvar, snv_rankscore, snv_pathogenic, sv_pathogenic, sv_vcf_path, snv_vcf_path, hpo_path, age_of_onset)
 	        }
 	        multi_ngs_prio(rankvar_join_hpo_ordered,inheritance_mode)
 
