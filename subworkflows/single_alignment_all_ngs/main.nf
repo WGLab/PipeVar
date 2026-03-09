@@ -33,6 +33,8 @@ workflow SINGLE_ALIGNMENT_ALL_NGS {
 	target
 	caller_mode
 	inheritance_mode
+	include_clinvar_report
+	allow_unphased_comphet
 
 	main:
 

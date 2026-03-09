@@ -100,6 +100,10 @@ FILTERING OPTIONS
   --inheritance_mode <ml|omim|gnomad>
                            Dominant/recessive assignment mode. Default: ml (ML-first, OMIM fallback)
                            Note: gnomad uses gnomAD constraint (LOEUF) fallback lists.
+  --include_clinvar_report <yes|no>
+                           Include ClinVar-only calls in final prioritized report outputs. Default: yes
+  --allow_unphased_comphet <yes|no>
+                           Treat unphased 0/1 or 1/0 AR het pairs as compound het in final prioritization. Default: no
   --rankscore <FLOAT>      Minimum RankScore cutoff. Default: 0.50
   --rankvar <FLOAT>        Minimum RankVar score cutoff. Default: 0.05
   --gq <INT>               Minimum genotype quality. Default: 20
@@ -183,6 +187,8 @@ def raw_target_param = params.target ?: params.targeted
 def clean_target = raw_target_param ? raw_target_param.trim().toLowerCase() : 'no'
 def clean_note   = params.note   ? params.note.trim().toLowerCase()   : 'no'
 def clean_inheritance_mode = params.inheritance_mode ? params.inheritance_mode.trim().toLowerCase() : 'ml'
+def clean_include_clinvar_report = params.include_clinvar_report ? params.include_clinvar_report.trim().toLowerCase() : 'yes'
+def clean_allow_unphased_comphet = params.allow_unphased_comphet ? params.allow_unphased_comphet.trim().toLowerCase() : 'no'
 
 // ------------------------------------------------------------------
 // 1. INPUT VALIDATION (Catching Typos)
@@ -193,6 +199,7 @@ def valid_modes   = ['snp', 'sv']
 def valid_types   = ['ont', 'pacbio', 'short']
 def valid_genomes = ['hg38', 'grch38']
 def valid_inheritance_modes = ['ml', 'omim', 'gnomad']
+def valid_yes_no = ['yes', 'no']
 
 // CHECK 1: Validate Mode
 if (clean_mode && !valid_modes.contains(clean_mode)) {
@@ -258,6 +265,34 @@ if (!valid_inheritance_modes.contains(clean_inheritance_mode)) {
     Notes:
       - ml    = ML-first with OMIM fallback (current script behavior)
       - gnomad maps to LOEUF fallback lists
+    ================================================================
+    """
+}
+
+if (!valid_yes_no.contains(clean_include_clinvar_report)) {
+    error """
+    ================================================================
+    ERROR: Invalid ClinVar Report Toggle
+    ================================================================
+    You provided: --include_clinvar_report "${params.include_clinvar_report}"
+
+    Valid options are:
+      --include_clinvar_report yes
+      --include_clinvar_report no
+    ================================================================
+    """
+}
+
+if (!valid_yes_no.contains(clean_allow_unphased_comphet)) {
+    error """
+    ================================================================
+    ERROR: Invalid Unphased CompHet Toggle
+    ================================================================
+    You provided: --allow_unphased_comphet "${params.allow_unphased_comphet}"
+
+    Valid options are:
+      --allow_unphased_comphet yes
+      --allow_unphased_comphet no
     ================================================================
     """
 }
@@ -501,6 +536,8 @@ ref_fa = Channel
 	type=Channel.value(params.type)
 	def inheritance_mode_script = (clean_inheritance_mode == 'gnomad') ? 'LOEUF' : 'OMIM'
 	inheritance_mode=Channel.value(inheritance_mode_script)
+	include_clinvar_report=Channel.value(clean_include_clinvar_report)
+	allow_unphased_comphet=Channel.value(clean_allow_unphased_comphet)
 	gnomad=Channel.value(params.gnomad)
         rankscore_filter=Channel.value(params.rankscore)
 	rankvar_filter=Channel.value(params.rankvar)
@@ -516,33 +553,33 @@ ref_fa = Channel
 	if ( params.input_csv ) {
         if ( input_vcf != null ) {
             if ( params.mode == 'sv' ) {
-                INPUT_CSV_ALIGNMENT_VCF_SV(input_vcf, input_age, ref_fa, phen2gene_top_n, is_note, target, inheritance_mode)
+                INPUT_CSV_ALIGNMENT_VCF_SV(input_vcf, input_age, ref_fa, phen2gene_top_n, is_note, target, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
             }
             else if ( params.mode == 'snp' ) {
-                INPUT_CSV_ALIGNMENT_VCF_SNP(input_vcf, input_age, ref_fa, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, inheritance_mode)
+                INPUT_CSV_ALIGNMENT_VCF_SNP(input_vcf, input_age, ref_fa, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
             }
         }
         else if ( input_bam != null ) {
 	            if ( params.type == 'short' ) {
 	                    if ( params.mode == 'sv' ) {
-	                        INPUT_CSV_ALIGNMENT_NGS_SV(input_bam, input_age, ref_fa,  is_note, inheritance_mode)
+	                        INPUT_CSV_ALIGNMENT_NGS_SV(input_bam, input_age, ref_fa,  is_note, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 	                    }
 	                    else if ( params.mode == 'snp' ) {
-                        INPUT_CSV_NGS_SNP(input_bam, input_age, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode)
+                        INPUT_CSV_NGS_SNP(input_bam, input_age, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 				}
 				else {
-                                INPUT_CSV_ALIGNMENT_ALL_NGS(input_bam, input_age, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode)
+                                INPUT_CSV_ALIGNMENT_ALL_NGS(input_bam, input_age, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 	                        }
 	            }
 	            else { // Long reads
 	                    if ( params.mode == 'sv' ) {
-	                        INPUT_CSV_ALIGNMENT_LONG_SV(input_bam, input_age, ref_fa,  is_note, inheritance_mode)
+	                        INPUT_CSV_ALIGNMENT_LONG_SV(input_bam, input_age, ref_fa,  is_note, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 	                    }
 	                    else if ( params.mode == 'snp' ) {
-                        INPUT_CSV_ALIGNMENT_LONG_SNP(input_bam, input_age, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller, inheritance_mode)
+                        INPUT_CSV_ALIGNMENT_LONG_SNP(input_bam, input_age, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 	                    }
 	                    else {
-                        INPUT_CSV_ALIGNMENT_ALL_LONGPHASE(input_bam, input_age, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller, inheritance_mode)
+                        INPUT_CSV_ALIGNMENT_ALL_LONGPHASE(input_bam, input_age, ref_fa,  rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 	                    }
 	            }
 	        }
@@ -550,33 +587,33 @@ ref_fa = Channel
     else { // Single File Mode
         if ( params.vcf ) {
             if ( params.mode == 'sv' ) {
-                SINGLE_ALIGNMENT_VCF_SV(vcf, out_prefix, ref_fa,  note, phen2gene_top_n, is_note, target, inheritance_mode)
+                SINGLE_ALIGNMENT_VCF_SV(vcf, out_prefix, ref_fa,  note, phen2gene_top_n, is_note, target, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
             }
             else if ( params.mode == 'snp' ) {
-                SINGLE_ALIGNMENT_VCF_SNP(vcf, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, inheritance_mode)
+                SINGLE_ALIGNMENT_VCF_SNP(vcf, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
             }
         }
         else if ( params.bam != null ) {
 	            if ( params.type == 'short' ) {
 	                    if ( params.mode == 'sv' ) {
-	                        SINGLE_ALIGNMENT_NGS_SV(bam, out_prefix, ref_fa,  note, is_note, inheritance_mode)
+	                        SINGLE_ALIGNMENT_NGS_SV(bam, out_prefix, ref_fa,  note, is_note, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 	                    }
 	                    else if ( params.mode == 'snp' ) {
-                        SINGLE_ALIGNMENT_NGS_SNP(bam, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode)
+                        SINGLE_ALIGNMENT_NGS_SNP(bam, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 	                    }
 			    else {
-			                SINGLE_ALIGNMENT_ALL_NGS(bam, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode)
+			                SINGLE_ALIGNMENT_ALL_NGS(bam, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 			    }
 	            }
 	            else { // Long reads
 	                    if ( params.mode == 'sv' ) {
-	                        SINGLE_ALIGNMENT_LONG_SV(bam, out_prefix, ref_fa,  note, is_note, inheritance_mode)
+	                        SINGLE_ALIGNMENT_LONG_SV(bam, out_prefix, ref_fa,  note, is_note, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 	                    }
 	                    else if ( params.mode == 'snp' ) {
-                        SINGLE_ALIGNMENT_LONG_SNP(bam, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller, inheritance_mode)
+                        SINGLE_ALIGNMENT_LONG_SNP(bam, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 	                    }
 	                    else {
-                        SINGLE_ALIGNMENT_ALL_LONGPHASE(bam, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller, inheritance_mode)
+                        SINGLE_ALIGNMENT_ALL_LONGPHASE(bam, out_prefix, ref_fa,  note, rankscore_filter, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 	                    }
 	            }
 	        }

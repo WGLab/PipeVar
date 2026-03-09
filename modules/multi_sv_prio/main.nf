@@ -1,12 +1,14 @@
 
 // Batch SV evidence merging (PhenoSV + SV annotation) to prioritized VCF.
 process multi_sv_prio {
-	container ='beoungl/docker_test:longphase_0.2.18'
+	container ='beoungl/docker_test:longphase_0.2.24'
 
 	input:
 	tuple val(out_prefix), path(sv_pathogenic), path(annovar_sv_vcf), path(hpo_path), val(age_of_onset)
 
 	val(inheritance_mode)
+	val(include_clinvar_report)
+	val(allow_unphased_comphet)
 
 	output:
 	path "${out_prefix}.prio.vcf"
@@ -25,8 +27,8 @@ process multi_sv_prio {
 
 	python3 /assign_dom_or_rec_sv_only.py ${out_prefix}.phenosv.vcf $hpo_path $age_of_onset $inheritance_mode ${out_prefix}.assigned.vcf
 
-	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio_gene.vcf gene
-	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio.vcf variant
+	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio_gene.vcf gene --include-clinvar $include_clinvar_report --allow-unphased-comphet $allow_unphased_comphet
+	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio.vcf variant --include-clinvar $include_clinvar_report --allow-unphased-comphet $allow_unphased_comphet
 	
 
 	#Potential homozygotes are ranked higher than single heterozygotes, but nothing conclusive.

@@ -31,6 +31,8 @@ workflow INPUT_CSV_NGS_SNP {
 	target
 	caller_mode
 	inheritance_mode
+	include_clinvar_report
+	allow_unphased_comphet
 
 	main:
 
@@ -78,6 +80,6 @@ workflow INPUT_CSV_NGS_SNP {
         snp_prio_input=rankscore_rankvar_join.join(annovar_result_vcf)
         input_bam_hpo_age=input_bam_no_bam.join(input_age).map { out_prefix, hpo_path, age_of_onset -> tuple(out_prefix, hpo_path, age_of_onset) }
         snp_prio_input_hpo=snp_prio_input.join(input_bam_hpo_age)
-        multi_snp_prio(snp_prio_input_hpo,inheritance_mode)
+        multi_snp_prio(snp_prio_input_hpo,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
 
 }	

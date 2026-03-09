@@ -1,7 +1,7 @@
 
 // Filter annotated variants by RankScore and emit ClinVar/RankScore subsets.
 process Rankscore_analysis {
-	container ='beoungl/docker_test:rankscore_0.2.15'
+	container ='beoungl/docker_test:rankscore_0.2.18'
 
 
 	input:
@@ -19,7 +19,7 @@ process Rankscore_analysis {
 
 	"""
 
-	sh /rankscore/clinvar.sh $annovar_output $phen2_gene $out_prefix $gnomad_af $rankscore_filter $phen2gene_top_n $gq
+	bash /rankscore/clinvar.sh $annovar_output $phen2_gene $out_prefix $gnomad_af $rankscore_filter $phen2gene_top_n $gq
 
 	"""
 }

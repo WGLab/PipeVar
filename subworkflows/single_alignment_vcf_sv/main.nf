@@ -20,6 +20,8 @@ workflow SINGLE_ALIGNMENT_VCF_SV {
 	is_note
 	target
 	inheritance_mode
+	include_clinvar_report
+	allow_unphased_comphet
 
 	main:
 	
@@ -39,5 +41,5 @@ workflow SINGLE_ALIGNMENT_VCF_SV {
 		ANNOVAR_SV(vcf,out_prefix,Phen2gene.out,annovar_sv_bed)
 		SURVIVOR(ANNOVAR_SV.out,out_prefix)
 		PhenoSV(SURVIVOR.out,out_prefix,hpo)
-		sv_prio(out_prefix,PhenoSV.out,ANNOVAR_SV.out,hpo,inheritance_mode)
+		sv_prio(out_prefix,PhenoSV.out,ANNOVAR_SV.out,hpo,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
 }

@@ -33,6 +33,8 @@ workflow INPUT_CSV_ALIGNMENT_ALL_LONGPHASE {
 	target
 	caller_mode
 	inheritance_mode
+	include_clinvar_report
+	allow_unphased_comphet
 
 	main:
 	
@@ -98,6 +100,6 @@ workflow INPUT_CSV_ALIGNMENT_ALL_LONGPHASE {
 	join_vcf_bam_rankvar=rankvar_result.join(join_vcf_bam_rankscore)
 	input_bam_hpo_age=input_bam_no_bam.join(input_age).map { out_prefix, hpo_path, age_of_onset -> tuple(out_prefix, hpo_path, age_of_onset) }
 	join_vcf_bam_rankvar_hpo=join_vcf_bam_rankvar.join(input_bam_hpo_age)
-	multi_longphase(join_vcf_bam_rankvar_hpo,ref_fa,inheritance_mode)
+	multi_longphase(join_vcf_bam_rankvar_hpo,ref_fa,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
 
 }	

@@ -24,6 +24,8 @@ workflow INPUT_CSV_ALIGNMENT_VCF_SNP {
 	is_note
 	target
 	inheritance_mode
+	include_clinvar_report
+	allow_unphased_comphet
 
 	main:
 
@@ -52,5 +54,5 @@ workflow INPUT_CSV_ALIGNMENT_VCF_SNP {
 	snp_prio_input=rankscore_rankvar_join.join(annovar_result_vcf)
 	input_vcf_hpo_age=input_vcf_no_vcf.join(input_age).map { out_prefix, hpo_path, age_of_onset -> tuple(out_prefix, hpo_path, age_of_onset) }
 	snp_prio_input_hpo=snp_prio_input.join(input_vcf_hpo_age)
-	multi_snp_prio(snp_prio_input_hpo,inheritance_mode)
+	multi_snp_prio(snp_prio_input_hpo,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
 }	

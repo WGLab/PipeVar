@@ -34,6 +34,8 @@ workflow INPUT_CSV_ALIGNMENT_ALL_NGS {
 	target
 	caller_mode
 	inheritance_mode
+	include_clinvar_report
+	allow_unphased_comphet
 
 	main:
 
@@ -97,6 +99,6 @@ workflow INPUT_CSV_ALIGNMENT_ALL_NGS {
 	rankvar_join_hpo_ordered=rankvar_join_hpo.map { out_prefix, sv_pathogenic, snv_vcf_path, sv_vcf_path, snv_rankscore, snv_pathogenic, snv_rankvar, hpo_path, age_of_onset ->
 	    tuple(out_prefix, snv_rankvar, snv_rankscore, snv_pathogenic, sv_pathogenic, sv_vcf_path, snv_vcf_path, hpo_path, age_of_onset)
 	}
-	multi_ngs_prio(rankvar_join_hpo_ordered,inheritance_mode)
+	multi_ngs_prio(rankvar_join_hpo_ordered,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
 
 }	

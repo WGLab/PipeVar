@@ -31,6 +31,8 @@ workflow SINGLE_ALIGNMENT_ALL_NGS_LIGHT {
 	is_note
 	target
 	inheritance_mode
+	include_clinvar_report
+	allow_unphased_comphet
 
 	main:
 

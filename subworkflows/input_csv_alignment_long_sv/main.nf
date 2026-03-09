@@ -17,6 +17,8 @@ workflow INPUT_CSV_ALIGNMENT_LONG_SV {
 	ref_fa
 	is_note
 	inheritance_mode
+	include_clinvar_report
+	allow_unphased_comphet
 
 	main:
 
@@ -36,6 +38,6 @@ workflow INPUT_CSV_ALIGNMENT_LONG_SV {
         sv_prio_input=phenosv_result.join(annovar_sv_result)
         input_bam_hpo_age=input_bam_no_bam.join(input_age).map { out_prefix, hpo_path, age_of_onset -> tuple(out_prefix, hpo_path, age_of_onset) }
         sv_prio_input_hpo=sv_prio_input.join(input_bam_hpo_age)
-        multi_sv_prio(sv_prio_input_hpo,inheritance_mode)
+        multi_sv_prio(sv_prio_input_hpo,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
 
 }	

@@ -31,6 +31,8 @@ workflow SINGLE_ALIGNMENT_NGS_SNP {
 	target
 	caller_mode
 	inheritance_mode
+	include_clinvar_report
+	allow_unphased_comphet
 
 	main:
 
@@ -64,5 +66,5 @@ workflow SINGLE_ALIGNMENT_NGS_SNP {
 	Rankscore_analysis(ANNOVAR.out.txt_output,Phen2gene.out,out_prefix,gnomad,rankscore_filter,gq,phen2gene_top_n)
 	ExpansionHunter(bam,out_prefix,ref_fa)
 	eh_filter(out_prefix,ExpansionHunter.out)
-	snp_prio(out_prefix,Rankscore_analysis.out.rankscore,Rankscore_analysis.out.clinvar,RankVar.out,ANNOVAR.out.vcf_output,hpo,inheritance_mode)
+	snp_prio(out_prefix,Rankscore_analysis.out.rankscore,Rankscore_analysis.out.clinvar,RankVar.out,ANNOVAR.out.vcf_output,hpo,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
 }

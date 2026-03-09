@@ -187,6 +187,9 @@ Expected CSV columns:
 - `--phen2gene_filter <INT>`: top-N genes retained for targeted mode (default: 500)
 - `--rankscore <FLOAT>`: RankScore threshold (default: 0.50)
 - `--gnomad <FLOAT>`: max AF threshold for SNP prioritization (default: 0.0001)
+- `--inheritance_mode <ml|omim|gnomad>`: inheritance assignment backend for prioritization (default: `ml`)
+- `--include_clinvar_report <yes|no>`: include ClinVar-only calls in final prioritized reports (default: `yes`)
+- `--allow_unphased_comphet <yes|no>`: allow unphased `0/1` or `1/0` AR pairs as compound het in final prioritization (default: `no`)
 - `--gq <INT>`: genotype quality threshold (default: 20)
 - `--ad <INT>`: allele depth threshold (default: 15)
 - `--note <FILE|no>`: phenotype note input, or `no` in CSV mode to interpret `note_path` as HPO file
