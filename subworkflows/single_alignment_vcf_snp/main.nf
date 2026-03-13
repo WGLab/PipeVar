@@ -16,6 +16,7 @@ workflow SINGLE_ALIGNMENT_VCF_SNP {
 	ref_fa
 	note
 	rankscore_filter
+	rankscore_softwares
 	phen2gene_top_n
 	gnomad
 	gq
@@ -45,6 +46,6 @@ workflow SINGLE_ALIGNMENT_VCF_SNP {
 	}
 	ANNOVAR(vcf,out_prefix,annovar_bed)
 	RankVar(ANNOVAR.out.txt_output,Phen2gene.out,hpo,out_prefix,gnomad,gq,ad,rankvar_filter)
-	Rankscore_analysis(ANNOVAR.out.txt_output,Phen2gene.out,out_prefix,gnomad,rankscore_filter,gq,phen2gene_top_n)
+	Rankscore_analysis(ANNOVAR.out.txt_output,Phen2gene.out,out_prefix,gnomad,rankscore_filter,rankscore_softwares,gq,phen2gene_top_n)
 	snp_prio(out_prefix,Rankscore_analysis.out.rankscore,Rankscore_analysis.out.clinvar,RankVar.out,ANNOVAR.out.vcf_output,hpo,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
 }
