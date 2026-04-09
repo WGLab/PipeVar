@@ -10,8 +10,6 @@ process mito_prio {
 
 	script:
 	"""
-	set -euo pipefail
-
 	python3 /opt/mito/bin/prioritize_mito_variants.py \
 	    --input "$annotated_tsv" \
 	    --out "${out_prefix}.mito.prioritized.tsv" \

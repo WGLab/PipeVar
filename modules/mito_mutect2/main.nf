@@ -13,8 +13,6 @@ process mito_mutect2 {
 
 	script:
 	"""
-	set -euo pipefail
-
 	MITO_CONTIG="${mito_contig}"
 	if ! grep -Eq "^>\$MITO_CONTIG([[:space:]]|\$)" "$ref_fa"; then
 	    if grep -Eq '^>MT([[:space:]]|\$)' "$ref_fa"; then

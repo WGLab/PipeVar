@@ -12,21 +12,30 @@ process mito_prep_mutect2 {
 
 	script:
 	"""
-	set -euo pipefail
-
 	MITO_CONTIG="${mito_contig}"
-	if ! samtools idxstats "$bam" | cut -f1 | grep -qx "\$MITO_CONTIG"; then
-	    if samtools idxstats "$bam" | cut -f1 | grep -qx "MT"; then
+	INPUT_BAM="$bam"
+	INPUT_INDEX="$index_file"
+
+	if [[ "$bam" == *.cram ]]; then
+	    samtools view -@ ${task.cpus} -b -T "$ref_fa" -o "${out_prefix}.mito.input.unsorted.bam" "$bam"
+	    samtools sort -@ ${task.cpus} -o "${out_prefix}.mito.input.bam" "${out_prefix}.mito.input.unsorted.bam"
+	    samtools index -@ ${task.cpus} "${out_prefix}.mito.input.bam"
+	    INPUT_BAM="${out_prefix}.mito.input.bam"
+	    INPUT_INDEX="${out_prefix}.mito.input.bam.bai"
+	fi
+
+	if ! samtools idxstats "\$INPUT_BAM" | cut -f1 | grep -qx "\$MITO_CONTIG"; then
+	    if samtools idxstats "\$INPUT_BAM" | cut -f1 | grep -qx "MT"; then
 	        MITO_CONTIG="MT"
-	    elif samtools idxstats "$bam" | cut -f1 | grep -qx "chrM"; then
+	    elif samtools idxstats "\$INPUT_BAM" | cut -f1 | grep -qx "chrM"; then
 	        MITO_CONTIG="chrM"
 	    else
-	        echo "Unable to find mitochondrial contig in $bam" >&2
+	        echo "Unable to find mitochondrial contig in \$INPUT_BAM" >&2
 	        exit 1
 	    fi
 	fi
 
-	gatk PrintReads -R "$ref_fa" -I "$bam" -L "\$MITO_CONTIG" -O "${out_prefix}.mito.subset.bam"
+	gatk PrintReads -R "$ref_fa" -I "\$INPUT_BAM" -L "\$MITO_CONTIG" -O "${out_prefix}.mito.subset.bam"
 	samtools index -@ ${task.cpus} "${out_prefix}.mito.subset.bam"
 	gatk RevertSam \
 	    -I "${out_prefix}.mito.subset.bam" \

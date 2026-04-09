@@ -9,8 +9,6 @@ process multi_mito_annotation {
 
 	script:
 	"""
-	set -euo pipefail
-
 	python3 /opt/mito/bin/annotate_mito_variants.py \
 	    --vcf "$mito_vcf" \
 	    --out-prefix "$out_prefix" \
