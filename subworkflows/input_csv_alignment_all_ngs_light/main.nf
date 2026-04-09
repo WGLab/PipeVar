@@ -20,14 +20,21 @@ include { multi_ngs_prio } from '../../modules/multi_ngs_prio/'
 workflow INPUT_CSV_ALIGNMENT_ALL_NGS_LIGHT {
 	take:
 	input_bam
+	input_age
 	ref_fa
 	rankscore_filter
+	rankscore_softwares
 	phen2gene_top_n
 	gnomad
 	gq
 	ad
+
+	rankvar_filter
 	is_note
 	target
+	inheritance_mode
+	include_clinvar_report
+	allow_unphased_comphet
 
 	main:
 
@@ -46,17 +53,27 @@ workflow INPUT_CSV_ALIGNMENT_ALL_NGS_LIGHT {
         else {
                 haplotypecaller_result=multi_haplotypecaller(multi_prep_gatk_result,ref_fa,target)
         }
-        haplotypecaller_result_annovar=haplotypecaller_result.join(input_bam_no_bam)
-        annovar_result=multi_annovar(haplotypecaller_result_annovar)
+        if ( target == "yes" ) {
+                annovar_input=haplotypecaller_result.join(phen2_gene_bed).map { out_prefix, vcf_file, bed_file -> tuple(out_prefix, vcf_file, bed_file) }
+        }
+        else {
+                annovar_input=haplotypecaller_result.map { out_prefix, vcf_file -> tuple(out_prefix, vcf_file, target) }
+        }
+        annovar_result=multi_annovar(annovar_input)
 	annovar_result_txt=annovar_result.map { item -> tuple(item[0], item[1]) }
         join_annovar_phen2gene=annovar_result_txt.join(phen2gene_result)
         join_annovar_hpo=join_annovar_phen2gene.join(input_bam_no_bam)
-        rankscore_result=multi_rankscore(join_annovar_phen2gene,gnomad,rankscore_filter,phen2gene_top_n)
-        rankvar_result=multi_rankvar(join_annovar_hpo,gnomad,gq,ad)
+        rankscore_result=multi_rankscore(join_annovar_phen2gene,gnomad,rankscore_filter,rankscore_softwares,gq,phen2gene_top_n)
+        rankvar_result=multi_rankvar(join_annovar_hpo,gnomad,gq,ad,rankvar_filter)
         multi_eh_result=multi_expansionhunter(input_bam_with_bam,ref_fa_no_dict)
         multi_eh_filter(multi_eh_result)
         manta_result=multi_manta(input_bam_with_bam,ref_fa_no_dict)
-	manta_result_annovar=manta_result.join(input_bam_no_bam)
+        if ( target == "yes" ) {
+	        manta_result_annovar=manta_result.join(phen2gene_result).join(phen2_gene_bed).map { out_prefix, vcf_file, phen2gene_file, bed_file -> tuple(out_prefix, vcf_file, phen2gene_file, bed_file) }
+        }
+        else {
+	        manta_result_annovar=manta_result.join(phen2gene_result).map { out_prefix, vcf_file, phen2gene_file -> tuple(out_prefix, vcf_file, phen2gene_file, target) }
+        }
 	annovar_sv_result=multi_annovar_sv(manta_result_annovar)
         survivor_result=multi_survivor(annovar_sv_result)
         phenosv_input=survivor_result.join(input_bam_no_bam)
@@ -66,8 +83,11 @@ workflow INPUT_CSV_ALIGNMENT_ALL_NGS_LIGHT {
         sv_join=phenosv_annovar_snv.join(annovar_sv_result)
         rankscore_join=sv_join.join(rankscore_result)
 	        rankvar_join=rankscore_join.join(rankvar_result)
-	        multi_ngs_prio(rankvar_join)
+	        input_bam_hpo_age=input_bam_no_bam.join(input_age).map { out_prefix, hpo_path, age_of_onset -> tuple(out_prefix, hpo_path, age_of_onset) }
+	        rankvar_join_hpo=rankvar_join.join(input_bam_hpo_age)
+	        rankvar_join_hpo_ordered=rankvar_join_hpo.map { out_prefix, sv_pathogenic, snv_vcf_path, sv_vcf_path, snv_rankscore, snv_pathogenic, snv_rankvar, hpo_path, age_of_onset ->
+	            tuple(out_prefix, snv_rankvar, snv_rankscore, snv_pathogenic, sv_pathogenic, sv_vcf_path, snv_vcf_path, hpo_path, age_of_onset)
+	        }
+	        multi_ngs_prio(rankvar_join_hpo_ordered,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
 
 }	
-
-

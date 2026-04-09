@@ -18,6 +18,9 @@ workflow SINGLE_ALIGNMENT_LONG_SV {
 	ref_fa
 	note
 	is_note
+	inheritance_mode
+	include_clinvar_report
+	allow_unphased_comphet
 
 	main:
 	
@@ -28,10 +31,9 @@ workflow SINGLE_ALIGNMENT_LONG_SV {
 	}
 	Phen2gene(hpo,out_prefix)
 	sniffles(bam,out_prefix,ref_fa)
-	ANNOVAR_SV(sniffles.out,out_prefix,Phen2gene.out)
+	ANNOVAR_SV(sniffles.out,out_prefix,Phen2gene.out,"null")
 	SURVIVOR(ANNOVAR_SV.out,out_prefix)
 	PhenoSV(SURVIVOR.out,out_prefix,hpo)
 	NanoRepeat(bam,out_prefix,ref_fa)
-	sv_prio(out_prefix,PhenoSV.out,ANNOVAR_SV.out)
+	sv_prio(out_prefix,PhenoSV.out,ANNOVAR_SV.out,hpo,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
 }
-

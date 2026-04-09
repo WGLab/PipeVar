@@ -18,15 +18,22 @@ include { multi_snp_prio } from '../../modules/multi_snp_prio/'
 workflow INPUT_CSV_NGS_SNP {
 	take:
 	input_bam
+	input_age
 	ref_fa
 	rankscore_filter
+	rankscore_softwares
 	phen2gene_top_n
 	gnomad
 	gq
 	ad
+
+	rankvar_filter
 	is_note
 	target
 	caller_mode
+	inheritance_mode
+	include_clinvar_report
+	allow_unphased_comphet
 
 	main:
 
@@ -55,20 +62,25 @@ workflow INPUT_CSV_NGS_SNP {
                         snp_result=multi_deepvariant(input_bam_with_bam,ref_fa,target)
                 }
         }
-        snp_result_annovar=snp_result.join(input_bam_no_bam)
-        annovar_result=multi_annovar(snp_result_annovar)
+        if ( target == "yes" ) {
+                annovar_input=snp_result.join(phen2_gene_bed).map { out_prefix, vcf_file, bed_file -> tuple(out_prefix, vcf_file, bed_file) }
+        }
+        else {
+                annovar_input=snp_result.map { out_prefix, vcf_file -> tuple(out_prefix, vcf_file, target) }
+        }
+        annovar_result=multi_annovar(annovar_input)
 	annovar_result_txt=annovar_result.map { item -> tuple(item[0], item[1]) }
         join_annovar_phen2gene=annovar_result_txt.join(phen2gene_result)
         join_annovar_hpo=join_annovar_phen2gene.join(input_bam_no_bam)
         multi_eh_result=multi_expansionhunter(input_bam_with_bam,ref_fa)
         multi_eh_filter(multi_eh_result)
-	rankscore_result=multi_rankscore(join_annovar_phen2gene,gnomad,rankscore_filter,phen2gene_top_n)
-        rankvar_result=multi_rankvar(join_annovar_hpo,gnomad,gq,ad)
-        rankscore_rankvar_join=rankvar_result.join(rankscore_result)
+	rankscore_result=multi_rankscore(join_annovar_phen2gene,gnomad,rankscore_filter,rankscore_softwares,gq,phen2gene_top_n)
+        rankvar_result=multi_rankvar(join_annovar_hpo,gnomad,gq,ad,rankvar_filter)
+        rankscore_rankvar_join=rankscore_result.join(rankvar_result)
         annovar_result_vcf=annovar_result.map { item -> tuple(item[0], item[2]) }
         snp_prio_input=rankscore_rankvar_join.join(annovar_result_vcf)
-        multi_snp_prio(snp_prio_input)
+        input_bam_hpo_age=input_bam_no_bam.join(input_age).map { out_prefix, hpo_path, age_of_onset -> tuple(out_prefix, hpo_path, age_of_onset) }
+        snp_prio_input_hpo=snp_prio_input.join(input_bam_hpo_age)
+        multi_snp_prio(snp_prio_input_hpo,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
 
 }	
-
-

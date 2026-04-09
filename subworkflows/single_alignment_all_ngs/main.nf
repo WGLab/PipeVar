@@ -6,13 +6,18 @@ include { ANNOVAR } from '../../modules/annovar/'
 include { Phen2gene } from '../../modules/phen2gene/'
 include { RankVar } from '../../modules/rankvar/'
 include { Manta } from '../../modules/manta/'
+include { normalize_shortread_alignment } from '../../modules/normalize_shortread_alignment/'
+include { CNVnator } from '../../modules/cnvnator/'
+include { merge_shortread_sv_callers } from '../../modules/merge_shortread_sv_callers/'
 include { deepvariant } from '../../modules/deepvariant/'
 include { haplotypecaller } from '../../modules/haplotypecaller/'
+include { ANNOVAR_SV } from '../../modules/annovar_sv/'
 include { ExpansionHunter } from '../../modules/expansion_hunter/'
 include { Rankscore_analysis } from '../../modules/rankscore_analysis/'
 include { phenotagger } from '../../modules/phenotagger/'
 include { eh_filter } from '../../modules/eh_filter/'
 include { phen2gene_filter } from '../../modules/reduce_region_phen2gene/'
+include { ngs_prio } from '../../modules/ngs_prio/'
 
 
 // Single sample: short-read full path (SNP + SV + STR) with DeepVariant and Manta.
@@ -23,13 +28,19 @@ workflow SINGLE_ALIGNMENT_ALL_NGS {
 	ref_fa
 	note
 	rankscore_filter
+	rankscore_softwares
 	phen2gene_top_n
 	gnomad
 	gq
 	ad
+
+	rankvar_filter
 	is_note
 	target
 	caller_mode
+	inheritance_mode
+	include_clinvar_report
+	allow_unphased_comphet
 
 	main:
 
@@ -57,15 +68,29 @@ workflow SINGLE_ALIGNMENT_ALL_NGS {
 		}
 	}
 	snp_vcf = (caller_mode == "haplotypecaller") ? haplotypecaller.out : deepvariant.out
-	ANNOVAR(snp_vcf,out_prefix)
-	RankVar(ANNOVAR.out.txt_output,Phen2gene.out,hpo,out_prefix,gnomad,gq,ad)
-	rankscore_result=Rankscore_analysis(ANNOVAR.out.txt_output,Phen2gene.out,out_prefix,gnomad,rankscore_filter,phen2gene_top_n)
+	annovar_bed = (target == "yes") ? phen2_gene_bed : target
+	ANNOVAR(snp_vcf,out_prefix,annovar_bed)
+	RankVar(ANNOVAR.out.txt_output,Phen2gene.out,hpo,out_prefix,gnomad,gq,ad,rankvar_filter)
+	rankscore_result=Rankscore_analysis(ANNOVAR.out.txt_output,Phen2gene.out,out_prefix,gnomad,rankscore_filter,rankscore_softwares,gq,phen2gene_top_n)
 	Manta(bam,out_prefix,ref_fa)
-	SURVIVOR(Manta.out,out_prefix)
+
+	cnvnator_mode = params.cnvnator ? params.cnvnator.toString().trim().toLowerCase() : "yes"
+	if ( cnvnator_mode != "no" ) {
+		normalize_shortread_alignment(bam,out_prefix,ref_fa)
+		CNVnator(normalize_shortread_alignment.out,out_prefix,ref_fa,params.cnvnator_bin_size)
+		merge_shortread_sv_callers(Manta.out,CNVnator.out.vcf,out_prefix)
+		sv_vcf=merge_shortread_sv_callers.out
+	}
+	else {
+		sv_vcf=Manta.out
+	}
+
+	sv_annovar_bed = (target == "yes") ? phen2_gene_bed : target
+	ANNOVAR_SV(sv_vcf,out_prefix,Phen2gene.out,sv_annovar_bed)
+	SURVIVOR(ANNOVAR_SV.out,out_prefix)
 	PhenoSV(SURVIVOR.out,out_prefix,hpo)
 	ExpansionHunter(bam,out_prefix,ref_fa)
 	eh_filter(out_prefix,ExpansionHunter.out)
+	ngs_prio(out_prefix,RankVar.out,Rankscore_analysis.out.rankscore,Rankscore_analysis.out.clinvar,PhenoSV.out,ANNOVAR_SV.out,ANNOVAR.out.vcf_output,hpo,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
 
 }
-
-

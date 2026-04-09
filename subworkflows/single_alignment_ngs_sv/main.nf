@@ -4,6 +4,9 @@ include { SURVIVOR } from '../../modules/survivor/'
 include { PhenoSV } from '../../modules/phenosv/'
 include { Phen2gene } from '../../modules/phen2gene/'
 include { Manta } from '../../modules/manta/'
+include { normalize_shortread_alignment } from '../../modules/normalize_shortread_alignment/'
+include { CNVnator } from '../../modules/cnvnator/'
+include { merge_shortread_sv_callers } from '../../modules/merge_shortread_sv_callers/'
 include { ANNOVAR_SV } from '../../modules/annovar_sv/'
 include { ExpansionHunter } from '../../modules/expansion_hunter/'
 include { phenotagger } from '../../modules/phenotagger/'
@@ -19,6 +22,9 @@ workflow SINGLE_ALIGNMENT_NGS_SV {
 	ref_fa
 	note
 	is_note
+	inheritance_mode
+	include_clinvar_report
+	allow_unphased_comphet
 
 	main:
 
@@ -29,12 +35,22 @@ workflow SINGLE_ALIGNMENT_NGS_SV {
 	}
 	Phen2gene(hpo,out_prefix)
 	Manta(bam,out_prefix,ref_fa)
-		ANNOVAR_SV(Manta.out,out_prefix,Phen2gene.out)
+
+	cnvnator_mode = params.cnvnator ? params.cnvnator.toString().trim().toLowerCase() : "yes"
+	if ( cnvnator_mode != "no" ) {
+		normalize_shortread_alignment(bam,out_prefix,ref_fa)
+		CNVnator(normalize_shortread_alignment.out,out_prefix,ref_fa,params.cnvnator_bin_size)
+		merge_shortread_sv_callers(Manta.out,CNVnator.out.vcf,out_prefix)
+		sv_vcf=merge_shortread_sv_callers.out
+	}
+	else {
+		sv_vcf=Manta.out
+	}
+
+	ANNOVAR_SV(sv_vcf,out_prefix,Phen2gene.out,"null")
 	SURVIVOR(ANNOVAR_SV.out,out_prefix)
 	PhenoSV(SURVIVOR.out,out_prefix,hpo)
 	ExpansionHunter(bam,out_prefix,ref_fa)
 	eh_filter(out_prefix,ExpansionHunter.out)
-		sv_prio(out_prefix,PhenoSV.out,ANNOVAR_SV.out)
+		sv_prio(out_prefix,PhenoSV.out,ANNOVAR_SV.out,hpo,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
 }
-
-

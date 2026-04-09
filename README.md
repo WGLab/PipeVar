@@ -1,13 +1,14 @@
-# PipeVar
+# PipeVar_mito
 
-PipeVar is a Nextflow DSL2 workflow for rare-disease variant prioritization from short-read and long-read data.
-It supports SNP/indel, SV, and repeat expansion analysis, and integrates phenotype-aware ranking.
+PipeVar_mito is a Nextflow DSL2 workflow for rare-disease variant prioritization from short-read and long-read data, with an additional opt-in mitochondrial analysis branch for short-read BAM/CRAM inputs.
+It keeps the existing nuclear SNP/SV/repeat analysis and adds mtDNA calling, annotation, and prioritization outputs.
 
 ## What PipeVar does
 
 - Calls and prioritizes SNP/indel variants.
 - Calls and prioritizes structural variants (SV).
 - Runs repeat expansion analysis (short-read and long-read paths).
+- Optionally calls and annotates mitochondrial variants with Mutect2 plus bundled mtDNA evidence databases.
 - Uses phenotype inputs (`--hpo` or clinical note via `--note`) for phenotype-guided ranking.
 - Supports single-sample mode and CSV batch mode.
 
@@ -41,6 +42,8 @@ All Singularity/Docker profiles mount:
 
 - `--annovar_host_path` -> `/annovar`
 - `--phenosv_host_path` -> `/PhenoSV/train_data`
+
+Mitochondrial databases are baked into the mito annotation Docker image and do not require extra runtime bind mounts.
 
 ## Setup
 
@@ -100,6 +103,38 @@ Non-interactive setup example:
   --phenosv-bind=/data/PhenoSV_model
 ```
 
+## Mitochondrial analysis
+
+PipeVar_mito adds an opt-in mitochondrial branch for short-read BAM/CRAM input:
+
+- enable with `--mito yes`
+- supported only with `--type short`
+- supported only with BAM/CRAM input, not VCF-only mode
+- supported with `--mode snp` or when `--mode` is omitted
+
+The mito branch emits separate outputs and does not modify the existing nuclear `.prio.vcf` outputs.
+
+Bundled mito database sources in the annotation image:
+
+- `MITOMAP`
+- `MitoTip`
+- `t-APOGEE`
+- `MitImpact`
+
+Example:
+
+```bash
+nextflow run main.nf \
+  -profile local_docker \
+  --bam sample.bam \
+  --ref_fa ref.fa \
+  --hpo sample.hpo.txt \
+  --type short \
+  --mode snp \
+  --mito yes \
+  --out_prefix sample1
+```
+
 ## Input modes
 
 ## Single-sample BAM/CRAM mode
@@ -136,6 +171,14 @@ Required:
 Expected CSV columns:
 
 - `sample,file_path,note_path`
+- Optional age column for CSV prioritization flows:
+  - `sample,file_path,note_path,age_of_onset`
+  - `sample,file_path,note_path,age`
+  - If both are present, `age_of_onset` is used.
+  - Age is interpreted per row (per sample), not globally.
+  - Empty age is allowed and treated as not provided.
+  - Non-empty age must be `xd`/`xm`/`xy` or integer years.
+  - Examples: `10d`, `9m`, `7y`, `7` (`7` is normalized to `7y`).
 
 Phenotype handling in CSV mode:
 
@@ -154,6 +197,14 @@ Required:
 Expected CSV columns:
 
 - `sample,file_path,note_path`
+- Optional age column for CSV prioritization flows:
+  - `sample,file_path,note_path,age_of_onset`
+  - `sample,file_path,note_path,age`
+  - If both are present, `age_of_onset` is used.
+  - Age is interpreted per row (per sample), not globally.
+  - Empty age is allowed and treated as not provided.
+  - Non-empty age must be `xd`/`xm`/`xy` or integer years.
+  - Examples: `10d`, `9m`, `7y`, `7` (`7` is normalized to `7y`).
 
 ## Core parameters
 
@@ -170,7 +221,11 @@ Expected CSV columns:
 - `--target <yes|no>`: restrict SNP calling to phenotype-derived gene BED
 - `--phen2gene_filter <INT>`: top-N genes retained for targeted mode (default: 500)
 - `--rankscore <FLOAT>`: RankScore threshold (default: 0.50)
+- `--rankscore_softwares <CSV>`: comma-separated RankScore software names for score aggregation (default: all built-in tools)
 - `--gnomad <FLOAT>`: max AF threshold for SNP prioritization (default: 0.0001)
+- `--inheritance_mode <ml|omim|gnomad>`: inheritance assignment backend for prioritization (default: `ml`)
+- `--include_clinvar_report <yes|no>`: include ClinVar-only calls in final prioritized reports (default: `yes`)
+- `--allow_unphased_comphet <yes|no>`: allow unphased `0/1` or `1/0` AR pairs as compound het in final prioritization (default: `no`)
 - `--gq <INT>`: genotype quality threshold (default: 20)
 - `--ad <INT>`: allele depth threshold (default: 15)
 - `--note <FILE|no>`: phenotype note input, or `no` in CSV mode to interpret `note_path` as HPO file
@@ -236,6 +291,7 @@ nextflow run main.nf \
   --mode snp \
   --ref_fa /refs/hg38.fa \
   --hpo /data/p3_hpo.txt \
+  --rankscore_softwares "REVEL,AlphaMissense,CADD_raw" \
   --out_prefix p3
 ```
 

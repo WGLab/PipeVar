@@ -16,12 +16,18 @@ workflow INPUT_CSV_ALIGNMENT_NGS_SNP_LIGHT {
 	input_bam
 	ref_fa
 	rankscore_filter
+	rankscore_softwares
 	phen2gene_top_n
 	gnomad
 	gq
 	ad
+
+	rankvar_filter
 	is_note
 	target
+	inheritance_mode
+	include_clinvar_report
+	allow_unphased_comphet
 
 	main:
 
@@ -40,19 +46,23 @@ workflow INPUT_CSV_ALIGNMENT_NGS_SNP_LIGHT {
         else {
                 haplotypecaller_result=multi_haplotypecaller(multi_prep_gatk_result,ref_fa,target)
         }	
-        haplotypecaller_result_annovar=haplotypecaller_result.join(input_bam_no_bam)
-        annovar_result=multi_annovar(haplotypecaller_result_annovar)
+        if ( target == "yes" ) {
+                annovar_input=haplotypecaller_result.join(phen2_gene_bed).map { out_prefix, vcf_file, bed_file -> tuple(out_prefix, vcf_file, bed_file) }
+        }
+        else {
+                annovar_input=haplotypecaller_result.map { out_prefix, vcf_file -> tuple(out_prefix, vcf_file, target) }
+        }
+        annovar_result=multi_annovar(annovar_input)
 	annovar_result_txt=annovar_result.map { item -> tuple(item[0], item[1]) }
         join_annovar_phen2gene=annovar_result_txt.join(phen2gene_result)
         join_annovar_hpo=join_annovar_phen2gene.join(input_bam_no_bam)
-        rankscore_result=multi_rankscore(join_annovar_phen2gene,gnomad,rankscore_filter,phen2gene_top_n)
-        rankvar_result=multi_rankvar(join_annovar_hpo,gnomad,gq,ad)
-        rankscore_rankvar_join=rankvar_result.join(rankscore_result)
+        rankscore_result=multi_rankscore(join_annovar_phen2gene,gnomad,rankscore_filter,rankscore_softwares,gq,phen2gene_top_n)
+        rankvar_result=multi_rankvar(join_annovar_hpo,gnomad,gq,ad,rankvar_filter)
+        rankscore_rankvar_join=rankscore_result.join(rankvar_result)
         annovar_result_vcf=annovar_result.map { item -> tuple(item[0], item[2]) }
         snp_prio_input=rankscore_rankvar_join.join(annovar_result_vcf)
-        multi_snp_prio(snp_prio_input)
+        snp_prio_input_hpo=snp_prio_input.join(input_bam_no_bam)
+        multi_snp_prio(snp_prio_input_hpo,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
 
 }	
-
-
 

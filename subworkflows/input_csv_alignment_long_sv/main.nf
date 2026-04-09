@@ -13,8 +13,12 @@ include { multi_sv_prio } from '../../modules/multi_sv_prio/'
 workflow INPUT_CSV_ALIGNMENT_LONG_SV {
 	take:
 	input_bam
+	input_age
 	ref_fa
 	is_note
+	inheritance_mode
+	include_clinvar_report
+	allow_unphased_comphet
 
 	main:
 
@@ -25,16 +29,15 @@ workflow INPUT_CSV_ALIGNMENT_LONG_SV {
         }
 	phen2gene_result=multi_phen2gene(input_bam_no_bam)
 	sniffles_result=multi_sniffles(input_bam_with_bam,ref_fa)
-	sniffles_result_annovar=sniffles_result.join(phen2gene_result)
+	sniffles_result_annovar=sniffles_result.join(phen2gene_result).map { out_prefix, vcf_file, phen2gene_file -> tuple(out_prefix, vcf_file, phen2gene_file, "null") }
 	annovar_sv_result=multi_annovar_sv(sniffles_result_annovar)
 	survivor_result=multi_survivor(annovar_sv_result)
 	phenosv_input=survivor_result.join(input_bam_no_bam)
 	phenosv_result=multi_phenosv(phenosv_input)
 	multi_nanorepeat(input_bam_with_bam,ref_fa)
         sv_prio_input=phenosv_result.join(annovar_sv_result)
-        multi_sv_prio(sv_prio_input)
+        input_bam_hpo_age=input_bam_no_bam.join(input_age).map { out_prefix, hpo_path, age_of_onset -> tuple(out_prefix, hpo_path, age_of_onset) }
+        sv_prio_input_hpo=sv_prio_input.join(input_bam_hpo_age)
+        multi_sv_prio(sv_prio_input_hpo,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
 
 }	
-
-
-
