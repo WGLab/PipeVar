@@ -676,6 +676,7 @@ mito_ref_fa = Channel
 	output_directory_check.mkdirs()
         }
 	type=Channel.value(params.type)
+	mito_contig=Channel.value(params.mito_contig)
 	def inheritance_mode_script = (clean_inheritance_mode == 'gnomad') ? 'LOEUF' : 'OMIM'
 	inheritance_mode=Channel.value(inheritance_mode_script)
 	include_clinvar_report=Channel.value(clean_include_clinvar_report)
@@ -704,7 +705,7 @@ mito_ref_fa = Channel
         }
         else if ( input_bam != null ) {
 	            if ( clean_mito == 'yes' && params.type == 'short' ) {
-	                INPUT_CSV_ALIGNMENT_NGS_MITO(input_bam, mito_ref_fa)
+	                INPUT_CSV_ALIGNMENT_NGS_MITO(input_bam, mito_ref_fa, mito_contig)
 	            }
 	            if ( params.type == 'short' ) {
 	                    if ( params.mode == 'sv' ) {
@@ -741,7 +742,7 @@ mito_ref_fa = Channel
         }
         else if ( params.bam != null ) {
 	            if ( clean_mito == 'yes' && params.type == 'short' ) {
-	                SINGLE_ALIGNMENT_NGS_MITO(bam, out_prefix, mito_ref_fa)
+	                SINGLE_ALIGNMENT_NGS_MITO(bam, out_prefix, mito_ref_fa, mito_contig)
 	            }
 	            if ( params.type == 'short' ) {
 	                    if ( params.mode == 'sv' ) {

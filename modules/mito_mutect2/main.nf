@@ -5,6 +5,7 @@ process mito_mutect2 {
 	tuple path(bam), path(index_file), path(metrics_file)
 	val out_prefix
 	tuple path(ref_fa), path(fa_index), path(dict_index)
+	val mito_contig
 
 	output:
 	path "${out_prefix}.mito.vcf.gz"
@@ -14,11 +15,11 @@ process mito_mutect2 {
 	"""
 	set -euo pipefail
 
-	MITO_CONTIG="${params.mito_contig}"
-	if ! grep -Eq "^>${MITO_CONTIG}([[:space:]]|$)" "$ref_fa"; then
-	    if grep -Eq '^>MT([[:space:]]|$)' "$ref_fa"; then
+	MITO_CONTIG="${mito_contig}"
+	if ! grep -Eq "^>\$MITO_CONTIG([[:space:]]|\$)" "$ref_fa"; then
+	    if grep -Eq '^>MT([[:space:]]|\$)' "$ref_fa"; then
 	        MITO_CONTIG="MT"
-	    elif grep -Eq '^>chrM([[:space:]]|$)' "$ref_fa"; then
+	    elif grep -Eq '^>chrM([[:space:]]|\$)' "$ref_fa"; then
 	        MITO_CONTIG="chrM"
 	    fi
 	fi
@@ -26,7 +27,7 @@ process mito_mutect2 {
 	gatk Mutect2 \
 	    -R "$ref_fa" \
 	    -I "$bam" \
-	    -L "$MITO_CONTIG" \
+	    -L "\$MITO_CONTIG" \
 	    --mitochondria-mode true \
 	    -O "${out_prefix}.mito.raw.vcf.gz"
 

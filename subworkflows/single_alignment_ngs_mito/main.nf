@@ -8,10 +8,11 @@ workflow SINGLE_ALIGNMENT_NGS_MITO {
 	bam
 	out_prefix
 	ref_fa
+	mito_contig
 
 	main:
-	mito_prep_mutect2(bam, out_prefix, ref_fa)
-	mito_mutect2(mito_prep_mutect2.out, out_prefix, ref_fa)
+	mito_prep_mutect2(bam, out_prefix, ref_fa, mito_contig)
+	mito_mutect2(mito_prep_mutect2.out, out_prefix, ref_fa, mito_contig)
 	mito_annotation(mito_mutect2.out[0], out_prefix)
 	mito_prio(mito_annotation.out[0], out_prefix)
 

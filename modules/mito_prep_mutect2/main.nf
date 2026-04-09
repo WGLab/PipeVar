@@ -5,6 +5,7 @@ process mito_prep_mutect2 {
 	tuple path(bam), path(index_file)
 	val out_prefix
 	tuple path(ref_fa), path(fa_index), path(dict_index)
+	val mito_contig
 
 	output:
 	tuple path("${out_prefix}.mito.prepped.bam"), path("${out_prefix}.mito.prepped.bam.bai"), path("${out_prefix}.mito.dup_metrics.txt")
@@ -13,8 +14,8 @@ process mito_prep_mutect2 {
 	"""
 	set -euo pipefail
 
-	MITO_CONTIG="${params.mito_contig}"
-	if ! samtools idxstats "$bam" | cut -f1 | grep -qx "$MITO_CONTIG"; then
+	MITO_CONTIG="${mito_contig}"
+	if ! samtools idxstats "$bam" | cut -f1 | grep -qx "\$MITO_CONTIG"; then
 	    if samtools idxstats "$bam" | cut -f1 | grep -qx "MT"; then
 	        MITO_CONTIG="MT"
 	    elif samtools idxstats "$bam" | cut -f1 | grep -qx "chrM"; then
@@ -25,7 +26,7 @@ process mito_prep_mutect2 {
 	    fi
 	fi
 
-	gatk PrintReads -R "$ref_fa" -I "$bam" -L "$MITO_CONTIG" -O "${out_prefix}.mito.subset.bam"
+	gatk PrintReads -R "$ref_fa" -I "$bam" -L "\$MITO_CONTIG" -O "${out_prefix}.mito.subset.bam"
 	samtools index -@ ${task.cpus} "${out_prefix}.mito.subset.bam"
 	gatk RevertSam \
 	    -I "${out_prefix}.mito.subset.bam" \
