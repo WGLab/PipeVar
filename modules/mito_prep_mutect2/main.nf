@@ -24,6 +24,20 @@ process mito_prep_mutect2 {
 	    INPUT_INDEX="${out_prefix}.mito.input.bam.bai"
 	fi
 
+	if ! samtools view -H "\$INPUT_BAM" | grep -q '^@RG'; then
+	    gatk AddOrReplaceReadGroups \
+	        -I "\$INPUT_BAM" \
+	        -O "${out_prefix}.mito.rg.bam" \
+	        -RGID "${out_prefix}" \
+	        -RGLB "${out_prefix}" \
+	        -RGPL "ILLUMINA" \
+	        -RGPU "${out_prefix}.unit1" \
+	        -RGSM "${out_prefix}" \
+	        --CREATE_INDEX true
+	    INPUT_BAM="${out_prefix}.mito.rg.bam"
+	    INPUT_INDEX="${out_prefix}.mito.rg.bam.bai"
+	fi
+
 	if ! samtools idxstats "\$INPUT_BAM" | cut -f1 | grep -qx "\$MITO_CONTIG"; then
 	    if samtools idxstats "\$INPUT_BAM" | cut -f1 | grep -qx "MT"; then
 	        MITO_CONTIG="MT"
