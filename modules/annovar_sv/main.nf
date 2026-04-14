@@ -27,9 +27,7 @@ process ANNOVAR_SV {
 	bash /phen2gene_filter.sh $phen2gene ${out_prefix}_sv.hg38_multianno.vcf $out_prefix
 
 
-	bcftools view -h ${out_prefix}_sv.hg38_multianno.vcf > ${out_prefix}.exonic.vcf
-
-	grep -wi 'exonic' ${out_prefix}_sv.phen2gene.vcf >> ${out_prefix}.exonic.vcf
+	cp ${out_prefix}_sv.phen2gene.vcf ${out_prefix}.exonic.vcf
 
 
 	"""

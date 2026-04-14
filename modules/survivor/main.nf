@@ -29,7 +29,7 @@ process SURVIVOR {
 	        -e 's/\\bINV\\b/inversion/g' \
 	        -e 's/\\bDUP\\b/duplication/g' \
 	        -e 's/\\bBND\\b/translocation/g' | \
-	    awk 'BEGIN{IGNORECASE=1} \$0 !~ /(^|[[:space:]])TRA([[:space:]]|\$)/ && \$0 !~ /(^|[[:space:]])INS([[:space:]]|\$)/ {print}'
+	    awk 'BEGIN{IGNORECASE=1} \$0 !~ /(^|[[:space:]])TRA([[:space:]]|\$)/ {print}'
 	} > ${out_prefix}.bed
 
 	rm -f ${out_prefix}.int.bed

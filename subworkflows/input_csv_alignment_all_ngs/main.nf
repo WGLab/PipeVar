@@ -7,6 +7,7 @@ include { multi_survivor } from '../../modules/multi_survivor/'
 include { multi_phenosv } from '../../modules/multi_phenosv/'
 include { multi_rankvar } from '../../modules/multi_rankvar/'
 include { multi_manta } from '../../modules/multi_manta/'
+include { multi_melt } from '../../modules/multi_melt/'
 include { multi_normalize_shortread_alignment } from '../../modules/multi_normalize_shortread_alignment/'
 include { multi_cnvnator } from '../../modules/multi_cnvnator/'
 include { multi_merge_shortread_sv_callers } from '../../modules/multi_merge_shortread_sv_callers/'
@@ -83,12 +84,32 @@ workflow INPUT_CSV_ALIGNMENT_ALL_NGS {
         multi_eh_result=multi_expansionhunter(input_bam_with_bam,ref_fa)
         multi_eh_filter(multi_eh_result)
         manta_result=multi_manta(input_bam_with_bam,ref_fa)
+	melt_mode = params.melt ? params.melt.toString().trim().toLowerCase() : "no"
+	if ( melt_mode == "yes" ) {
+		melt_result=multi_melt(input_bam_with_bam,ref_fa)
+	}
 
 	cnvnator_mode = params.cnvnator ? params.cnvnator.toString().trim().toLowerCase() : "yes"
-	if ( cnvnator_mode != "no" ) {
+	if ( cnvnator_mode != "no" && melt_mode == "yes" ) {
 		normalized_bam=multi_normalize_shortread_alignment(input_bam_with_bam,ref_fa)
 		multi_cnvnator(normalized_bam,ref_fa,params.cnvnator_bin_size)
-		merged_sv_input=manta_result.join(multi_cnvnator.out.vcf)
+		merged_sv_input=manta_result.join(multi_cnvnator.out.vcf).join(melt_result).map { out_prefix, manta_vcf, cnvnator_vcf, melt_vcf ->
+			tuple(out_prefix, [manta_vcf, cnvnator_vcf, melt_vcf])
+		}
+		sv_result=multi_merge_shortread_sv_callers(merged_sv_input)
+	}
+	else if ( cnvnator_mode != "no" ) {
+		normalized_bam=multi_normalize_shortread_alignment(input_bam_with_bam,ref_fa)
+		multi_cnvnator(normalized_bam,ref_fa,params.cnvnator_bin_size)
+		merged_sv_input=manta_result.join(multi_cnvnator.out.vcf).map { out_prefix, manta_vcf, cnvnator_vcf ->
+			tuple(out_prefix, [manta_vcf, cnvnator_vcf])
+		}
+		sv_result=multi_merge_shortread_sv_callers(merged_sv_input)
+	}
+	else if ( melt_mode == "yes" ) {
+		merged_sv_input=manta_result.join(melt_result).map { out_prefix, manta_vcf, melt_vcf ->
+			tuple(out_prefix, [manta_vcf, melt_vcf])
+		}
 		sv_result=multi_merge_shortread_sv_callers(merged_sv_input)
 	}
 	else {

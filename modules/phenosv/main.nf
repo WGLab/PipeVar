@@ -40,7 +40,7 @@ process PhenoSV {
 
 	python3 /opt/PhenoSV/phenosv/model/phenosv.py --sv_file $bed $args --target_folder ${out_prefix}_phenosv --target_file_name  \$phenosv_dir/phenosv_out --HPO "\$HPO_STRING"
 
-	awk -F',' '\$6 > 0.5' \$phenosv_dir/phenosv_out.csv | awk -F',' '\$2 == "SV" ' | awk -F',' '{print \$7"\t"\$0}' | sort -k1,1 > ${out_prefix}_phenosv_top.join.tsv || true
+	awk -F',' '\$6 > 0.5 && \$7 != ""' \$phenosv_dir/phenosv_out.csv | awk -F',' '{print \$7"\t"\$0}' | sort -k1,1 > ${out_prefix}_phenosv_top.join.tsv || true
 
 	sort -k4,4 $bed > ${out_prefix}.sorted.bed
 

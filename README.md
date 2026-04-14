@@ -135,6 +135,30 @@ nextflow run main.nf \
   --out_prefix sample1
 ```
 
+## MELT mobile-element analysis
+
+PipeVar_mito also supports an opt-in MELT branch for nuclear short-read SV/MEI analysis:
+
+- enable with `--melt yes`
+- supported only with `--type short`
+- supported only with BAM/CRAM input, not VCF-only mode
+- supported with `--mode sv` or when `--mode` is omitted
+- executed per sample in both single-sample and CSV batch BAM/CRAM modes
+
+The MELT container is expected to bundle:
+
+- `MELT.jar`
+- genome-matched MELT resource files under `/opt/melt/resources/<hg38|grch38>`
+- transposon ZIP paths in `/opt/melt/resources/<hg38|grch38>/mei_zip_paths.txt`
+
+Important notes:
+
+- MELT is intended for short-read WGS MEI discovery/genotyping.
+- BAM/CRAM must be indexed.
+- CRAM is supported but may run slower than BAM.
+- MC/MQ mate tags are recommended for better MELT runtime.
+- MELT download/licensing is handled outside this repo; the private image should already contain the bundled assets.
+
 ## Input modes
 
 ## Single-sample BAM/CRAM mode
@@ -219,6 +243,7 @@ Expected CSV columns:
 - `--light <yes|no>`: enable lightweight models/callers where supported
 - `--genome <hg38|grch38>`: genome build for ExpansionHunter catalog selection
 - `--target <yes|no>`: restrict SNP calling to phenotype-derived gene BED
+- `--melt <yes|no>`: enable MELT MEI calling in short-read SV/all-NGS BAM/CRAM paths (default: `no`)
 - `--phen2gene_filter <INT>`: top-N genes retained for targeted mode (default: 500)
 - `--rankscore <FLOAT>`: RankScore threshold (default: 0.50)
 - `--rankscore_softwares <CSV>`: comma-separated RankScore software names for score aggregation (default: all built-in tools)
@@ -282,6 +307,20 @@ nextflow run main.nf \
   --light yes
 ```
 
+### Single-sample short-read SV analysis with MELT
+
+```bash
+nextflow run main.nf \
+  -profile standard \
+  --bam /data/p2.bam \
+  --ref_fa /refs/hg38.fa \
+  --hpo /data/p2_hpo.txt \
+  --out_prefix p2_sv \
+  --type short \
+  --mode sv \
+  --melt yes
+```
+
 ### Single-sample VCF SNP re-annotation/prioritization
 
 ```bash
@@ -305,6 +344,20 @@ nextflow run main.nf \
   --note no \
   --ref_fa /refs/hg38.fa \
   --type short
+```
+
+### CSV batch short-read SV mode with MELT
+
+```bash
+nextflow run main.nf \
+  -profile slurm_singularity \
+  --input_csv /data/samples.csv \
+  --bam true \
+  --note no \
+  --ref_fa /refs/hg38.fa \
+  --type short \
+  --mode sv \
+  --melt yes
 ```
 
 ### CSV batch VCF mode (SV only)
@@ -339,7 +392,9 @@ Exact files depend on `--mode`, `--type`, and input type.
 ### SV-related outputs
 
 - short-read SV:
-  - `*.manta.vcf.gz`
+  - `*_manta.vcf`
+  - `*_melt.vcf` when `--melt yes`
+  - `*.shortread_sv.merged.vcf` when multiple short-read SV/MEI callers are merged
 - long-read SV:
   - `*.sniffles.vcf.gz`
 - downstream SV prioritization:

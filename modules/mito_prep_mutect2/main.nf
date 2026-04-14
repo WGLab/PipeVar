@@ -4,7 +4,7 @@ process mito_prep_mutect2 {
 	input:
 	tuple path(bam), path(index_file)
 	val out_prefix
-	tuple path(ref_fa), path(fa_index), path(dict_index)
+	tuple path(ref_fa), path(fa_index), path(dict_index), path(bwa_amb), path(bwa_ann), path(bwa_bwt), path(bwa_pac), path(bwa_sa)
 	val mito_contig
 
 	output:
@@ -17,6 +17,7 @@ process mito_prep_mutect2 {
 	INPUT_INDEX="$index_file"
 
 	if [[ "$bam" == *.cram ]]; then
+	    # DRAGEN CRAMs must be decoded against the exact original reference bundle.
 	    samtools view -@ ${task.cpus} -b -T "$ref_fa" -o "${out_prefix}.mito.input.unsorted.bam" "$bam"
 	    samtools sort -@ ${task.cpus} -o "${out_prefix}.mito.input.bam" "${out_prefix}.mito.input.unsorted.bam"
 	    samtools index -@ ${task.cpus} "${out_prefix}.mito.input.bam"
@@ -43,6 +44,10 @@ process mito_prep_mutect2 {
 	        MITO_CONTIG="MT"
 	    elif samtools idxstats "\$INPUT_BAM" | cut -f1 | grep -qx "chrM"; then
 	        MITO_CONTIG="chrM"
+	    elif samtools idxstats "\$INPUT_BAM" | cut -f1 | grep -qx "M"; then
+	        MITO_CONTIG="M"
+	    elif samtools idxstats "\$INPUT_BAM" | cut -f1 | grep -qx "chrMT"; then
+	        MITO_CONTIG="chrMT"
 	    else
 	        echo "Unable to find mitochondrial contig in \$INPUT_BAM" >&2
 	        exit 1
@@ -55,6 +60,7 @@ process mito_prep_mutect2 {
 	    -I "${out_prefix}.mito.subset.bam" \
 	    -O "${out_prefix}.mito.ubam" \
 	    --REMOVE_ALIGNMENT_INFORMATION true \
+	    --RESTORE_HARDCLIPS false \
 	    --RESTORE_ORIGINAL_QUALITIES true \
 	    --VALIDATION_STRINGENCY SILENT
 

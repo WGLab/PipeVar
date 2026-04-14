@@ -114,7 +114,9 @@ FILTERING OPTIONS
   --cnvnator <yes|no>      Add CNVnator to short-read SV/all-NGS calling. Default: yes
   --cnvnator_bin_size <INT>
                            CNVnator read-depth bin size. Default: 100
+  --melt <yes|no>          Add MELT mobile-element calling to short-read SV/all-NGS paths. Default: no
   --mito <yes|no>          Add mitochondrial Mutect2 + mtDNA annotation branch for short-read BAM/CRAM. Default: no
+                           Requires BWA-indexed reference sidecars alongside --ref_fa.
   --mito_contig <STRING>   Preferred mitochondrial contig alias. Default: chrM
   --mito_min_vaf <FLOAT>   Minimum heteroplasmy/allele fraction retained in mito prioritization. Default: 0.01
   --mito_min_depth <INT>   Minimum depth retained in mito prioritization. Default: 50
@@ -169,6 +171,9 @@ EXAMPLES
 NOTES
   - BAM mode requires index files (.bai for BAM, .crai for CRAM).
   - Reference FASTA index (.fai) must exist.
+  - Mito mode also requires the matching `.dict` and BWA sidecars:
+    `.amb`, `.ann`, `.bwt`, `.pac`, `.sa`.
+  - The DRAGEN CRAM compatibility path uses `RevertSam --RESTORE_HARDCLIPS false`.
   - For VCF single-file mode, provide --mode snp or --mode sv.
   - For single-file mode, at least one of --note <FILE> or --hpo <FILE> is required.
   
@@ -201,6 +206,7 @@ def clean_include_clinvar_report = params.include_clinvar_report ? params.includ
 def clean_allow_unphased_comphet = params.allow_unphased_comphet ? params.allow_unphased_comphet.trim().toLowerCase() : 'no'
 def clean_rankscore_softwares = params.rankscore_softwares ? params.rankscore_softwares.toString().trim() : ""
 def clean_cnvnator = params.cnvnator ? params.cnvnator.toString().trim().toLowerCase() : 'yes'
+def clean_melt = params.melt ? params.melt.toString().trim().toLowerCase() : 'no'
 def clean_mito = params.mito ? params.mito.toString().trim().toLowerCase() : 'no'
 
 // ------------------------------------------------------------------
@@ -274,6 +280,52 @@ if (!valid_yes_no.contains(clean_cnvnator)) {
       --cnvnator no
     ================================================================
     """
+}
+
+if (!valid_yes_no.contains(clean_melt)) {
+    error """
+    ================================================================
+    ERROR: Invalid MELT Toggle
+    ================================================================
+    You provided: --melt "${params.melt}"
+
+    Valid options are:
+      --melt yes
+      --melt no
+    ================================================================
+    """
+}
+
+if (clean_melt == 'yes') {
+    if (params.vcf) {
+        error """
+        ================================================================
+        ERROR: MELT requires BAM/CRAM input
+        ================================================================
+        --melt yes is only supported for BAM/CRAM input.
+        ================================================================
+        """
+    }
+
+    if (clean_type != 'short') {
+        error """
+        ================================================================
+        ERROR: MELT is short-read only
+        ================================================================
+        --melt yes currently supports only --type short.
+        ================================================================
+        """
+    }
+
+    if (clean_mode == 'snp') {
+        error """
+        ================================================================
+        ERROR: MELT is not available with --mode snp
+        ================================================================
+        Use --mode sv or omit --mode when running --melt yes.
+        ================================================================
+        """
+    }
 }
 
 if (clean_mito == 'yes') {
@@ -460,6 +512,26 @@ if (params.ref_fa) {
             ================================================================
             """
         }
+
+        def bwa_suffixes = ['amb', 'ann', 'bwt', 'pac', 'sa']
+        def missing_bwa_indexes = bwa_suffixes.findAll { suffix ->
+            !file("${params.ref_fa}.${suffix}").exists()
+        }
+        if (!missing_bwa_indexes.isEmpty()) {
+            def expected_files = missing_bwa_indexes.collect { suffix -> "${params.ref_fa}.${suffix}" }.join('\n            ')
+            error """
+            ================================================================
+            ERROR: BWA reference sidecar files not found
+            ================================================================
+            Mitochondrial analysis requires a BWA-indexed reference bundle.
+            Missing:
+              ${expected_files}
+
+            Create the sidecars with:
+              bwa index ${params.ref_fa}
+            ================================================================
+            """
+        }
     }
 }
 
@@ -642,7 +714,12 @@ mito_ref_fa = Channel
     .map { fa_file ->
         def fai_file = file("${fa_file}.fai")
         def dict_file = file("${fa_file.parent}/${fa_file.baseName}.dict")
-        return [ fa_file, fai_file, dict_file ]
+        def bwa_amb = file("${fa_file}.amb")
+        def bwa_ann = file("${fa_file}.ann")
+        def bwa_bwt = file("${fa_file}.bwt")
+        def bwa_pac = file("${fa_file}.pac")
+        def bwa_sa = file("${fa_file}.sa")
+        return [ fa_file, fai_file, dict_file, bwa_amb, bwa_ann, bwa_bwt, bwa_pac, bwa_sa ]
     }
     .first()
 	}
