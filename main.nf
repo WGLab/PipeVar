@@ -114,7 +114,7 @@ FILTERING OPTIONS
   --cnvnator <yes|no>      Add CNVnator to short-read SV/all-NGS calling. Default: yes
   --cnvnator_bin_size <INT>
                            CNVnator read-depth bin size. Default: 100
-  --melt <yes|no>          Add MELT mobile-element calling to short-read SV/all-NGS paths. Default: no
+  --scramble <yes|no>      Add SCRAMBLE mobile-element calling to short-read SV/all-NGS BAM paths. Default: no
   --mito <yes|no>          Add mitochondrial Mutect2 + mtDNA annotation branch for short-read BAM/CRAM. Default: no
                            Requires BWA-indexed reference sidecars alongside --ref_fa.
   --mito_contig <STRING>   Preferred mitochondrial contig alias. Default: chrM
@@ -206,7 +206,7 @@ def clean_include_clinvar_report = params.include_clinvar_report ? params.includ
 def clean_allow_unphased_comphet = params.allow_unphased_comphet ? params.allow_unphased_comphet.trim().toLowerCase() : 'no'
 def clean_rankscore_softwares = params.rankscore_softwares ? params.rankscore_softwares.toString().trim() : ""
 def clean_cnvnator = params.cnvnator ? params.cnvnator.toString().trim().toLowerCase() : 'yes'
-def clean_melt = params.melt ? params.melt.toString().trim().toLowerCase() : 'no'
+def clean_scramble = params.scramble ? params.scramble.toString().trim().toLowerCase() : 'no'
 def clean_mito = params.mito ? params.mito.toString().trim().toLowerCase() : 'no'
 
 // ------------------------------------------------------------------
@@ -282,27 +282,27 @@ if (!valid_yes_no.contains(clean_cnvnator)) {
     """
 }
 
-if (!valid_yes_no.contains(clean_melt)) {
+if (!valid_yes_no.contains(clean_scramble)) {
     error """
     ================================================================
-    ERROR: Invalid MELT Toggle
+    ERROR: Invalid SCRAMBLE Toggle
     ================================================================
-    You provided: --melt "${params.melt}"
+    You provided: --scramble "${params.scramble}"
 
     Valid options are:
-      --melt yes
-      --melt no
+      --scramble yes
+      --scramble no
     ================================================================
     """
 }
 
-if (clean_melt == 'yes') {
+if (clean_scramble == 'yes') {
     if (params.vcf) {
         error """
         ================================================================
-        ERROR: MELT requires BAM/CRAM input
+        ERROR: SCRAMBLE requires BAM input
         ================================================================
-        --melt yes is only supported for BAM/CRAM input.
+        --scramble yes is only supported for BAM input in v1.
         ================================================================
         """
     }
@@ -310,9 +310,9 @@ if (clean_melt == 'yes') {
     if (clean_type != 'short') {
         error """
         ================================================================
-        ERROR: MELT is short-read only
+        ERROR: SCRAMBLE is short-read only
         ================================================================
-        --melt yes currently supports only --type short.
+        --scramble yes currently supports only --type short.
         ================================================================
         """
     }
@@ -320,9 +320,35 @@ if (clean_melt == 'yes') {
     if (clean_mode == 'snp') {
         error """
         ================================================================
-        ERROR: MELT is not available with --mode snp
+        ERROR: SCRAMBLE is not available with --mode snp
         ================================================================
-        Use --mode sv or omit --mode when running --melt yes.
+        Use --mode sv or omit --mode when running --scramble yes.
+        ================================================================
+        """
+    }
+
+    if (params.input_csv && params.bam) {
+        def csvRows = file(params.input_csv, checkIfExists: true).readLines().drop(1)
+        def hasCram = csvRows.any { line ->
+            def cols = line.split(',', -1)
+            cols.size() > 1 && cols[1].trim().toLowerCase().endsWith('.cram')
+        }
+        if (hasCram) {
+            error """
+            ================================================================
+            ERROR: SCRAMBLE is BAM-only in v1
+            ================================================================
+            --scramble yes currently supports BAM inputs only in CSV mode.
+            ================================================================
+            """
+        }
+    }
+    else if (params.bam && params.bam != true && params.bam.toString().trim().toLowerCase().endsWith('.cram')) {
+        error """
+        ================================================================
+        ERROR: SCRAMBLE is BAM-only in v1
+        ================================================================
+        --scramble yes currently supports BAM input only.
         ================================================================
         """
     }

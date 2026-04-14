@@ -4,7 +4,7 @@ include { SURVIVOR } from '../../modules/survivor/'
 include { PhenoSV } from '../../modules/phenosv/'
 include { Phen2gene } from '../../modules/phen2gene/'
 include { Manta } from '../../modules/manta/'
-include { MELT } from '../../modules/melt/'
+include { SCRAMBLE } from '../../modules/scramble/'
 include { normalize_shortread_alignment } from '../../modules/normalize_shortread_alignment/'
 include { CNVnator } from '../../modules/cnvnator/'
 include { merge_shortread_sv_callers } from '../../modules/merge_shortread_sv_callers/'
@@ -36,16 +36,16 @@ workflow SINGLE_ALIGNMENT_NGS_SV {
 	}
 	Phen2gene(hpo,out_prefix)
 	Manta(bam,out_prefix,ref_fa)
-	melt_mode = params.melt ? params.melt.toString().trim().toLowerCase() : "no"
-	if ( melt_mode == "yes" ) {
-		MELT(bam,out_prefix,ref_fa)
+	scramble_mode = params.scramble ? params.scramble.toString().trim().toLowerCase() : "no"
+	if ( scramble_mode == "yes" ) {
+		SCRAMBLE(bam,out_prefix,ref_fa)
 	}
 
 	cnvnator_mode = params.cnvnator ? params.cnvnator.toString().trim().toLowerCase() : "yes"
-	if ( cnvnator_mode != "no" && melt_mode == "yes" ) {
+	if ( cnvnator_mode != "no" && scramble_mode == "yes" ) {
 		normalize_shortread_alignment(bam,out_prefix,ref_fa)
 		CNVnator(normalize_shortread_alignment.out,out_prefix,ref_fa,params.cnvnator_bin_size)
-		sv_merge_inputs = Manta.out.combine(CNVnator.out.vcf).combine(MELT.out).map { combined_vcfs ->
+		sv_merge_inputs = Manta.out.combine(CNVnator.out.vcf).combine(SCRAMBLE.out.vcf).map { combined_vcfs ->
 			combined_vcfs.flatten()
 		}
 		merge_shortread_sv_callers(sv_merge_inputs,out_prefix)
@@ -60,8 +60,8 @@ workflow SINGLE_ALIGNMENT_NGS_SV {
 		merge_shortread_sv_callers(sv_merge_inputs,out_prefix)
 		sv_vcf=merge_shortread_sv_callers.out
 	}
-	else if ( melt_mode == "yes" ) {
-		sv_merge_inputs = Manta.out.combine(MELT.out).map { combined_vcfs ->
+	else if ( scramble_mode == "yes" ) {
+		sv_merge_inputs = Manta.out.combine(SCRAMBLE.out.vcf).map { combined_vcfs ->
 			combined_vcfs.flatten()
 		}
 		merge_shortread_sv_callers(sv_merge_inputs,out_prefix)

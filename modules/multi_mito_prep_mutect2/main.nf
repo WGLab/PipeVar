@@ -61,7 +61,10 @@ process multi_mito_prep_mutect2 {
 	    --REMOVE_ALIGNMENT_INFORMATION true \
 	    --RESTORE_HARDCLIPS false \
 	    --RESTORE_ORIGINAL_QUALITIES true \
-	    --VALIDATION_STRINGENCY SILENT
+	    --SANITIZE true \
+	    --MAX_DISCARD_FRACTION 0.05 \
+	    --SORT_ORDER queryname \
+	    --VALIDATION_STRINGENCY LENIENT
 
 	gatk SamToFastq -I "${out_prefix}.mito.ubam" -FASTQ /dev/stdout -INTERLEAVE true \
 	    | bwa mem -p -t ${task.cpus} "$ref_fa" /dev/stdin \
