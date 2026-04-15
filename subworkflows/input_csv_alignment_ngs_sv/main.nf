@@ -4,7 +4,8 @@ include { multi_annovar_sv } from '../../modules/multi_annovar_sv/'
 include { multi_survivor } from '../../modules/multi_survivor/'
 include { multi_phenosv } from '../../modules/multi_phenosv/'
 include { multi_manta } from '../../modules/multi_manta/'
-include { multi_scramble } from '../../modules/multi_scramble/'
+include { multi_scramble_clusteridentifier } from '../../modules/multi_scramble_clusteridentifier/'
+include { multi_scramble_clusteranalysis } from '../../modules/multi_scramble_clusteranalysis/'
 include { multi_normalize_shortread_alignment } from '../../modules/multi_normalize_shortread_alignment/'
 include { multi_cnvnator } from '../../modules/multi_cnvnator/'
 include { multi_merge_shortread_sv_callers } from '../../modules/multi_merge_shortread_sv_callers/'
@@ -38,15 +39,22 @@ workflow INPUT_CSV_ALIGNMENT_NGS_SV {
         multi_eh_filter(multi_eh_result)
         manta_result=multi_manta(input_bam_with_bam,ref_fa)
 	scramble_mode = params.scramble ? params.scramble.toString().trim().toLowerCase() : "no"
+	scramble_vcf = null
 	if ( scramble_mode == "yes" ) {
-		multi_scramble(input_bam_with_bam,ref_fa)
+		scramble_ref_meta = ref_fa.map { ref_tuple -> tuple([id: 'reference'], ref_tuple[0], ref_tuple[1]) }
+		scramble_cluster_input = input_bam_with_bam.map { out_prefix, bam_file, index_file ->
+			tuple([id: out_prefix], bam_file, index_file)
+		}
+		multi_scramble_clusteridentifier(scramble_cluster_input, scramble_ref_meta)
+		multi_scramble_clusteranalysis(multi_scramble_clusteridentifier.out.clusters, scramble_ref_meta)
+		scramble_vcf = multi_scramble_clusteranalysis.out.vcf.map { meta, vcf -> tuple(meta.id, vcf) }
 	}
 
 	cnvnator_mode = params.cnvnator ? params.cnvnator.toString().trim().toLowerCase() : "yes"
 	if ( cnvnator_mode != "no" && scramble_mode == "yes" ) {
 		normalized_bam=multi_normalize_shortread_alignment(input_bam_with_bam,ref_fa)
 		multi_cnvnator(normalized_bam,ref_fa,params.cnvnator_bin_size)
-		merged_sv_input=manta_result.join(multi_cnvnator.out.vcf).join(multi_scramble.out.vcf).map { out_prefix, manta_vcf, cnvnator_vcf, scramble_vcf ->
+		merged_sv_input=manta_result.join(multi_cnvnator.out.vcf).join(scramble_vcf).map { out_prefix, manta_vcf, cnvnator_vcf, scramble_vcf ->
 			tuple(out_prefix, [manta_vcf, cnvnator_vcf, scramble_vcf])
 		}
 		sv_result=multi_merge_shortread_sv_callers(merged_sv_input)
@@ -60,7 +68,7 @@ workflow INPUT_CSV_ALIGNMENT_NGS_SV {
 		sv_result=multi_merge_shortread_sv_callers(merged_sv_input)
 	}
 	else if ( scramble_mode == "yes" ) {
-		merged_sv_input=manta_result.join(multi_scramble.out.vcf).map { out_prefix, manta_vcf, scramble_vcf ->
+		merged_sv_input=manta_result.join(scramble_vcf).map { out_prefix, manta_vcf, scramble_vcf ->
 			tuple(out_prefix, [manta_vcf, scramble_vcf])
 		}
 		sv_result=multi_merge_shortread_sv_callers(merged_sv_input)

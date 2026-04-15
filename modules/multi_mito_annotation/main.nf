@@ -1,5 +1,5 @@
 process multi_mito_annotation {
-	container = 'beoungl/docker_test:mito_annotation_0.1'
+	container = 'beoungl/docker_test:mito_annotation_0.2'
 
 	input:
 	tuple val(out_prefix), path(mito_vcf), path(mito_tbi)

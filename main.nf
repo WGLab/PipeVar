@@ -114,7 +114,7 @@ FILTERING OPTIONS
   --cnvnator <yes|no>      Add CNVnator to short-read SV/all-NGS calling. Default: yes
   --cnvnator_bin_size <INT>
                            CNVnator read-depth bin size. Default: 100
-  --scramble <yes|no>      Add SCRAMBLE mobile-element calling to short-read SV/all-NGS BAM paths. Default: no
+  --scramble <yes|no>      Add SCRAMBLE mobile-element calling to short-read SV/all-NGS BAM/CRAM paths. Default: no
   --mito <yes|no>          Add mitochondrial Mutect2 + mtDNA annotation branch for short-read BAM/CRAM. Default: no
                            Requires BWA-indexed reference sidecars alongside --ref_fa.
   --mito_contig <STRING>   Preferred mitochondrial contig alias. Default: chrM
@@ -300,9 +300,9 @@ if (clean_scramble == 'yes') {
     if (params.vcf) {
         error """
         ================================================================
-        ERROR: SCRAMBLE requires BAM input
+        ERROR: SCRAMBLE requires BAM/CRAM input
         ================================================================
-        --scramble yes is only supported for BAM input in v1.
+        --scramble yes is only supported for BAM/CRAM input.
         ================================================================
         """
     }
@@ -327,31 +327,6 @@ if (clean_scramble == 'yes') {
         """
     }
 
-    if (params.input_csv && params.bam) {
-        def csvRows = file(params.input_csv, checkIfExists: true).readLines().drop(1)
-        def hasCram = csvRows.any { line ->
-            def cols = line.split(',', -1)
-            cols.size() > 1 && cols[1].trim().toLowerCase().endsWith('.cram')
-        }
-        if (hasCram) {
-            error """
-            ================================================================
-            ERROR: SCRAMBLE is BAM-only in v1
-            ================================================================
-            --scramble yes currently supports BAM inputs only in CSV mode.
-            ================================================================
-            """
-        }
-    }
-    else if (params.bam && params.bam != true && params.bam.toString().trim().toLowerCase().endsWith('.cram')) {
-        error """
-        ================================================================
-        ERROR: SCRAMBLE is BAM-only in v1
-        ================================================================
-        --scramble yes currently supports BAM input only.
-        ================================================================
-        """
-    }
 }
 
 if (clean_mito == 'yes') {

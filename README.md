@@ -141,11 +141,16 @@ PipeVar_mito also supports an opt-in SCRAMBLE branch for nuclear short-read SV/M
 
 - enable with `--scramble yes`
 - supported only with `--type short`
-- supported only with BAM input, not CRAM or VCF-only mode
+- supported only with BAM/CRAM input, not VCF-only mode
 - supported with `--mode sv` or when `--mode` is omitted
-- executed per sample in both single-sample and CSV batch BAM modes
+- executed per sample in both single-sample and CSV batch BAM/CRAM modes
 
-The SCRAMBLE container is expected to bundle:
+PipeVar runs SCRAMBLE through two stages inside the existing short-read subworkflows:
+
+- `clusteridentifier`
+- `clusteranalysis`
+
+The shared SCRAMBLE image is expected to provide:
 
 - `cluster_identifier`
 - `cluster_analysis/bin/SCRAMble.R`
@@ -154,9 +159,9 @@ The SCRAMBLE container is expected to bundle:
 Important notes:
 
 - SCRAMBLE is intended for short-read WGS MEI discovery/genotyping.
-- BAM must be indexed.
-- CRAM is not supported for SCRAMBLE in PipeVar_mito v1.
-- SCRAMBLE download/build is handled outside this repo; the private image should already contain the bundled assets.
+- BAM and CRAM must be indexed.
+- CRAM runs require the matching reference FASTA.
+- SCRAMBLE download/build is handled outside this repo; the shared image should already contain the bundled assets.
 
 ## Input modes
 
@@ -242,7 +247,7 @@ Expected CSV columns:
 - `--light <yes|no>`: enable lightweight models/callers where supported
 - `--genome <hg38|grch38>`: genome build for ExpansionHunter catalog selection
 - `--target <yes|no>`: restrict SNP calling to phenotype-derived gene BED
-- `--scramble <yes|no>`: enable SCRAMBLE MEI calling in short-read SV/all-NGS BAM paths (default: `no`)
+- `--scramble <yes|no>`: enable SCRAMBLE MEI calling in short-read SV/all-NGS BAM/CRAM paths (default: `no`)
 - `--phen2gene_filter <INT>`: top-N genes retained for targeted mode (default: 500)
 - `--rankscore <FLOAT>`: RankScore threshold (default: 0.50)
 - `--rankscore_softwares <CSV>`: comma-separated RankScore software names for score aggregation (default: all built-in tools)

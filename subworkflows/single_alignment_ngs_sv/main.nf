@@ -4,7 +4,8 @@ include { SURVIVOR } from '../../modules/survivor/'
 include { PhenoSV } from '../../modules/phenosv/'
 include { Phen2gene } from '../../modules/phen2gene/'
 include { Manta } from '../../modules/manta/'
-include { SCRAMBLE } from '../../modules/scramble/'
+include { scramble_clusteridentifier } from '../../modules/scramble_clusteridentifier/'
+include { scramble_clusteranalysis } from '../../modules/scramble_clusteranalysis/'
 include { normalize_shortread_alignment } from '../../modules/normalize_shortread_alignment/'
 include { CNVnator } from '../../modules/cnvnator/'
 include { merge_shortread_sv_callers } from '../../modules/merge_shortread_sv_callers/'
@@ -37,15 +38,22 @@ workflow SINGLE_ALIGNMENT_NGS_SV {
 	Phen2gene(hpo,out_prefix)
 	Manta(bam,out_prefix,ref_fa)
 	scramble_mode = params.scramble ? params.scramble.toString().trim().toLowerCase() : "no"
+	scramble_vcf = null
 	if ( scramble_mode == "yes" ) {
-		SCRAMBLE(bam,out_prefix,ref_fa)
+		scramble_ref_meta = ref_fa.map { ref_tuple -> tuple([id: 'reference'], ref_tuple[0], ref_tuple[1]) }
+		scramble_cluster_input = out_prefix.combine(bam).map { prefix, bam_tuple ->
+			tuple([id: prefix], bam_tuple[0], bam_tuple[1])
+		}
+		scramble_clusteridentifier(scramble_cluster_input, scramble_ref_meta)
+		scramble_clusteranalysis(scramble_clusteridentifier.out.clusters, scramble_ref_meta)
+		scramble_vcf = scramble_clusteranalysis.out.vcf.map { meta, vcf -> vcf }
 	}
 
 	cnvnator_mode = params.cnvnator ? params.cnvnator.toString().trim().toLowerCase() : "yes"
 	if ( cnvnator_mode != "no" && scramble_mode == "yes" ) {
 		normalize_shortread_alignment(bam,out_prefix,ref_fa)
 		CNVnator(normalize_shortread_alignment.out,out_prefix,ref_fa,params.cnvnator_bin_size)
-		sv_merge_inputs = Manta.out.combine(CNVnator.out.vcf).combine(SCRAMBLE.out.vcf).map { combined_vcfs ->
+		sv_merge_inputs = Manta.out.combine(CNVnator.out.vcf).combine(scramble_vcf).map { combined_vcfs ->
 			combined_vcfs.flatten()
 		}
 		merge_shortread_sv_callers(sv_merge_inputs,out_prefix)
@@ -61,7 +69,7 @@ workflow SINGLE_ALIGNMENT_NGS_SV {
 		sv_vcf=merge_shortread_sv_callers.out
 	}
 	else if ( scramble_mode == "yes" ) {
-		sv_merge_inputs = Manta.out.combine(SCRAMBLE.out.vcf).map { combined_vcfs ->
+		sv_merge_inputs = Manta.out.combine(scramble_vcf).map { combined_vcfs ->
 			combined_vcfs.flatten()
 		}
 		merge_shortread_sv_callers(sv_merge_inputs,out_prefix)
