@@ -1,5 +1,5 @@
 process mito_annotation {
-	container = 'beoungl/docker_test:mito_annotation_0.2'
+	container = 'beoungl/docker_test:mito_annotation_0.3'
 
 	input:
 	path mito_vcf

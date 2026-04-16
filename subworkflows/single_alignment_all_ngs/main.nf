@@ -6,8 +6,7 @@ include { ANNOVAR } from '../../modules/annovar/'
 include { Phen2gene } from '../../modules/phen2gene/'
 include { RankVar } from '../../modules/rankvar/'
 include { Manta } from '../../modules/manta/'
-include { scramble_clusteridentifier } from '../../modules/scramble_clusteridentifier/'
-include { scramble_clusteranalysis } from '../../modules/scramble_clusteranalysis/'
+include { scramble } from '../../modules/scramble/'
 include { normalize_shortread_alignment } from '../../modules/normalize_shortread_alignment/'
 include { CNVnator } from '../../modules/cnvnator/'
 include { merge_shortread_sv_callers } from '../../modules/merge_shortread_sv_callers/'
@@ -82,9 +81,8 @@ workflow SINGLE_ALIGNMENT_ALL_NGS {
 		scramble_cluster_input = out_prefix.combine(bam).map { prefix, bam_tuple ->
 			tuple([id: prefix], bam_tuple[0], bam_tuple[1])
 		}
-		scramble_clusteridentifier(scramble_cluster_input, scramble_ref_meta)
-		scramble_clusteranalysis(scramble_clusteridentifier.out.clusters, scramble_ref_meta)
-		scramble_vcf = scramble_clusteranalysis.out.vcf.map { meta, vcf -> vcf }
+		scramble(scramble_cluster_input, scramble_ref_meta)
+		scramble_vcf = scramble.out.vcf.map { meta, vcf -> vcf }
 	}
 
 	cnvnator_mode = params.cnvnator ? params.cnvnator.toString().trim().toLowerCase() : "yes"

@@ -145,10 +145,10 @@ PipeVar_mito also supports an opt-in SCRAMBLE branch for nuclear short-read SV/M
 - supported with `--mode sv` or when `--mode` is omitted
 - executed per sample in both single-sample and CSV batch BAM/CRAM modes
 
-PipeVar runs SCRAMBLE through two stages inside the existing short-read subworkflows:
+PipeVar runs SCRAMBLE as one internal short-read subworkflow step that performs:
 
-- `clusteridentifier`
-- `clusteranalysis`
+- soft-clipped cluster identification
+- cluster analysis into MEI/deletion outputs
 
 The shared SCRAMBLE image is expected to provide:
 

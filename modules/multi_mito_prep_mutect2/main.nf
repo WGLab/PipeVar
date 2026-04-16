@@ -85,5 +85,7 @@ process multi_mito_prep_mutect2 {
 	    -M "${out_prefix}.mito.dup_metrics.txt" \
 	    --CREATE_INDEX true \
 	    --VALIDATION_STRINGENCY SILENT
+
+	mv "${out_prefix}.mito.prepped.bai" "${out_prefix}.mito.prepped.bam.bai"
 	"""
 }

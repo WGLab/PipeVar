@@ -4,8 +4,7 @@ include { multi_annovar_sv } from '../../modules/multi_annovar_sv/'
 include { multi_survivor } from '../../modules/multi_survivor/'
 include { multi_phenosv } from '../../modules/multi_phenosv/'
 include { multi_manta } from '../../modules/multi_manta/'
-include { multi_scramble_clusteridentifier } from '../../modules/multi_scramble_clusteridentifier/'
-include { multi_scramble_clusteranalysis } from '../../modules/multi_scramble_clusteranalysis/'
+include { multi_scramble } from '../../modules/multi_scramble/'
 include { multi_normalize_shortread_alignment } from '../../modules/multi_normalize_shortread_alignment/'
 include { multi_cnvnator } from '../../modules/multi_cnvnator/'
 include { multi_merge_shortread_sv_callers } from '../../modules/multi_merge_shortread_sv_callers/'
@@ -45,9 +44,8 @@ workflow INPUT_CSV_ALIGNMENT_NGS_SV {
 		scramble_cluster_input = input_bam_with_bam.map { out_prefix, bam_file, index_file ->
 			tuple([id: out_prefix], bam_file, index_file)
 		}
-		multi_scramble_clusteridentifier(scramble_cluster_input, scramble_ref_meta)
-		multi_scramble_clusteranalysis(multi_scramble_clusteridentifier.out.clusters, scramble_ref_meta)
-		scramble_vcf = multi_scramble_clusteranalysis.out.vcf.map { meta, vcf -> tuple(meta.id, vcf) }
+		multi_scramble(scramble_cluster_input, scramble_ref_meta)
+		scramble_vcf = multi_scramble.out.vcf.map { meta, vcf -> tuple(meta.id, vcf) }
 	}
 
 	cnvnator_mode = params.cnvnator ? params.cnvnator.toString().trim().toLowerCase() : "yes"
