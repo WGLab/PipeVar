@@ -1,4 +1,18 @@
-## PipeVar_mito Usage Notes
+## PipeVar_annotated_snv Usage Notes
+
+- Enable pre-annotated SNP input with `--annotated_snv yes`.
+- Annotated-SNV mode requires:
+  - `--annovar_txt <sample.hg38_multianno.txt>`
+  - `--vcf <sample.hg38_multianno.vcf>`
+  - one phenotype source: `--note <FILE>` or `--hpo <FILE>`
+- Annotated-SNV mode skips runtime ANNOVAR re-annotation.
+- If annotated-SNV is combined with BAM/CRAM input and `--type short`, PipeVar_annotated_snv also runs short-read SV, CNV, STR, and optional mito analysis.
+- Annotated-SNV mode rejects `--mode sv` and `--target yes`.
+- Unified batch manifests now use:
+  - `sample,input_kind,phenotype_path,phenotype_format`
+  - conditional columns `snv_txt_path,snv_vcf_path,vcf_path,alignment_path,alignment_index_path`
+- For `input_kind=annotated_snv`, `alignment_path` and `alignment_index_path` are optional; if present for all rows, the batch run uses the hybrid annotated-SNV + all-NGS path.
+- Supported unified `input_kind` values are `annotated_snv`, `vcf_snv`, `vcf_sv`, `bam_ngs`, and `cram_ngs`.
 
 - Enable SCRAMBLE with `--scramble yes` only for short-read BAM/CRAM runs.
 - `--scramble yes` is valid with `--mode sv` or when `--mode` is omitted.

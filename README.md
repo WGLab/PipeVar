@@ -1,11 +1,12 @@
-# PipeVar_mito
+# PipeVar_annotated_snv
 
-PipeVar_mito is a Nextflow DSL2 workflow for rare-disease variant prioritization from short-read and long-read data, with an additional opt-in mitochondrial analysis branch for short-read BAM/CRAM inputs.
-It keeps the existing nuclear SNP/SV/repeat analysis and adds mtDNA calling, annotation, and prioritization outputs.
+PipeVar_annotated_snv is a Nextflow DSL2 workflow for rare-disease variant prioritization from short-read and long-read data, with support for a standalone pre-annotated ANNOVAR SNP input mode.
+It preserves the existing BAM/CRAM, VCF, SV, STR, mito, and SCRAMBLE analysis paths from `PipeVar_mito` and adds an ANNOVAR TXT + VCF SNP-prioritization path that skips ANNOVAR runtime re-annotation.
 
 ## What PipeVar does
 
 - Calls and prioritizes SNP/indel variants.
+- Accepts pre-annotated ANNOVAR SNP input (`.hg38_multianno.txt` + `.hg38_multianno.vcf`) and prioritizes it without rerunning ANNOVAR.
 - Calls and prioritizes structural variants (SV).
 - Runs repeat expansion analysis (short-read and long-read paths).
 - Optionally calls and annotates mitochondrial variants with Mutect2 plus bundled mtDNA evidence databases.
@@ -56,7 +57,8 @@ cd PipeVar
 
 ### 2) External data/software prerequisites
 
-PipeVar expects ANNOVAR and PhenoSV resources to be available (mounted via profile runtime options).
+PipeVar_annotated_snv expects ANNOVAR and PhenoSV resources to be available for legacy re-annotation modes.
+The new `--annotated_snv yes` mode does not require ANNOVAR runtime databases because it consumes pre-annotated ANNOVAR outputs directly.
 
 ANNOVAR registration/download:
 
@@ -103,9 +105,53 @@ Non-interactive setup example:
   --phenosv-bind=/data/PhenoSV_model
 ```
 
+## Pre-annotated ANNOVAR SNP mode
+
+PipeVar_annotated_snv adds a standalone SNP-only input mode for pre-annotated ANNOVAR output:
+
+- enable with `--annotated_snv yes`
+- required inputs:
+  - `--annovar_txt sample.hg38_multianno.txt`
+  - `--vcf sample.hg38_multianno.vcf`
+  - one phenotype source: `--note <FILE>` or `--hpo <FILE>`
+- this mode skips the `ANNOVAR` module and reuses the existing `Phen2gene`, `RankScore`, `RankVar`, and `snp_prio` stack
+- if you also provide BAM/CRAM input (`--bam ... --type short --ref_fa ...`), the same annotated-SNV mode now runs short-read SV, CNV, STR, and optional mito analysis alongside the imported SNP evidence
+- `--mode sv` is rejected
+- `--target yes` is rejected
+- `--ref_fa` is not required for SNP-only annotated-SNV runs
+- `--ref_fa` is required for annotated-SNV + BAM/CRAM hybrid runs
+
+Example:
+
+```bash
+nextflow run main.nf \
+  -profile local_docker \
+  --annotated_snv yes \
+  --annovar_txt /data/sample.hg38_multianno.txt \
+  --vcf /data/sample.hg38_multianno.vcf \
+  --hpo /data/sample.hpo.txt \
+  --out_prefix sample1
+```
+
+Hybrid short-read example:
+
+```bash
+nextflow run main.nf \
+  -profile local_docker \
+  --annotated_snv yes \
+  --annovar_txt /data/sample.hg38_multianno.txt \
+  --vcf /data/sample.hg38_multianno.vcf \
+  --bam /data/sample.cram \
+  --ref_fa /refs/hg38.fa \
+  --type short \
+  --mito yes \
+  --hpo /data/sample.hpo.txt \
+  --out_prefix sample1_all_ngs
+```
+
 ## Mitochondrial analysis
 
-PipeVar_mito adds an opt-in mitochondrial branch for short-read BAM/CRAM input:
+PipeVar_annotated_snv keeps the opt-in mitochondrial branch for short-read BAM/CRAM input:
 
 - enable with `--mito yes`
 - supported only with `--type short`
@@ -137,7 +183,7 @@ nextflow run main.nf \
 
 ## SCRAMBLE mobile-element analysis
 
-PipeVar_mito also supports an opt-in SCRAMBLE branch for nuclear short-read SV/MEI analysis:
+PipeVar_annotated_snv also supports an opt-in SCRAMBLE branch for nuclear short-read SV/MEI analysis:
 
 - enable with `--scramble yes`
 - supported only with `--type short`
@@ -161,6 +207,8 @@ Important notes:
 - SCRAMBLE is intended for short-read WGS MEI discovery/genotyping.
 - BAM and CRAM must be indexed.
 - CRAM runs require the matching reference FASTA.
+- PipeVar now builds the reference BLAST database SCRAMBLE needs from `--ref_fa`, so users do not need to prepare `.nhr/.nin/.nsq` sidecar files ahead of time.
+- SCRAMBLE CRAM support remains provisional because upstream `cluster_identifier` reference resolution still needs dedicated validation.
 - SCRAMBLE download/build is handled outside this repo; the shared image should already contain the bundled assets.
 
 ## Input modes
@@ -188,7 +236,48 @@ Required:
 - `--mode <snp|sv>`
 - one phenotype source (`--note` or `--hpo`)
 
-## CSV batch mode (BAM/CRAM)
+## CSV batch mode (Unified manifest)
+
+`PipeVar_annotated_snv` now supports a unified batch manifest.
+
+Required common columns:
+
+- `sample,input_kind,phenotype_path,phenotype_format`
+
+Conditional file columns:
+
+- `snv_txt_path,snv_vcf_path,vcf_path,alignment_path,alignment_index_path`
+
+Supported `input_kind` values:
+
+- `annotated_snv`
+- `vcf_snv`
+- `vcf_sv`
+- `bam_ngs`
+- `cram_ngs`
+
+Supported `phenotype_format` values:
+
+- `clinical_note`
+- `hpo`
+
+Example annotated-SNV row:
+
+```csv
+sample,input_kind,phenotype_path,phenotype_format,age_of_onset,snv_txt_path,snv_vcf_path,vcf_path,alignment_path,alignment_index_path
+P001,annotated_snv,/data/pheno/P001.hpo.txt,hpo,7y,/data/annovar/P001.hg38_multianno.txt,/data/annovar/P001.hg38_multianno.vcf,,,
+```
+
+Hybrid annotated-SNV + alignment row:
+
+```csv
+sample,input_kind,phenotype_path,phenotype_format,age_of_onset,snv_txt_path,snv_vcf_path,vcf_path,alignment_path,alignment_index_path
+P001,annotated_snv,/data/pheno/P001.hpo.txt,hpo,7y,/data/annovar/P001.hg38_multianno.txt,/data/annovar/P001.hg38_multianno.vcf,,/data/ngs/P001.cram,/data/ngs/P001.cram.crai
+```
+
+The helper script `scripts/generate_input_csv.sh` now writes this unified schema.
+
+## CSV batch mode (BAM/CRAM, legacy)
 
 Required:
 
@@ -213,7 +302,7 @@ Phenotype handling in CSV mode:
 - default: `note_path` is treated as clinical note (PhenoTagger ON)
 - if `--note no`: `note_path` is treated as HPO file (PhenoTagger OFF)
 
-## CSV batch mode (VCF)
+## CSV batch mode (VCF, legacy)
 
 Required:
 

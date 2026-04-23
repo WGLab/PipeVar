@@ -8,6 +8,7 @@ include { multi_phenosv } from '../../modules/multi_phenosv/'
 include { multi_rankvar } from '../../modules/multi_rankvar/'
 include { multi_manta } from '../../modules/multi_manta/'
 include { multi_scramble } from '../../modules/multi_scramble/'
+include { scramble_ref_prep } from '../../modules/scramble_ref_prep/'
 include { multi_normalize_shortread_alignment } from '../../modules/multi_normalize_shortread_alignment/'
 include { multi_cnvnator } from '../../modules/multi_cnvnator/'
 include { multi_merge_shortread_sv_callers } from '../../modules/multi_merge_shortread_sv_callers/'
@@ -88,10 +89,11 @@ workflow INPUT_CSV_ALIGNMENT_ALL_NGS {
 	scramble_vcf = null
 	if ( scramble_mode == "yes" ) {
 		scramble_ref_meta = ref_fa.map { ref_tuple -> tuple([id: 'reference'], ref_tuple[0], ref_tuple[1]) }
+		scramble_ref_bundle = scramble_ref_prep(scramble_ref_meta)
 		scramble_cluster_input = input_bam_with_bam.map { out_prefix, bam_file, index_file ->
 			tuple([id: out_prefix], bam_file, index_file)
 		}
-		multi_scramble(scramble_cluster_input, scramble_ref_meta)
+		multi_scramble(scramble_cluster_input, scramble_ref_bundle.out.ref)
 		scramble_vcf = multi_scramble.out.vcf.map { meta, vcf -> tuple(meta.id, vcf) }
 	}
 
