@@ -22,6 +22,8 @@ workflow INPUT_CSV_ALIGNMENT_NGS_SV {
 	input_bam
 	input_age
 	ref_fa
+	eh_ref_fa
+	eh_variant_catalog
 	is_note
 	inheritance_mode
 	include_clinvar_report
@@ -35,8 +37,8 @@ workflow INPUT_CSV_ALIGNMENT_NGS_SV {
                 input_bam_no_bam=multi_phenotagger(input_bam_no_bam)
         }
         phen2gene_result=multi_phen2gene(input_bam_no_bam)
-        multi_eh_result=multi_expansionhunter(input_bam_with_bam,ref_fa)
-        multi_eh_filter(multi_eh_result)
+        multi_eh_result=multi_expansionhunter(input_bam_with_bam,eh_ref_fa,eh_variant_catalog)
+        multi_eh_filter(multi_eh_result.json)
         manta_result=multi_manta(input_bam_with_bam,ref_fa)
 	scramble_mode = params.scramble ? params.scramble.toString().trim().toLowerCase() : "no"
 	scramble_vcf = null

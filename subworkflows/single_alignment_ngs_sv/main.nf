@@ -22,6 +22,8 @@ workflow SINGLE_ALIGNMENT_NGS_SV {
 	bam
 	out_prefix
 	ref_fa
+	eh_ref_fa
+	eh_variant_catalog
 	note
 	is_note
 	inheritance_mode
@@ -82,7 +84,7 @@ workflow SINGLE_ALIGNMENT_NGS_SV {
 	ANNOVAR_SV(sv_vcf,out_prefix,Phen2gene.out,"null")
 	SURVIVOR(ANNOVAR_SV.out,out_prefix)
 	PhenoSV(SURVIVOR.out,out_prefix,hpo)
-	ExpansionHunter(bam,out_prefix,ref_fa)
-	eh_filter(out_prefix,ExpansionHunter.out)
+	ExpansionHunter(bam,out_prefix,eh_ref_fa,eh_variant_catalog)
+	eh_filter(out_prefix,ExpansionHunter.out.json)
 		sv_prio(out_prefix,PhenoSV.out,ANNOVAR_SV.out,hpo,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
 }

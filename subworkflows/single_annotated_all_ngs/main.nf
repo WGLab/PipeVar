@@ -28,6 +28,8 @@ workflow SINGLE_ANNOTATED_ALL_NGS {
 	snv_vcf
 	out_prefix
 	ref_fa
+	eh_ref_fa
+	eh_variant_catalog
 	phenotype
 	phenotype_format
 	rankscore_filter
@@ -107,8 +109,8 @@ workflow SINGLE_ANNOTATED_ALL_NGS {
 	ANNOVAR_SV(sv_vcf, out_prefix, Phen2gene.out, "null")
 	SURVIVOR(ANNOVAR_SV.out, out_prefix)
 	PhenoSV(SURVIVOR.out, out_prefix, hpo)
-	ExpansionHunter(bam, out_prefix, ref_fa)
-	eh_filter(out_prefix, ExpansionHunter.out)
+	ExpansionHunter(bam, out_prefix, eh_ref_fa, eh_variant_catalog)
+	eh_filter(out_prefix, ExpansionHunter.out.json)
 	ngs_prio(out_prefix, RankVar.out, rankscore_result.out.rankscore, rankscore_result.out.clinvar, PhenoSV.out, ANNOVAR_SV.out, validate_preannotated_annovar_pair.out[1], hpo, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 
 	if ( mito_ref_fa != null ) {

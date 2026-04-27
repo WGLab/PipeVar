@@ -20,6 +20,8 @@ workflow SINGLE_ALIGNMENT_ALL_NGS_LIGHT {
 	bam
 	out_prefix
 	ref_fa
+	eh_ref_fa
+	eh_variant_catalog
 	note
 	rankscore_filter
 	rankscore_softwares
@@ -57,9 +59,8 @@ workflow SINGLE_ALIGNMENT_ALL_NGS_LIGHT {
 	Manta(bam,out_prefix,ref_fa)
 	SURVIVOR(Manta.out,out_prefix)
 	PhenoSV(SURVIVOR.out,out_prefix,hpo)
-	ExpansionHunter(bam,out_prefix,ref_fa)
-	eh_filter(out_prefix,ExpansionHunter.out)
+	ExpansionHunter(bam,out_prefix,eh_ref_fa,eh_variant_catalog)
+	eh_filter(out_prefix,ExpansionHunter.out.json)
 
 }
-
 

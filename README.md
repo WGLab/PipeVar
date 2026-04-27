@@ -334,7 +334,8 @@ Expected CSV columns:
 - `--mode <snp|sv>`: restrict to SNP or SV branch
 - `--type <ont|pacbio|short>`: sequencing type for BAM/CRAM flows
 - `--light <yes|no>`: enable lightweight models/callers where supported
-- `--genome <hg38|grch38>`: genome build for ExpansionHunter catalog selection
+- `--expansionhunter_variant_catalog <FILE>`: ExpansionHunter variant catalog for short-read BAM/CRAM workflows
+- `--genome <hg38|grch38>`: reserved for non-ExpansionHunter uses
 - `--target <yes|no>`: restrict SNP calling to phenotype-derived gene BED
 - `--scramble <yes|no>`: enable SCRAMBLE MEI calling in short-read SV/all-NGS BAM/CRAM paths (default: `no`)
 - `--phen2gene_filter <INT>`: top-N genes retained for targeted mode (default: 500)
@@ -366,12 +367,13 @@ The workflow now uses unified subworkflows and switches SNP caller internally by
 
 `--light yes` also enables PhenoSV-light model through config (`ext.args`).
 
-### ExpansionHunter catalog selection
+### ExpansionHunter catalog input
 
-Catalog path is selected from `--genome` for both single and batch modes:
+Short-read BAM/CRAM workflows that run ExpansionHunter require an explicit catalog:
 
-- `hg38` -> `/hg38/variant_catalog.json`
-- `grch38` -> `/EH_grch38/variant_catalog.json`
+- `--expansionhunter_variant_catalog /path/to/variant_catalog.json`
+
+The catalog is staged by Nextflow as a regular task input, so Docker and Singularity runs do not depend on a fixed in-container catalog path.
 
 ## Example commands
 
@@ -497,7 +499,7 @@ Exact files depend on `--mode`, `--type`, and input type.
 ### Repeat expansion outputs
 
 - short-read:
-  - `*.json` (ExpansionHunter raw output)
+  - `*.json.gz` (ExpansionHunter raw output)
   - `*.eh.tsv` (filtered disease-threshold loci)
 - long-read:
   - NanoRepeat result files (`*_nanoRepeat_output.tsv`, related summary files)

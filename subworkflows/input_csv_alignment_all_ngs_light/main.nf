@@ -22,6 +22,8 @@ workflow INPUT_CSV_ALIGNMENT_ALL_NGS_LIGHT {
 	input_bam
 	input_age
 	ref_fa
+	eh_ref_fa
+	eh_variant_catalog
 	rankscore_filter
 	rankscore_softwares
 	phen2gene_top_n
@@ -65,8 +67,8 @@ workflow INPUT_CSV_ALIGNMENT_ALL_NGS_LIGHT {
         join_annovar_hpo=join_annovar_phen2gene.join(input_bam_no_bam)
         rankscore_result=multi_rankscore(join_annovar_phen2gene,gnomad,rankscore_filter,rankscore_softwares,gq,phen2gene_top_n)
         rankvar_result=multi_rankvar(join_annovar_hpo,gnomad,gq,ad,rankvar_filter)
-        multi_eh_result=multi_expansionhunter(input_bam_with_bam,ref_fa_no_dict)
-        multi_eh_filter(multi_eh_result)
+        multi_eh_result=multi_expansionhunter(input_bam_with_bam,eh_ref_fa,eh_variant_catalog)
+        multi_eh_filter(multi_eh_result.json)
         manta_result=multi_manta(input_bam_with_bam,ref_fa_no_dict)
         if ( target == "yes" ) {
 	        manta_result_annovar=manta_result.join(phen2gene_result).join(phen2_gene_bed).map { out_prefix, vcf_file, phen2gene_file, bed_file -> tuple(out_prefix, vcf_file, phen2gene_file, bed_file) }

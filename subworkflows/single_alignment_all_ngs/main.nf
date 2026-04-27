@@ -28,6 +28,8 @@ workflow SINGLE_ALIGNMENT_ALL_NGS {
 	bam
 	out_prefix
 	ref_fa
+	eh_ref_fa
+	eh_variant_catalog
 	note
 	rankscore_filter
 	rankscore_softwares
@@ -121,8 +123,8 @@ workflow SINGLE_ALIGNMENT_ALL_NGS {
 	ANNOVAR_SV(sv_vcf,out_prefix,Phen2gene.out,sv_annovar_bed)
 	SURVIVOR(ANNOVAR_SV.out,out_prefix)
 	PhenoSV(SURVIVOR.out,out_prefix,hpo)
-	ExpansionHunter(bam,out_prefix,ref_fa)
-	eh_filter(out_prefix,ExpansionHunter.out)
+	ExpansionHunter(bam,out_prefix,eh_ref_fa,eh_variant_catalog)
+	eh_filter(out_prefix,ExpansionHunter.out.json)
 	ngs_prio(out_prefix,RankVar.out,Rankscore_analysis.out.rankscore,Rankscore_analysis.out.clinvar,PhenoSV.out,ANNOVAR_SV.out,ANNOVAR.out.vcf_output,hpo,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
 
 }

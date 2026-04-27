@@ -40,6 +40,8 @@ INPUT MODES
      Required:
        --bam <FILE>
        --ref_fa <FILE>
+       For short-read runs (`--type short`):
+         --expansionhunter_variant_catalog <FILE>
        One phenotype source:
          --note <FILE>   (clinical note; pipeline runs PhenoTagger)
          --hpo  <FILE>   (HPO IDs; pipeline skips PhenoTagger)
@@ -62,12 +64,16 @@ INPUT MODES
      Notes:
        Without --bam: SNP prioritization only, --ref_fa not required
        With --bam/--type short: also runs short-read SV/CNV/STR and optional mito analysis
+       With --bam/--type short:
+         --expansionhunter_variant_catalog <FILE>
        --mode sv is not supported
        --target yes is not supported
 
   4) CSV batch BAM mode
      Required:
        --input_csv <FILE> --bam true --ref_fa <FILE>
+       For short-read runs (`--type short`):
+         --expansionhunter_variant_catalog <FILE>
      CSV columns:
        sample,file_path,note_path
        Optional age field for CSV prioritization flows:
@@ -97,6 +103,8 @@ INPUT MODES
      Notes:
        annotated_snv rows may also include alignment_path/alignment_index_path to run SV/CNV/STR
        and optional mito analysis alongside imported SNP evidence
+       annotated_snv rows with alignment_path and --type short also require:
+         --expansionhunter_variant_catalog <FILE>
 
   6) CSV batch VCF mode
      Required:
@@ -122,7 +130,9 @@ CORE OPTIONS
   --type <ont|pacbio|short>
                            Sequencing type for BAM/CRAM flows. Default: ont
   --light <yes|no>         Use lightweight SNP/SV models where supported. Default: no
-  --genome <hg38|grch38>   Genome build for ExpansionHunter catalog. Default: hg38
+  --expansionhunter_variant_catalog <FILE>
+                           ExpansionHunter variant catalog for short-read BAM/CRAM workflows
+  --genome <hg38|grch38>   Reserved for non-ExpansionHunter uses. Default: hg38
 
 --------------------------------------------------------------------------------
 FILTERING OPTIONS
@@ -199,6 +209,7 @@ EXAMPLES
        --vcf /data/sample.hg38_multianno.vcf \\
        --bam /data/sample.cram \\
        --ref_fa /refs/hg38.fa \\
+       --expansionhunter_variant_catalog /refs/variant_catalog.json \\
        --type short \\
        --mito yes \\
        --hpo /data/sample.hpo.txt \\
@@ -210,6 +221,7 @@ EXAMPLES
        --input_csv /data/samples.csv \\
        --bam true \\
        --ref_fa /refs/hg38.fa \\
+       --expansionhunter_variant_catalog /refs/variant_catalog.json \\
        --note no
 
   6) Local + Singularity with custom mount sources:
@@ -231,6 +243,8 @@ NOTES
   - For single-file mode, at least one of --note <FILE> or --hpo <FILE> is required.
   - Annotated-SNV mode requires an ANNOVAR multianno TXT plus matching ANNOVAR multianno VCF.
   - Annotated-SNV plus BAM/CRAM is supported for short-read all-NGS analysis only.
+  - Short-read BAM/CRAM workflows that run ExpansionHunter require
+    --expansionhunter_variant_catalog <FILE>.
   
 ================================================================================
 """
@@ -693,12 +707,26 @@ def annotatedHybridNeedsReference = clean_annotated_snv == 'yes' && params.bam
 def annotatedManifestNeedsReference = manifestUsesUnifiedSchema && manifestRowsForValidation.any { row ->
     row.input_kind == 'annotated_snv' && row.containsKey('alignment_path') && row.alignment_path
 }
+def unifiedManifestNeedsExpansionHunter = manifestUsesUnifiedSchema && (
+    manifestInputKinds.any { it in ['bam_ngs', 'cram_ngs'] } || annotatedManifestNeedsReference
+)
 def is_ref_mode = params.bam || (params.input_csv && params.bam) || (params.vcf && clean_annotated_snv != 'yes') || unifiedManifestNeedsReference || annotatedHybridNeedsReference || annotatedManifestNeedsReference
 if (is_ref_mode && !params.ref_fa) {
     error """
     ERROR: Reference FASTA missing.
     This input mode requires a reference genome.
     Please specify: --ref_fa <path/to/reference.fasta>
+    """
+}
+
+def is_expansionhunter_mode = clean_type == 'short' && (
+    params.bam || (params.input_csv && params.bam) || unifiedManifestNeedsExpansionHunter
+)
+if (is_expansionhunter_mode && !params.expansionhunter_variant_catalog) {
+    error """
+    ERROR: ExpansionHunter variant catalog missing.
+    Short-read BAM/CRAM workflows that run ExpansionHunter require:
+      --expansionhunter_variant_catalog <path/to/variant_catalog.json>
     """
 }
 
@@ -783,6 +811,18 @@ if (params.ref_fa) {
     }
 }
 
+if (params.expansionhunter_variant_catalog) {
+    def eh_catalog = file(params.expansionhunter_variant_catalog)
+    if (!eh_catalog.exists()) {
+        error """
+        ERROR: ExpansionHunter variant catalog not found.
+        Expected at: ${eh_catalog}
+        Please provide a valid file with:
+          --expansionhunter_variant_catalog <path/to/variant_catalog.json>
+        """
+    }
+}
+
 include { SINGLE_ALIGNMENT_ALL_LONGPHASE } from './subworkflows/single_alignment_all_longphase' 
 include { SINGLE_ALIGNMENT_ALL_NGS } from './subworkflows/single_alignment_all_ngs'
 include { SINGLE_ALIGNMENT_NGS_MITO } from './subworkflows/single_alignment_ngs_mito'
@@ -813,6 +853,8 @@ include { INPUT_CSV_ANNOTATED_ALL_NGS } from './subworkflows/input_csv_annotated
 workflow {
 	def input_age = null
 	def mito_ref_fa = null
+	def eh_ref_fa = null
+	def eh_variant_catalog = null
 	def input_annotated_snv = null
 	def input_annotated_ngs = null
 	def csv_manifest_mode = null
@@ -1089,6 +1131,20 @@ ref_fa = Channel
     }
     .first()
         }
+	if (params.ref_fa != null && clean_type == 'short') {
+eh_ref_fa = Channel
+    .fromPath(params.ref_fa)
+    .map { fa_file ->
+        def fai_file = file("${fa_file}.fai")
+        return [ fa_file, fai_file ]
+    }
+    .first()
+	}
+	if (params.expansionhunter_variant_catalog != null) {
+eh_variant_catalog = Channel
+    .fromPath(params.expansionhunter_variant_catalog)
+    .first()
+	}
 	if (params.ref_fa != null && clean_mito == 'yes' && params.type == 'short') {
 mito_ref_fa = Channel
     .fromPath(params.ref_fa)
@@ -1160,7 +1216,7 @@ mito_ref_fa = Channel
 	}
 	if ( params.input_csv ) {
         if ( input_annotated_ngs != null ) {
-                INPUT_CSV_ANNOTATED_ALL_NGS(input_annotated_ngs, input_age, ref_fa, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_ref_fa, mito_contig)
+                INPUT_CSV_ANNOTATED_ALL_NGS(input_annotated_ngs, input_age, ref_fa, eh_ref_fa, eh_variant_catalog, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_ref_fa, mito_contig)
         }
         else if ( input_annotated_snv != null ) {
                 INPUT_CSV_ANNOTATED_SNV_SNP(input_annotated_snv, input_age, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
@@ -1180,13 +1236,13 @@ mito_ref_fa = Channel
 	            }
 	            if ( params.type == 'short' ) {
 	                    if ( params.mode == 'sv' ) {
-	                        INPUT_CSV_ALIGNMENT_NGS_SV(input_bam, input_age, ref_fa,  is_note, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
+	                        INPUT_CSV_ALIGNMENT_NGS_SV(input_bam, input_age, ref_fa, eh_ref_fa, eh_variant_catalog, is_note, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 	                    }
 	                    else if ( params.mode == 'snp' ) {
-                        INPUT_CSV_NGS_SNP(input_bam, input_age, ref_fa,  rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
+                        INPUT_CSV_NGS_SNP(input_bam, input_age, ref_fa, eh_ref_fa, eh_variant_catalog, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 				}
 				else {
-                                INPUT_CSV_ALIGNMENT_ALL_NGS(input_bam, input_age, ref_fa,  rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
+                                INPUT_CSV_ALIGNMENT_ALL_NGS(input_bam, input_age, ref_fa, eh_ref_fa, eh_variant_catalog, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 	                        }
 	            }
 	            else { // Long reads
@@ -1204,7 +1260,7 @@ mito_ref_fa = Channel
 	    }
     else { // Single File Mode
         if ( clean_annotated_snv == 'yes' && params.vcf && params.bam != null ) {
-            SINGLE_ANNOTATED_ALL_NGS(bam, annovar_txt, vcf, out_prefix, ref_fa, note, phenotype_format, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_ref_fa, mito_contig)
+            SINGLE_ANNOTATED_ALL_NGS(bam, annovar_txt, vcf, out_prefix, ref_fa, eh_ref_fa, eh_variant_catalog, note, phenotype_format, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_ref_fa, mito_contig)
         }
         else if ( clean_annotated_snv == 'yes' && params.vcf ) {
             SINGLE_ANNOTATED_SNV_SNP(annovar_txt, vcf, out_prefix, note, phenotype_format, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
@@ -1223,13 +1279,13 @@ mito_ref_fa = Channel
 	            }
 	            if ( params.type == 'short' ) {
 	                    if ( params.mode == 'sv' ) {
-	                        SINGLE_ALIGNMENT_NGS_SV(bam, out_prefix, ref_fa,  note, is_note, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
+	                        SINGLE_ALIGNMENT_NGS_SV(bam, out_prefix, ref_fa, eh_ref_fa, eh_variant_catalog, note, is_note, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 	                    }
 	                    else if ( params.mode == 'snp' ) {
-                        SINGLE_ALIGNMENT_NGS_SNP(bam, out_prefix, ref_fa,  note, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
+                        SINGLE_ALIGNMENT_NGS_SNP(bam, out_prefix, ref_fa, eh_ref_fa, eh_variant_catalog, note, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 	                    }
 			    else {
-			                SINGLE_ALIGNMENT_ALL_NGS(bam, out_prefix, ref_fa,  note, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
+			                SINGLE_ALIGNMENT_ALL_NGS(bam, out_prefix, ref_fa, eh_ref_fa, eh_variant_catalog, note, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 			    }
 	            }
 	            else { // Long reads

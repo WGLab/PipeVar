@@ -26,6 +26,8 @@ workflow INPUT_CSV_ANNOTATED_ALL_NGS {
 	input_annotated_ngs
 	input_age
 	ref_fa
+	eh_ref_fa
+	eh_variant_catalog
 	rankscore_filter
 	rankscore_softwares
 	phen2gene_top_n
@@ -65,8 +67,8 @@ workflow INPUT_CSV_ANNOTATED_ALL_NGS {
 	input_bam_with_bam = input_annotated_ngs.map { out_prefix, annovar_txt, annovar_vcf, bam_file, bai_file, phenotype_path, phenotype_format ->
 		tuple(out_prefix, bam_file, bai_file)
 	}
-	multi_eh_result = multi_expansionhunter(input_bam_with_bam, ref_fa)
-	multi_eh_filter(multi_eh_result)
+	multi_eh_result = multi_expansionhunter(input_bam_with_bam, eh_ref_fa, eh_variant_catalog)
+	multi_eh_filter(multi_eh_result.json)
 	manta_result = multi_manta(input_bam_with_bam, ref_fa)
 
 	scramble_mode = params.scramble ? params.scramble.toString().trim().toLowerCase() : "no"

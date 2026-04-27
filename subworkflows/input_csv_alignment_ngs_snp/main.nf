@@ -20,6 +20,8 @@ workflow INPUT_CSV_NGS_SNP {
 	input_bam
 	input_age
 	ref_fa
+	eh_ref_fa
+	eh_variant_catalog
 	rankscore_filter
 	rankscore_softwares
 	phen2gene_top_n
@@ -72,8 +74,8 @@ workflow INPUT_CSV_NGS_SNP {
 	annovar_result_txt=annovar_result.map { item -> tuple(item[0], item[1]) }
         join_annovar_phen2gene=annovar_result_txt.join(phen2gene_result)
         join_annovar_hpo=join_annovar_phen2gene.join(input_bam_no_bam)
-        multi_eh_result=multi_expansionhunter(input_bam_with_bam,ref_fa)
-        multi_eh_filter(multi_eh_result)
+        multi_eh_result=multi_expansionhunter(input_bam_with_bam,eh_ref_fa,eh_variant_catalog)
+        multi_eh_filter(multi_eh_result.json)
 	rankscore_result=multi_rankscore(join_annovar_phen2gene,gnomad,rankscore_filter,rankscore_softwares,gq,phen2gene_top_n)
         rankvar_result=multi_rankvar(join_annovar_hpo,gnomad,gq,ad,rankvar_filter)
         rankscore_rankvar_join=rankscore_result.join(rankvar_result)

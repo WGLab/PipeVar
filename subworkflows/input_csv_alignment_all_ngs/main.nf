@@ -28,6 +28,8 @@ workflow INPUT_CSV_ALIGNMENT_ALL_NGS {
 	input_bam
 	input_age
 	ref_fa
+	eh_ref_fa
+	eh_variant_catalog
 	rankscore_filter
 	rankscore_softwares
 	phen2gene_top_n
@@ -82,8 +84,8 @@ workflow INPUT_CSV_ALIGNMENT_ALL_NGS {
         join_annovar_hpo=join_annovar_phen2gene.join(input_bam_no_bam)
         rankscore_result=multi_rankscore(join_annovar_phen2gene,gnomad,rankscore_filter,rankscore_softwares,gq,phen2gene_top_n)
         rankvar_result=multi_rankvar(join_annovar_hpo,gnomad,gq,ad,rankvar_filter)
-        multi_eh_result=multi_expansionhunter(input_bam_with_bam,ref_fa)
-        multi_eh_filter(multi_eh_result)
+        multi_eh_result=multi_expansionhunter(input_bam_with_bam,eh_ref_fa,eh_variant_catalog)
+        multi_eh_filter(multi_eh_result.json)
         manta_result=multi_manta(input_bam_with_bam,ref_fa)
 	scramble_mode = params.scramble ? params.scramble.toString().trim().toLowerCase() : "no"
 	scramble_vcf = null

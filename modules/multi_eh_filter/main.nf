@@ -11,15 +11,24 @@ process multi_eh_filter {
 	path "${out_prefix}.eh.tsv"
 
 	script:
+	def filtered_input = eh_output.name.endsWith('.gz') ? "${out_prefix}.eh_input.json" : eh_output
 
 	"""
-	python3 /filter_eh/filter_eh.py $eh_output > ${out_prefix}.eh.tsv
+	if [[ "$eh_output" == *.gz ]]; then
+		python3 - "$eh_output" "$filtered_input" <<'PY'
+import gzip
+import sys
+
+with gzip.open(sys.argv[1], "rt") as src, open(sys.argv[2], "w") as dst:
+    dst.write(src.read())
+PY
+	fi
+	python3 /filter_eh/filter_eh.py $filtered_input > ${out_prefix}.eh.tsv
 	
 	
 	"""
 
 
 }
-
 
 
