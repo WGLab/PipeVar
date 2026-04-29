@@ -26,6 +26,7 @@ workflow SINGLE_ANNOTATED_ALL_NGS {
 	bam
 	annovar_txt
 	snv_vcf
+	annovar_sv_vcf
 	out_prefix
 	ref_fa
 	eh_ref_fa
@@ -55,7 +56,7 @@ workflow SINGLE_ANNOTATED_ALL_NGS {
 	)
 
 	hpo = phenotype
-	if ( phenotype_format == 'clinical_note' ) {
+	if ( phenotype_format == 'clinical_note' || phenotype_format == 'yes' ) {
 		phenotagger(phenotype, out_prefix)
 		hpo = phenotagger.out
 	}
@@ -63,50 +64,7 @@ workflow SINGLE_ANNOTATED_ALL_NGS {
 	RankVar(validate_preannotated_annovar_pair.out[0], Phen2gene.out, hpo, out_prefix, gnomad, gq, ad, rankvar_filter)
 	rankscore_result = Rankscore_analysis(validate_preannotated_annovar_pair.out[0], Phen2gene.out, out_prefix, gnomad, rankscore_filter, rankscore_softwares, gq, phen2gene_top_n)
 
-	Manta(bam, out_prefix, ref_fa)
-	scramble_mode = params.scramble ? params.scramble.toString().trim().toLowerCase() : "no"
-	scramble_vcf = null
-	if ( scramble_mode == "yes" ) {
-		scramble_ref_meta = ref_fa.map { ref_tuple -> tuple([id: 'reference'], ref_tuple[0], ref_tuple[1]) }
-		scramble_ref_bundle = scramble_ref_prep(scramble_ref_meta)
-		scramble_cluster_input = out_prefix.combine(bam).map { prefix, bam_tuple ->
-			tuple([id: prefix], bam_tuple[0], bam_tuple[1])
-		}
-		scramble(scramble_cluster_input, scramble_ref_bundle.out.ref)
-		scramble_vcf = scramble.out.vcf.map { meta, vcf -> vcf }
-	}
-
-	cnvnator_mode = params.cnvnator ? params.cnvnator.toString().trim().toLowerCase() : "yes"
-	if ( cnvnator_mode != "no" && scramble_mode == "yes" ) {
-		normalize_shortread_alignment(bam, out_prefix, ref_fa)
-		CNVnator(normalize_shortread_alignment.out, out_prefix, ref_fa, params.cnvnator_bin_size)
-		sv_merge_inputs = Manta.out.combine(CNVnator.out.vcf).combine(scramble_vcf).map { combined_vcfs ->
-			combined_vcfs.flatten()
-		}
-		merge_shortread_sv_callers(sv_merge_inputs, out_prefix)
-		sv_vcf = merge_shortread_sv_callers.out
-	}
-	else if ( cnvnator_mode != "no" ) {
-		normalize_shortread_alignment(bam, out_prefix, ref_fa)
-		CNVnator(normalize_shortread_alignment.out, out_prefix, ref_fa, params.cnvnator_bin_size)
-		sv_merge_inputs = Manta.out.combine(CNVnator.out.vcf).map { combined_vcfs ->
-			combined_vcfs.flatten()
-		}
-		merge_shortread_sv_callers(sv_merge_inputs, out_prefix)
-		sv_vcf = merge_shortread_sv_callers.out
-	}
-	else if ( scramble_mode == "yes" ) {
-		sv_merge_inputs = Manta.out.combine(scramble_vcf).map { combined_vcfs ->
-			combined_vcfs.flatten()
-		}
-		merge_shortread_sv_callers(sv_merge_inputs, out_prefix)
-		sv_vcf = merge_shortread_sv_callers.out
-	}
-	else {
-		sv_vcf = Manta.out
-	}
-
-	ANNOVAR_SV(sv_vcf, out_prefix, Phen2gene.out, "null")
+	ANNOVAR_SV(annovar_sv_vcf, out_prefix, Phen2gene.out, "null", "preannotated")
 	SURVIVOR(ANNOVAR_SV.out, out_prefix)
 	PhenoSV(SURVIVOR.out, out_prefix, hpo)
 	ExpansionHunter(bam, out_prefix, eh_ref_fa, eh_variant_catalog)

@@ -43,17 +43,17 @@ workflow INPUT_CSV_ANNOTATED_ALL_NGS {
 
 	main:
 	validator_script = Channel.value(file("${projectDir}/scripts/validate_preannotated_annovar_pair.py"))
-	validate_input = input_annotated_ngs.map { out_prefix, annovar_txt, annovar_vcf, bam_file, bai_file, phenotype_path, phenotype_format ->
+	validate_input = input_annotated_ngs.map { out_prefix, annovar_txt, annovar_vcf, annovar_sv_vcf, bam_file, bai_file, phenotype_path, phenotype_format ->
 		tuple(out_prefix, annovar_txt, annovar_vcf)
 	}
 	validated_annovar = validate_preannotated_annovar_pair(validate_input, validator_script)
 
 	clinical_note_input = input_annotated_ngs
-		.filter { out_prefix, annovar_txt, annovar_vcf, bam_file, bai_file, phenotype_path, phenotype_format -> phenotype_format == 'clinical_note' }
-		.map { out_prefix, annovar_txt, annovar_vcf, bam_file, bai_file, phenotype_path, phenotype_format -> tuple(out_prefix, phenotype_path) }
+		.filter { out_prefix, annovar_txt, annovar_vcf, annovar_sv_vcf, bam_file, bai_file, phenotype_path, phenotype_format -> phenotype_format == 'clinical_note' }
+		.map { out_prefix, annovar_txt, annovar_vcf, annovar_sv_vcf, bam_file, bai_file, phenotype_path, phenotype_format -> tuple(out_prefix, phenotype_path) }
 	hpo_input = input_annotated_ngs
-		.filter { out_prefix, annovar_txt, annovar_vcf, bam_file, bai_file, phenotype_path, phenotype_format -> phenotype_format == 'hpo' }
-		.map { out_prefix, annovar_txt, annovar_vcf, bam_file, bai_file, phenotype_path, phenotype_format -> tuple(out_prefix, phenotype_path) }
+		.filter { out_prefix, annovar_txt, annovar_vcf, annovar_sv_vcf, bam_file, bai_file, phenotype_path, phenotype_format -> phenotype_format == 'hpo' }
+		.map { out_prefix, annovar_txt, annovar_vcf, annovar_sv_vcf, bam_file, bai_file, phenotype_path, phenotype_format -> tuple(out_prefix, phenotype_path) }
 	phenotagger_result = multi_phenotagger(clinical_note_input)
 	hpo_paths = phenotagger_result.mix(hpo_input)
 	phen2gene_result = multi_phen2gene(hpo_paths)
@@ -64,54 +64,17 @@ workflow INPUT_CSV_ANNOTATED_ALL_NGS {
 	rankscore_result = multi_rankscore(join_annovar_phen2gene, gnomad, rankscore_filter, rankscore_softwares, gq, phen2gene_top_n)
 	rankvar_result = multi_rankvar(join_annovar_hpo, gnomad, gq, ad, rankvar_filter)
 
-	input_bam_with_bam = input_annotated_ngs.map { out_prefix, annovar_txt, annovar_vcf, bam_file, bai_file, phenotype_path, phenotype_format ->
+	input_bam_with_bam = input_annotated_ngs.map { out_prefix, annovar_txt, annovar_vcf, annovar_sv_vcf, bam_file, bai_file, phenotype_path, phenotype_format ->
 		tuple(out_prefix, bam_file, bai_file)
 	}
 	multi_eh_result = multi_expansionhunter(input_bam_with_bam, eh_ref_fa, eh_variant_catalog)
 	multi_eh_filter(multi_eh_result.json)
-	manta_result = multi_manta(input_bam_with_bam, ref_fa)
 
-	scramble_mode = params.scramble ? params.scramble.toString().trim().toLowerCase() : "no"
-	scramble_vcf = null
-	if ( scramble_mode == "yes" ) {
-		scramble_ref_meta = ref_fa.map { ref_tuple -> tuple([id: 'reference'], ref_tuple[0], ref_tuple[1]) }
-		scramble_ref_bundle = scramble_ref_prep(scramble_ref_meta)
-		scramble_cluster_input = input_bam_with_bam.map { out_prefix, bam_file, index_file ->
-			tuple([id: out_prefix], bam_file, index_file)
-		}
-		multi_scramble(scramble_cluster_input, scramble_ref_bundle.out.ref)
-		scramble_vcf = multi_scramble.out.vcf.map { meta, vcf -> tuple(meta.id, vcf) }
+	annotated_sv_input = input_annotated_ngs.map { out_prefix, annovar_txt, annovar_vcf, annovar_sv_vcf, bam_file, bai_file, phenotype_path, phenotype_format ->
+		tuple(out_prefix, annovar_sv_vcf)
 	}
-
-	cnvnator_mode = params.cnvnator ? params.cnvnator.toString().trim().toLowerCase() : "yes"
-	if ( cnvnator_mode != "no" && scramble_mode == "yes" ) {
-		normalized_bam = multi_normalize_shortread_alignment(input_bam_with_bam, ref_fa)
-		multi_cnvnator(normalized_bam, ref_fa, params.cnvnator_bin_size)
-		merged_sv_input = manta_result.join(multi_cnvnator.out.vcf).join(scramble_vcf).map { out_prefix, manta_vcf, cnvnator_vcf, scramble_vcf_file ->
-			tuple(out_prefix, [manta_vcf, cnvnator_vcf, scramble_vcf_file])
-		}
-		sv_result = multi_merge_shortread_sv_callers(merged_sv_input)
-	}
-	else if ( cnvnator_mode != "no" ) {
-		normalized_bam = multi_normalize_shortread_alignment(input_bam_with_bam, ref_fa)
-		multi_cnvnator(normalized_bam, ref_fa, params.cnvnator_bin_size)
-		merged_sv_input = manta_result.join(multi_cnvnator.out.vcf).map { out_prefix, manta_vcf, cnvnator_vcf ->
-			tuple(out_prefix, [manta_vcf, cnvnator_vcf])
-		}
-		sv_result = multi_merge_shortread_sv_callers(merged_sv_input)
-	}
-	else if ( scramble_mode == "yes" ) {
-		merged_sv_input = manta_result.join(scramble_vcf).map { out_prefix, manta_vcf, scramble_vcf_file ->
-			tuple(out_prefix, [manta_vcf, scramble_vcf_file])
-		}
-		sv_result = multi_merge_shortread_sv_callers(merged_sv_input)
-	}
-	else {
-		sv_result = manta_result
-	}
-
-	sv_result_annovar = sv_result.join(phen2gene_result).map { out_prefix, vcf_file, phen2gene_file ->
-		tuple(out_prefix, vcf_file, phen2gene_file, "null")
+	sv_result_annovar = annotated_sv_input.join(phen2gene_result).map { out_prefix, vcf_file, phen2gene_file ->
+		tuple(out_prefix, vcf_file, phen2gene_file, "null", "preannotated")
 	}
 	annovar_sv_result = multi_annovar_sv(sv_result_annovar)
 	survivor_result = multi_survivor(annovar_sv_result)

@@ -120,7 +120,7 @@ workflow SINGLE_ALIGNMENT_ALL_NGS {
 	}
 
 	sv_annovar_bed = (target == "yes") ? phen2_gene_bed : target
-	ANNOVAR_SV(sv_vcf,out_prefix,Phen2gene.out,sv_annovar_bed)
+	ANNOVAR_SV(sv_vcf,out_prefix,Phen2gene.out,sv_annovar_bed,"called")
 	SURVIVOR(ANNOVAR_SV.out,out_prefix)
 	PhenoSV(SURVIVOR.out,out_prefix,hpo)
 	ExpansionHunter(bam,out_prefix,eh_ref_fa,eh_variant_catalog)

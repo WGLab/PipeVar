@@ -289,6 +289,19 @@ MSG
         echo "ERROR: no alignment files matched suffix '$ALIGNMENT_SUFFIX' in $ALIGNMENT_DIR" >&2
         exit 1
       fi
+      read -r -p "Enter annotated SV VCF directory: " SV_VCF_DIR
+      SV_VCF_DIR="$(trim_spaces "$SV_VCF_DIR")"
+      [[ -d "$SV_VCF_DIR" ]] || { echo "ERROR: directory not found: $SV_VCF_DIR" >&2; exit 1; }
+      read -r -p "Enter annotated SV VCF suffix [.hg38_multianno.vcf]: " SV_VCF_SUFFIX
+      SV_VCF_SUFFIX="$(trim_spaces "$SV_VCF_SUFFIX")"
+      SV_VCF_SUFFIX="${SV_VCF_SUFFIX:-.hg38_multianno.vcf}"
+      declare -gA sv_vcf_map=()
+      declare -ga sv_vcf_prefixes=()
+      load_prefix_map "$SV_VCF_DIR" "$SV_VCF_SUFFIX" sv_vcf_map sv_vcf_prefixes
+      if [[ "${#sv_vcf_map[@]}" -eq 0 ]]; then
+        echo "ERROR: no annotated SV VCF files matched suffix '$SV_VCF_SUFFIX' in $SV_VCF_DIR" >&2
+        exit 1
+      fi
     else
       INCLUDE_ALIGNMENT="no"
     fi
@@ -332,7 +345,7 @@ MSG
   missing_count=0
 
   {
-    echo "sample,input_kind,phenotype_path,phenotype_format,age_of_onset,snv_txt_path,snv_vcf_path,vcf_path,alignment_path,alignment_index_path"
+    echo "sample,input_kind,phenotype_path,phenotype_format,age_of_onset,snv_txt_path,snv_vcf_path,sv_vcf_path,vcf_path,alignment_path,alignment_index_path"
 
     for sample in "${primary_prefixes[@]}"; do
       data_count=$((data_count + 1))
@@ -350,6 +363,7 @@ MSG
 
       snv_txt_path=""
       snv_vcf_path=""
+      sv_vcf_path=""
       vcf_path=""
       alignment_path=""
       alignment_index_path=""
@@ -379,6 +393,17 @@ MSG
             paired_alignment="${alignment_map[$matched_alignment]}"
           fi
           alignment_path="$paired_alignment"
+          paired_sv_vcf="${sv_vcf_map[$sample]:-}"
+          if [[ -z "$paired_sv_vcf" ]]; then
+            matched_sv_vcf="$(find_best_match "$sample" "${sv_vcf_prefixes[@]}")"
+            if [[ "$matched_sv_vcf" == AMBIGUOUS:* || -z "$matched_sv_vcf" ]]; then
+              echo "WARNING: no unambiguous annotated SV VCF match for '$sample'; skipping." >&2
+              missing_count=$((missing_count + 1))
+              continue
+            fi
+            paired_sv_vcf="${sv_vcf_map[$matched_sv_vcf]}"
+          fi
+          sv_vcf_path="$paired_sv_vcf"
           if [[ "$alignment_path" == *.bam ]]; then
             if [[ -f "${alignment_path}.bai" ]]; then
               alignment_index_path="${alignment_path}.bai"
@@ -421,7 +446,7 @@ MSG
         age_value="$(prompt_age "$sample")"
       fi
 
-      printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
+      printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
         "$sample" \
         "$INPUT_KIND" \
         "$phenotype_path" \
@@ -429,6 +454,7 @@ MSG
         "$age_value" \
         "$snv_txt_path" \
         "$snv_vcf_path" \
+        "$sv_vcf_path" \
         "$vcf_path" \
         "$alignment_path" \
         "$alignment_index_path"

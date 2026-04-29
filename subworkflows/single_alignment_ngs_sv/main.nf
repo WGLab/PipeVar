@@ -81,7 +81,7 @@ workflow SINGLE_ALIGNMENT_NGS_SV {
 		sv_vcf=Manta.out
 	}
 
-	ANNOVAR_SV(sv_vcf,out_prefix,Phen2gene.out,"null")
+	ANNOVAR_SV(sv_vcf,out_prefix,Phen2gene.out,"null","called")
 	SURVIVOR(ANNOVAR_SV.out,out_prefix)
 	PhenoSV(SURVIVOR.out,out_prefix,hpo)
 	ExpansionHunter(bam,out_prefix,eh_ref_fa,eh_variant_catalog)

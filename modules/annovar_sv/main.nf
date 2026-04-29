@@ -9,6 +9,7 @@ process ANNOVAR_SV {
 	val out_prefix
 	path phen2gene
 	val bed_file
+	val sv_annotation_mode
 
 	output:
 	path "${out_prefix}.exonic.vcf"
@@ -21,7 +22,11 @@ process ANNOVAR_SV {
 
 
 
-        perl /annovar/table_annovar.pl $vcf /annovar/humandb/ -buildver hg38 -out ${out_prefix}_sv -remove -protocol refGene -operation gx -nastring . -vcfinput -polish $bed_arg
+	if [[ "$sv_annotation_mode" == "preannotated" ]]; then
+		cp $vcf ${out_prefix}_sv.hg38_multianno.vcf
+	else
+		perl /annovar/table_annovar.pl $vcf /annovar/humandb/ -buildver hg38 -out ${out_prefix}_sv -remove -protocol refGene -operation gx -nastring . -vcfinput -polish $bed_arg
+	fi
 
 	#Filter with Phen2gene score here
 	bash /phen2gene_filter.sh $phen2gene ${out_prefix}_sv.hg38_multianno.vcf $out_prefix

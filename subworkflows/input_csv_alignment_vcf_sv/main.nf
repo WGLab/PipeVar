@@ -32,10 +32,10 @@ workflow INPUT_CSV_ALIGNMENT_VCF_SV {
         phen2gene_result=multi_phen2gene(input_vcf_no_vcf)
         if ( target == "yes" ) {
 	        phen2_gene_bed=multi_phen2gene_filter(phen2gene_result,ref_fa,phen2gene_top_n)
-	        sv_result_annovar=input_vcf.join(phen2gene_result).join(phen2_gene_bed).map { out_prefix, vcf_file, phen2gene_file, bed_file -> tuple(out_prefix, vcf_file, phen2gene_file, bed_file) }
+	        sv_result_annovar=input_vcf.join(phen2gene_result).join(phen2_gene_bed).map { out_prefix, vcf_file, phen2gene_file, bed_file -> tuple(out_prefix, vcf_file, phen2gene_file, bed_file, "called") }
         }
         else {
-	        sv_result_annovar=input_vcf.join(phen2gene_result).map { out_prefix, vcf_file, phen2gene_file -> tuple(out_prefix, vcf_file, phen2gene_file, target) }
+	        sv_result_annovar=input_vcf.join(phen2gene_result).map { out_prefix, vcf_file, phen2gene_file -> tuple(out_prefix, vcf_file, phen2gene_file, target, "called") }
         }
 	annovar_sv_result=multi_annovar_sv(sv_result_annovar)
         survivor_result=multi_survivor(annovar_sv_result)

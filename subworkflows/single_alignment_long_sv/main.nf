@@ -31,7 +31,7 @@ workflow SINGLE_ALIGNMENT_LONG_SV {
 	}
 	Phen2gene(hpo,out_prefix)
 	sniffles(bam,out_prefix,ref_fa)
-	ANNOVAR_SV(sniffles.out,out_prefix,Phen2gene.out,"null")
+	ANNOVAR_SV(sniffles.out,out_prefix,Phen2gene.out,"null","called")
 	SURVIVOR(ANNOVAR_SV.out,out_prefix)
 	PhenoSV(SURVIVOR.out,out_prefix,hpo)
 	NanoRepeat(bam,out_prefix,ref_fa)

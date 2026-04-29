@@ -246,7 +246,7 @@ Required common columns:
 
 Conditional file columns:
 
-- `snv_txt_path,snv_vcf_path,vcf_path,alignment_path,alignment_index_path`
+- `snv_txt_path,snv_vcf_path,sv_vcf_path,vcf_path,alignment_path,alignment_index_path`
 
 Supported `input_kind` values:
 
@@ -264,15 +264,15 @@ Supported `phenotype_format` values:
 Example annotated-SNV row:
 
 ```csv
-sample,input_kind,phenotype_path,phenotype_format,age_of_onset,snv_txt_path,snv_vcf_path,vcf_path,alignment_path,alignment_index_path
-P001,annotated_snv,/data/pheno/P001.hpo.txt,hpo,7y,/data/annovar/P001.hg38_multianno.txt,/data/annovar/P001.hg38_multianno.vcf,,,
+sample,input_kind,phenotype_path,phenotype_format,age_of_onset,snv_txt_path,snv_vcf_path,sv_vcf_path,vcf_path,alignment_path,alignment_index_path
+P001,annotated_snv,/data/pheno/P001.hpo.txt,hpo,7y,/data/annovar/P001.hg38_multianno.txt,/data/annovar/P001.hg38_multianno.vcf,,,,
 ```
 
-Hybrid annotated-SNV + alignment row:
+Hybrid annotated-SNV/SV + alignment row:
 
 ```csv
-sample,input_kind,phenotype_path,phenotype_format,age_of_onset,snv_txt_path,snv_vcf_path,vcf_path,alignment_path,alignment_index_path
-P001,annotated_snv,/data/pheno/P001.hpo.txt,hpo,7y,/data/annovar/P001.hg38_multianno.txt,/data/annovar/P001.hg38_multianno.vcf,,/data/ngs/P001.cram,/data/ngs/P001.cram.crai
+sample,input_kind,phenotype_path,phenotype_format,age_of_onset,snv_txt_path,snv_vcf_path,sv_vcf_path,vcf_path,alignment_path,alignment_index_path
+P001,annotated_snv,/data/pheno/P001.hpo.txt,hpo,7y,/data/annovar/P001.hg38_multianno.txt,/data/annovar/P001.hg38_multianno.vcf,/data/annovar/P001.sv.hg38_multianno.vcf,,/data/ngs/P001.cram,/data/ngs/P001.cram.crai
 ```
 
 The helper script `scripts/generate_input_csv.sh` now writes this unified schema.

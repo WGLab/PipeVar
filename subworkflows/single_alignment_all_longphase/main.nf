@@ -69,7 +69,7 @@ workflow SINGLE_ALIGNMENT_ALL_LONGPHASE {
 	rankscore_result=Rankscore_analysis(ANNOVAR.out.txt_output,Phen2gene.out,out_prefix,gnomad,rankscore_filter,rankscore_softwares,gq,phen2gene_top_n)
 	sniffles(bam,out_prefix,ref_fa)
 	annovar_sv_bed = (target == "yes") ? phen2_gene_bed : target
-	ANNOVAR_SV(sniffles.out,out_prefix,Phen2gene.out,annovar_sv_bed)
+	ANNOVAR_SV(sniffles.out,out_prefix,Phen2gene.out,annovar_sv_bed,"called")
 	SURVIVOR(ANNOVAR_SV.out,out_prefix)
 	PhenoSV(SURVIVOR.out,out_prefix,hpo)
 	NanoRepeat(bam,out_prefix,ref_fa)

@@ -63,7 +63,8 @@ INPUT MODES
          --note <FILE> or --hpo <FILE>
      Notes:
        Without --bam: SNP prioritization only, --ref_fa not required
-       With --bam/--type short: also runs short-read SV/CNV/STR and optional mito analysis
+       With --bam/--type short: requires --annotated_sv yes and --annovar_sv_vcf <FILE>
+         and runs annotated SV prioritization, STR, and optional mito analysis
        With --bam/--type short:
          --expansionhunter_variant_catalog <FILE>
        --mode sv is not supported
@@ -95,14 +96,14 @@ INPUT MODES
      Required common columns:
        sample,input_kind,phenotype_path,phenotype_format
      Conditional columns:
-       snv_txt_path,snv_vcf_path,vcf_path,alignment_path,alignment_index_path
+       snv_txt_path,snv_vcf_path,sv_vcf_path,vcf_path,alignment_path,alignment_index_path
      input_kind values:
        annotated_snv,vcf_snv,vcf_sv,bam_ngs,cram_ngs
      phenotype_format values:
        clinical_note,hpo
      Notes:
-       annotated_snv rows may also include alignment_path/alignment_index_path to run SV/CNV/STR
-       and optional mito analysis alongside imported SNP evidence
+       annotated_snv rows may also include sv_vcf_path plus alignment_path/alignment_index_path
+       to run annotated SV/STR and optional mito alongside imported SNP evidence
        annotated_snv rows with alignment_path and --type short also require:
          --expansionhunter_variant_catalog <FILE>
 
@@ -126,7 +127,9 @@ CORE OPTIONS
 --------------------------------------------------------------------------------
   --mode <snp|sv>          Run only SNP or SV branch. Omit to run both where applicable.
   --annotated_snv <yes|no> Use pre-annotated ANNOVAR TXT + VCF SNP input. Default: no
+  --annotated_sv <yes|no>  Use pre-annotated ANNOVAR SV VCF input. Default: no
   --annovar_txt <FILE>     Single-sample ANNOVAR multianno TXT paired with --vcf
+  --annovar_sv_vcf <FILE>  Single-sample ANNOVAR multianno SV VCF paired with --annotated_sv yes
   --type <ont|pacbio|short>
                            Sequencing type for BAM/CRAM flows. Default: ont
   --light <yes|no>         Use lightweight SNP/SV models where supported. Default: no
@@ -201,12 +204,14 @@ EXAMPLES
        --hpo /data/hpo.txt \\
        --out_prefix patient_annotated_snv
 
-  4) Local + Docker, imported ANNOVAR SNP plus short-read SV/CNV/mito:
+  4) Local + Docker, imported ANNOVAR SNP/SV plus short-read STR/mito:
      nextflow run main.nf \\
        -profile local_docker \\
        --annotated_snv yes \\
+       --annotated_sv yes \\
        --annovar_txt /data/sample.hg38_multianno.txt \\
        --vcf /data/sample.hg38_multianno.vcf \\
+       --annovar_sv_vcf /data/sample.sv.hg38_multianno.vcf \\
        --bam /data/sample.cram \\
        --ref_fa /refs/hg38.fa \\
        --expansionhunter_variant_catalog /refs/variant_catalog.json \\
@@ -242,7 +247,8 @@ NOTES
   - For VCF single-file mode, provide --mode snp or --mode sv.
   - For single-file mode, at least one of --note <FILE> or --hpo <FILE> is required.
   - Annotated-SNV mode requires an ANNOVAR multianno TXT plus matching ANNOVAR multianno VCF.
-  - Annotated-SNV plus BAM/CRAM is supported for short-read all-NGS analysis only.
+  - Annotated-SNV plus BAM/CRAM requires --annotated_sv yes and an ANNOVAR multianno SV VCF.
+  - Annotated-SNV/SV plus BAM/CRAM is supported for short-read all-NGS analysis only.
   - Short-read BAM/CRAM workflows that run ExpansionHunter require
     --expansionhunter_variant_catalog <FILE>.
   
@@ -278,6 +284,7 @@ def clean_cnvnator = params.cnvnator ? params.cnvnator.toString().trim().toLower
 def clean_scramble = params.scramble ? params.scramble.toString().trim().toLowerCase() : 'no'
 def clean_mito = params.mito ? params.mito.toString().trim().toLowerCase() : 'no'
 def clean_annotated_snv = params.annotated_snv ? params.annotated_snv.toString().trim().toLowerCase() : 'no'
+def clean_annotated_sv = params.annotated_sv ? params.annotated_sv.toString().trim().toLowerCase() : 'no'
 
 // ------------------------------------------------------------------
 // 1. INPUT VALIDATION (Catching Typos)
@@ -352,6 +359,7 @@ if (params.input_csv) {
 
             def snvTxtPath = row.containsKey('snv_txt_path') ? row.snv_txt_path : ''
             def snvVcfPath = row.containsKey('snv_vcf_path') ? row.snv_vcf_path : ''
+            def svVcfPath = row.containsKey('sv_vcf_path') ? row.sv_vcf_path : ''
             def vcfPath = row.containsKey('vcf_path') ? row.vcf_path : ''
             def alignmentPath = row.containsKey('alignment_path') ? row.alignment_path : ''
             def alignmentIndexPath = row.containsKey('alignment_index_path') ? row.alignment_index_path : ''
@@ -364,12 +372,18 @@ if (params.input_csv) {
                     error "ERROR: Unified input CSV sample '${sample}' cannot mix annotated_snv fields with vcf_path."
                 }
                 if (alignmentPath) {
+                    if (!svVcfPath) {
+                        error "ERROR: Unified input CSV sample '${sample}' requires sv_vcf_path when alignment_path is provided for input_kind=annotated_snv."
+                    }
                     if (!(alignmentPath.endsWith('.bam') || alignmentPath.endsWith('.cram'))) {
                         error "ERROR: Unified input CSV sample '${sample}' requires alignment_path ending in .bam or .cram when provided with input_kind=annotated_snv."
                     }
                     manifestAnnotatedRowsWithAlignment += 1
                 }
                 else {
+                    if (svVcfPath) {
+                        error "ERROR: Unified input CSV sample '${sample}' provides sv_vcf_path without alignment_path; annotated SV import is supported only with the annotated all-NGS CRAM/BAM path."
+                    }
                     manifestAnnotatedRowsWithoutAlignment += 1
                 }
             }
@@ -377,16 +391,16 @@ if (params.input_csv) {
                 if (!vcfPath) {
                     error "ERROR: Unified input CSV sample '${sample}' requires vcf_path for input_kind=${inputKind}."
                 }
-                if (snvTxtPath || snvVcfPath || alignmentPath || alignmentIndexPath) {
-                    error "ERROR: Unified input CSV sample '${sample}' cannot mix ${inputKind} with snv_txt_path/snv_vcf_path/alignment_path/alignment_index_path."
+                if (snvTxtPath || snvVcfPath || svVcfPath || alignmentPath || alignmentIndexPath) {
+                    error "ERROR: Unified input CSV sample '${sample}' cannot mix ${inputKind} with snv_txt_path/snv_vcf_path/sv_vcf_path/alignment_path/alignment_index_path."
                 }
             }
             else if (inputKind in ['bam_ngs', 'cram_ngs']) {
                 if (!alignmentPath) {
                     error "ERROR: Unified input CSV sample '${sample}' requires alignment_path for input_kind=${inputKind}."
                 }
-                if (snvTxtPath || snvVcfPath || vcfPath) {
-                    error "ERROR: Unified input CSV sample '${sample}' cannot mix ${inputKind} with snv_txt_path/snv_vcf_path/vcf_path."
+                if (snvTxtPath || snvVcfPath || svVcfPath || vcfPath) {
+                    error "ERROR: Unified input CSV sample '${sample}' cannot mix ${inputKind} with snv_txt_path/snv_vcf_path/sv_vcf_path/vcf_path."
                 }
                 if (inputKind == 'bam_ngs' && !alignmentPath.endsWith('.bam')) {
                     error "ERROR: Unified input CSV sample '${sample}' requires a .bam alignment_path for input_kind=bam_ngs."
@@ -479,6 +493,20 @@ if (!valid_yes_no.contains(clean_annotated_snv)) {
     Valid options are:
       --annotated_snv yes
       --annotated_snv no
+    ================================================================
+    """
+}
+
+if (!valid_yes_no.contains(clean_annotated_sv)) {
+    error """
+    ================================================================
+    ERROR: Invalid Annotated-SV Toggle
+    ================================================================
+    You provided: --annotated_sv "${params.annotated_sv}"
+
+    Valid options are:
+      --annotated_sv yes
+      --annotated_sv no
     ================================================================
     """
 }
@@ -749,6 +777,21 @@ if (clean_annotated_snv == 'yes') {
     if (params.bam && clean_type != 'short') {
         error "ERROR: Annotated-SNV plus BAM/CRAM currently supports only --type short."
     }
+    if (params.bam && clean_annotated_sv != 'yes') {
+        error "ERROR: Annotated-SNV plus BAM/CRAM now requires --annotated_sv yes and --annovar_sv_vcf <FILE>."
+    }
+    if (params.bam && !params.input_csv && !params.annovar_sv_vcf) {
+        error "ERROR: Annotated-SNV plus BAM/CRAM requires --annovar_sv_vcf <FILE>."
+    }
+}
+
+if (clean_annotated_sv == 'yes') {
+    if (clean_annotated_snv != 'yes') {
+        error "ERROR: --annotated_sv yes is currently supported only with --annotated_snv yes."
+    }
+    if (!params.input_csv && !params.annovar_sv_vcf) {
+        error "ERROR: Annotated-SV single-sample mode requires --annovar_sv_vcf <FILE>."
+    }
 }
 
 if (manifestUsesUnifiedSchema && manifestInputKinds == (['annotated_snv'] as Set)) {
@@ -855,6 +898,7 @@ workflow {
 	def mito_ref_fa = null
 	def eh_ref_fa = null
 	def eh_variant_catalog = null
+	def annovar_sv_vcf = null
 	def input_annotated_snv = null
 	def input_annotated_ngs = null
 	def csv_manifest_mode = null
@@ -920,6 +964,7 @@ workflow {
             row.sample,
             file(row.snv_txt_path, checkIfExists: true),
             file(row.snv_vcf_path, checkIfExists: true),
+            file(row.sv_vcf_path, checkIfExists: true),
             bam_file,
             bai,
             file(row.phenotype_path, checkIfExists: true),
@@ -1076,7 +1121,14 @@ input_bam = Channel
 		}
 	}
         else if ( params.bam != null ) {
-Channel
+		if ( clean_annotated_snv == 'yes' && params.vcf != null ) {
+                annovar_txt=Channel.value(file(params.annovar_txt, checkIfExists: true))
+                vcf=Channel.value(file(params.vcf, checkIfExists: true))
+                if ( clean_annotated_sv == 'yes' ) {
+                    annovar_sv_vcf=Channel.value(file(params.annovar_sv_vcf, checkIfExists: true))
+                }
+		}
+		Channel
     .fromPath(params.bam ) 
     .map { file ->
         def meta = [ id: file.simpleName ]
@@ -1105,6 +1157,9 @@ Channel
         else if ( clean_annotated_snv == 'yes' && params.vcf != null ) {
                 annovar_txt=Channel.value(file(params.annovar_txt, checkIfExists: true))
                 vcf=Channel.value(file(params.vcf, checkIfExists: true))
+                if ( clean_annotated_sv == 'yes' ) {
+                    annovar_sv_vcf=Channel.value(file(params.annovar_sv_vcf, checkIfExists: true))
+                }
                 out_prefix=Channel.value(params.out_prefix)
         }
         else if ( params.vcf != null ) {
@@ -1260,7 +1315,7 @@ mito_ref_fa = Channel
 	    }
     else { // Single File Mode
         if ( clean_annotated_snv == 'yes' && params.vcf && params.bam != null ) {
-            SINGLE_ANNOTATED_ALL_NGS(bam, annovar_txt, vcf, out_prefix, ref_fa, eh_ref_fa, eh_variant_catalog, note, phenotype_format, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_ref_fa, mito_contig)
+            SINGLE_ANNOTATED_ALL_NGS(bam, annovar_txt, vcf, annovar_sv_vcf, out_prefix, ref_fa, eh_ref_fa, eh_variant_catalog, note, is_note, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_ref_fa, mito_contig)
         }
         else if ( clean_annotated_snv == 'yes' && params.vcf ) {
             SINGLE_ANNOTATED_SNV_SNP(annovar_txt, vcf, out_prefix, note, phenotype_format, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, inheritance_mode, include_clinvar_report, allow_unphased_comphet)

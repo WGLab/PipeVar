@@ -6,12 +6,12 @@
   - `--vcf <sample.hg38_multianno.vcf>`
   - one phenotype source: `--note <FILE>` or `--hpo <FILE>`
 - Annotated-SNV mode skips runtime ANNOVAR re-annotation.
-- If annotated-SNV is combined with BAM/CRAM input and `--type short`, PipeVar_annotated_snv also runs short-read SV, CNV, STR, and optional mito analysis.
+- If annotated-SNV is combined with BAM/CRAM input and `--type short`, also provide `--annotated_sv yes` and `--annovar_sv_vcf <sample.sv.hg38_multianno.vcf>`; PipeVar_annotated_snv uses the pre-annotated SV VCF for SV prioritization and still runs STR plus optional mito from the alignment.
 - Annotated-SNV mode rejects `--mode sv` and `--target yes`.
 - Unified batch manifests now use:
   - `sample,input_kind,phenotype_path,phenotype_format`
-  - conditional columns `snv_txt_path,snv_vcf_path,vcf_path,alignment_path,alignment_index_path`
-- For `input_kind=annotated_snv`, `alignment_path` and `alignment_index_path` are optional; if present for all rows, the batch run uses the hybrid annotated-SNV + all-NGS path.
+  - conditional columns `snv_txt_path,snv_vcf_path,sv_vcf_path,vcf_path,alignment_path,alignment_index_path`
+- For `input_kind=annotated_snv`, `alignment_path`, `alignment_index_path`, and `sv_vcf_path` are optional; if alignment is present for all rows, `sv_vcf_path` is required and the batch run uses the hybrid annotated-SNV/SV + all-NGS path.
 - Supported unified `input_kind` values are `annotated_snv`, `vcf_snv`, `vcf_sv`, `bam_ngs`, and `cram_ngs`.
 
 - Enable SCRAMBLE with `--scramble yes` only for short-read BAM/CRAM runs.
