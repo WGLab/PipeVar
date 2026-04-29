@@ -137,6 +137,46 @@ load_prefix_map() {
   done < <(collect_by_suffix "$dir" "$suffix")
 }
 
+csv_split_line() {
+  local line="$1"
+  local array_name="$2"
+  declare -n out_array="$array_name"
+  IFS=',' read -r -a out_array <<< "$line"
+}
+
+csv_join_row() {
+  local first="yes"
+  local value
+  for value in "$@"; do
+    if [[ "$first" == "yes" ]]; then
+      printf '%s' "$value"
+      first="no"
+    else
+      printf ',%s' "$value"
+    fi
+  done
+  printf '\n'
+}
+
+array_insert_value() {
+  local array_name="$1"
+  local insert_idx="$2"
+  local insert_value="$3"
+  declare -n target_array="$array_name"
+  local rebuilt=()
+  local idx
+  for idx in "${!target_array[@]}"; do
+    if (( idx == insert_idx )); then
+      rebuilt+=("$insert_value")
+    fi
+    rebuilt+=("${target_array[$idx]}")
+  done
+  if (( insert_idx >= ${#target_array[@]} )); then
+    rebuilt+=("$insert_value")
+  fi
+  target_array=("${rebuilt[@]}")
+}
+
 prompt_age() {
   local sample="$1"
   local age_in
@@ -152,8 +192,136 @@ prompt_age() {
   done
 }
 
-main() {
-  echo "PipeVar_annotated_snv unified CSV generator"
+update_existing_annotated_snv_csv() {
+  local input_csv out_csv sv_vcf_dir sv_vcf_suffix overwrite_existing
+  echo
+  read -r -p "Existing annotated_snv CSV path: " input_csv
+  input_csv="$(trim_spaces "$input_csv")"
+  [[ -f "$input_csv" ]] || { echo "ERROR: CSV file not found: $input_csv" >&2; exit 1; }
+
+  read -r -p "Output updated CSV path [updated_annotated_snv.csv]: " out_csv
+  out_csv="$(trim_spaces "$out_csv")"
+  out_csv="${out_csv:-updated_annotated_snv.csv}"
+
+  read -r -p "Enter annotated SV VCF directory: " sv_vcf_dir
+  sv_vcf_dir="$(trim_spaces "$sv_vcf_dir")"
+  [[ -d "$sv_vcf_dir" ]] || { echo "ERROR: directory not found: $sv_vcf_dir" >&2; exit 1; }
+
+  read -r -p "Enter annotated SV VCF suffix [.hg38_multianno.vcf]: " sv_vcf_suffix
+  sv_vcf_suffix="$(trim_spaces "$sv_vcf_suffix")"
+  sv_vcf_suffix="${sv_vcf_suffix:-.hg38_multianno.vcf}"
+
+  read -r -p "Overwrite existing non-empty sv_vcf_path values? [y/N]: " overwrite_existing
+  overwrite_existing="$(trim_spaces "$overwrite_existing")"
+  overwrite_existing="${overwrite_existing,,}"
+  if [[ "$overwrite_existing" == "y" || "$overwrite_existing" == "yes" ]]; then
+    overwrite_existing="yes"
+  else
+    overwrite_existing="no"
+  fi
+
+  declare -A update_sv_vcf_map=()
+  update_sv_vcf_prefixes=()
+  load_prefix_map "$sv_vcf_dir" "$sv_vcf_suffix" update_sv_vcf_map update_sv_vcf_prefixes
+  if [[ "${#update_sv_vcf_map[@]}" -eq 0 ]]; then
+    echo "ERROR: no annotated SV VCF files matched suffix '$sv_vcf_suffix' in $sv_vcf_dir" >&2
+    exit 1
+  fi
+
+  local header
+  IFS= read -r header < "$input_csv" || { echo "ERROR: CSV is empty: $input_csv" >&2; exit 1; }
+  local headers=()
+  csv_split_line "$header" headers
+
+  local sample_idx=-1 input_kind_idx=-1 snv_vcf_idx=-1 sv_idx=-1 added_sv_column="no"
+  local idx column
+  for idx in "${!headers[@]}"; do
+    column="$(trim_spaces "${headers[$idx]}")"
+    headers[$idx]="$column"
+    case "$column" in
+      sample) sample_idx=$idx ;;
+      input_kind) input_kind_idx=$idx ;;
+      snv_vcf_path) snv_vcf_idx=$idx ;;
+      sv_vcf_path) sv_idx=$idx ;;
+    esac
+  done
+
+  if (( sample_idx < 0 || input_kind_idx < 0 )); then
+    echo "ERROR: CSV must include sample and input_kind columns." >&2
+    exit 1
+  fi
+  if (( sv_idx < 0 )); then
+    if (( snv_vcf_idx >= 0 )); then
+      sv_idx=$((snv_vcf_idx + 1))
+      array_insert_value headers "$sv_idx" "sv_vcf_path"
+    else
+      headers+=("sv_vcf_path")
+      sv_idx=$((${#headers[@]} - 1))
+    fi
+    added_sv_column="yes"
+  fi
+
+  local row_count=0 updated_count=0 skipped_count=0 missing_count=0
+  {
+    csv_join_row "${headers[@]}"
+    local line
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      [[ -n "$(trim_spaces "$line")" ]] || continue
+      local values=()
+      csv_split_line "$line" values
+      if [[ "$added_sv_column" == "yes" ]]; then
+        array_insert_value values "$sv_idx" ""
+      fi
+      while (( ${#values[@]} < ${#headers[@]} )); do
+        values+=("")
+      done
+
+      row_count=$((row_count + 1))
+      local sample input_kind current_sv matched_sv sv_path
+      sample="$(trim_spaces "${values[$sample_idx]}")"
+      input_kind="$(trim_spaces "${values[$input_kind_idx]}")"
+      current_sv="$(trim_spaces "${values[$sv_idx]}")"
+
+      if [[ "$input_kind" != "annotated_snv" ]]; then
+        skipped_count=$((skipped_count + 1))
+        csv_join_row "${values[@]}"
+        continue
+      fi
+      if [[ -n "$current_sv" && "$overwrite_existing" != "yes" ]]; then
+        skipped_count=$((skipped_count + 1))
+        csv_join_row "${values[@]}"
+        continue
+      fi
+
+      matched_sv="${update_sv_vcf_map[$sample]:-}"
+      if [[ -z "$matched_sv" ]]; then
+        local matched_prefix
+        matched_prefix="$(find_best_match "$sample" "${update_sv_vcf_prefixes[@]}")"
+        if [[ "$matched_prefix" == AMBIGUOUS:* || -z "$matched_prefix" ]]; then
+          echo "WARNING: no unambiguous annotated SV VCF match for '$sample'; leaving sv_vcf_path empty." >&2
+          missing_count=$((missing_count + 1))
+          csv_join_row "${values[@]}"
+          continue
+        fi
+        matched_sv="${update_sv_vcf_map[$matched_prefix]}"
+      fi
+
+      values[$sv_idx]="$matched_sv"
+      updated_count=$((updated_count + 1))
+      csv_join_row "${values[@]}"
+    done
+  } < <(tail -n +2 "$input_csv") > "$out_csv"
+
+  echo
+  echo "Done."
+  echo "  Rows scanned     : $row_count"
+  echo "  SV paths updated : $updated_count"
+  echo "  Rows skipped     : $skipped_count"
+  echo "  Missing matches  : $missing_count"
+  echo "  Output CSV       : $out_csv"
+}
+
+generate_new_csv() {
   echo
   cat <<'MSG'
 Choose input kind:
@@ -473,6 +641,26 @@ MSG
     echo "ERROR: zero matched samples. Check suffixes and prefixes." >&2
     exit 1
   fi
+}
+
+main() {
+  echo "PipeVar_annotated_snv unified CSV generator"
+  echo
+  cat <<'MSG'
+Choose action:
+  1) Generate new CSV
+  2) Update existing annotated_snv CSV with annotated SV VCF paths
+MSG
+  read -r -p "Select action [1-2]: " action_choice
+  action_choice="$(trim_spaces "$action_choice")"
+  case "$action_choice" in
+    1|"") generate_new_csv ;;
+    2) update_existing_annotated_snv_csv ;;
+    *)
+      echo "ERROR: invalid selection: $action_choice" >&2
+      exit 1
+      ;;
+  esac
 }
 
 main "$@"
