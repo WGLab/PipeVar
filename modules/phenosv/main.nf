@@ -15,6 +15,7 @@ process PhenoSV {
 
 	script:
 	def args   = task.ext.args ?: ''
+	def min_score = params.phenosv_score ?: '0.50'
 
 	"""
 
@@ -40,7 +41,7 @@ process PhenoSV {
 
 	python3 /opt/PhenoSV/phenosv/model/phenosv.py --sv_file $bed $args --target_folder ${out_prefix}_phenosv --target_file_name  \$phenosv_dir/phenosv_out --HPO "\$HPO_STRING"
 
-	awk -F',' '\$6 > 0.5 && \$7 != ""' \$phenosv_dir/phenosv_out.csv | awk -F',' '{print \$7"\t"\$0}' | sort -k1,1 > ${out_prefix}_phenosv_top.join.tsv || true
+	awk -F',' -v min_score="$min_score" '\$6+0 >= min_score && \$7 != ""' \$phenosv_dir/phenosv_out.csv | awk -F',' '{print \$7"\t"\$0}' | sort -k1,1 > ${out_prefix}_phenosv_top.join.tsv || true
 
 	sort -k4,4 $bed > ${out_prefix}.sorted.bed
 

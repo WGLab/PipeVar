@@ -24,9 +24,9 @@ process multi_clair3 {
 
 
 	if [ $bed_file != "null" ]; then
-		run_clair3.sh --bam_fn=$bam --ref_fn=$ref_fa --threads=4 $args --output=${out_prefix}_clair3 --bed_fn=$bed_file
+		run_clair3.sh --bam_fn=$bam --ref_fn=$ref_fa --threads=${task.cpus} $args --output=${out_prefix}_clair3 --bed_fn=$bed_file
 	else 
-		run_clair3.sh --bam_fn=$bam --ref_fn=$ref_fa --threads=4 $args --output=${out_prefix}_clair3
+		run_clair3.sh --bam_fn=$bam --ref_fn=$ref_fa --threads=${task.cpus} $args --output=${out_prefix}_clair3
 	fi
 	
 	mv ${out_prefix}_clair3/merge_output.vcf.gz ${out_prefix}_clair3/${out_prefix}.clair3.vcf.gz
@@ -38,6 +38,5 @@ process multi_clair3 {
 
 
 }
-
 
 

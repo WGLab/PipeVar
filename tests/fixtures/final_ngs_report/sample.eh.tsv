@@ -1,0 +1,10 @@
+FLAGGED: Locus 'HTT' (variant 'HTT') with genotype 17/42 exceeds threshold of 36.
+
+--- Filtered Results ---
+[
+    {
+        "LocusId": "HTT",
+        "Genotype": "17/42",
+        "GenotypeConfidenceInterval": "17-17/40-44"
+    }
+]

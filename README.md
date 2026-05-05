@@ -1,6 +1,6 @@
 # PipeVar_mito
 
-PipeVar_mito is a Nextflow DSL2 workflow for rare-disease variant prioritization from short-read and long-read data, with an additional opt-in mitochondrial analysis branch for short-read BAM/CRAM inputs.
+PipeVar_mito is a Nextflow DSL2 workflow for rare-disease variant prioritization from short-read and long-read data, with an additional opt-in mitochondrial analysis branch for BAM/CRAM inputs.
 It keeps the existing nuclear SNP/SV/repeat analysis and adds mtDNA calling, annotation, and prioritization outputs.
 
 ## What PipeVar does
@@ -8,7 +8,7 @@ It keeps the existing nuclear SNP/SV/repeat analysis and adds mtDNA calling, ann
 - Calls and prioritizes SNP/indel variants.
 - Calls and prioritizes structural variants (SV).
 - Runs repeat expansion analysis (short-read and long-read paths).
-- Optionally calls and annotates mitochondrial variants with Mutect2 plus bundled mtDNA evidence databases.
+- Optionally calls and annotates mitochondrial variants with Mutect2 for short reads or Clair3 for long reads, then applies bundled mtDNA evidence databases.
 - Uses phenotype inputs (`--hpo` or clinical note via `--note`) for phenotype-guided ranking.
 - Supports single-sample mode and CSV batch mode.
 
@@ -84,9 +84,9 @@ You can override both locations (recommended for HPC/shared filesystems):
 ```
 
 The setup script prepares required assets and writes host-path references used by runtime mounts.
-It now also writes a local override file, `.pipevar.user.config`, with:
+It updates the pipeline configuration in place with:
 
-- a persisted default execution profile (`manifest.defaultProfile`)
+- a persisted default execution profile
 - persisted bind source paths:
   - `params.annovar_host_path`
   - `params.phenosv_host_path`
@@ -105,12 +105,14 @@ Non-interactive setup example:
 
 ## Mitochondrial analysis
 
-PipeVar_mito adds an opt-in mitochondrial branch for short-read BAM/CRAM input:
+PipeVar_mito adds an opt-in mitochondrial branch for BAM/CRAM input:
 
 - enable with `--mito yes`
-- supported only with `--type short`
 - supported only with BAM/CRAM input, not VCF-only mode
 - supported with `--mode snp` or when `--mode` is omitted
+- short reads use Mutect2
+- long reads use a mito-specific Clair3 path adapted to the existing mtDNA annotation contract
+- long-read mito is unavailable with `--light yes` because that path switches to NanoCaller
 
 The mito branch emits separate outputs and does not modify the existing nuclear `.prio.vcf` outputs.
 
@@ -133,6 +135,20 @@ nextflow run main.nf \
   --mode snp \
   --mito yes \
   --out_prefix sample1
+```
+
+Long-read example:
+
+```bash
+nextflow run main.nf \
+  -profile local_docker \
+  --bam sample.ont.bam \
+  --ref_fa ref.fa \
+  --hpo sample.hpo.txt \
+  --type ont \
+  --mode snp \
+  --mito yes \
+  --out_prefix sample1_ont
 ```
 
 ## SCRAMBLE mobile-element analysis
@@ -161,6 +177,8 @@ Important notes:
 - SCRAMBLE is intended for short-read WGS MEI discovery/genotyping.
 - BAM and CRAM must be indexed.
 - CRAM runs require the matching reference FASTA.
+- PipeVar now builds the reference BLAST database SCRAMBLE needs from `--ref_fa`, so users do not need to prepare `.nhr/.nin/.nsq` sidecar files ahead of time.
+- SCRAMBLE CRAM support remains provisional because upstream `cluster_identifier` reference resolution still needs dedicated validation.
 - SCRAMBLE download/build is handled outside this repo; the shared image should already contain the bundled assets.
 
 ## Input modes
@@ -248,6 +266,16 @@ Expected CSV columns:
 - `--genome <hg38|grch38>`: genome build for ExpansionHunter catalog selection
 - `--target <yes|no>`: restrict SNP calling to phenotype-derived gene BED
 - `--scramble <yes|no>`: enable SCRAMBLE MEI calling in short-read SV/all-NGS BAM/CRAM paths (default: `no`)
+- `--cnvpytor <yes|no>`: enable experimental CNVpytor calling in long-read SV/all-longphase BAM/CRAM paths (default: `no`)
+- `--cnvpytor_baf <yes|no>`: allow CNVpytor to use long-read SNP/BAF support in full long-read mode when SNP calls exist (default: `yes`)
+- `--cnvpytor_bin_sizes <STRING>`: space-separated CNVpytor bin sizes (default: `100000`)
+- `--cnvpytor_primary_bin <INT>`: CNVpytor export bin size for final TSV/VCF (default: `100000`)
+- `--cnvpytor_min_size <INT>`: minimum CNV size retained from CNVpytor output (default: `100000`)
+- `--mito <yes|no>`: enable mitochondrial analysis for BAM/CRAM input; uses Mutect2 for short reads and Clair3 for long reads (default: `no`)
+- `--mito_contig <STRING>`: preferred mitochondrial contig alias (default: `chrM`)
+- `--mito_min_vaf <FLOAT>`: mito prioritization VAF floor (default: `0.01`)
+- `--mito_min_depth <INT>`: mito prioritization depth floor (default: `50`)
+- `--mito_min_alt_reads <INT>`: mito prioritization alternate-read floor (default: `5`)
 - `--phen2gene_filter <INT>`: top-N genes retained for targeted mode (default: 500)
 - `--rankscore <FLOAT>`: RankScore threshold (default: 0.50)
 - `--rankscore_softwares <CSV>`: comma-separated RankScore software names for score aggregation (default: all built-in tools)
@@ -296,6 +324,34 @@ nextflow run main.nf \
   --note /data/p1_note.txt \
   --out_prefix p1 \
   --type ont
+```
+
+### Single-sample long-read SV analysis with CNVpytor (RD-only)
+
+```bash
+nextflow run main.nf \
+  -profile standard \
+  --bam /data/p1_sv.bam \
+  --ref_fa /refs/hg38.fa \
+  --hpo /data/p1_sv_hpo.txt \
+  --out_prefix p1_sv \
+  --type ont \
+  --mode sv \
+  --cnvpytor yes
+```
+
+### Single-sample long-read full analysis with CNVpytor SNP/BAF support
+
+```bash
+nextflow run main.nf \
+  -profile standard \
+  --bam /data/p1_full.bam \
+  --ref_fa /refs/hg38.fa \
+  --hpo /data/p1_full_hpo.txt \
+  --out_prefix p1_full \
+  --type pacbio \
+  --cnvpytor yes \
+  --cnvpytor_baf yes
 ```
 
 ### Single-sample short-read full analysis (light)
@@ -387,11 +443,15 @@ Exact files depend on `--mode`, `--type`, and input type.
   - `*.recal.vcf.gz` (short light / HaplotypeCaller path)
   - `*.clair3.vcf.gz` (long default)
   - `*.nanocaller.vcf.gz` (long light)
+  - `*.mito.vcf.gz` (mito branch for short or long BAM/CRAM runs)
 - annotation/prioritization:
   - `*.clinvar.txt`
   - `*.rank_var.tsv`
   - `*.rankscore_filtered.tsv`
   - ANNOVAR intermediate/final files (`*.hg38_multianno.*`)
+  - `*.mito.annotated.tsv`
+  - `*.mito.annotated.vcf.gz`
+  - `*.mito.prioritized.tsv`
 
 ### SV-related outputs
 
@@ -401,6 +461,10 @@ Exact files depend on `--mode`, `--type`, and input type.
   - `*.shortread_sv.merged.vcf` when multiple short-read SV/MEI callers are merged
 - long-read SV:
   - `*.sniffles.vcf.gz`
+  - `*.cnvpytor.vcf`
+  - `*.cnvpytor.tsv`
+  - `*.pytor`
+  - `*.longread_sv.merged.vcf` when Sniffles and CNVpytor are merged
 - downstream SV prioritization:
   - `*.exonic.vcf`
   - `*.phenosv.filtered.tsv` (or corresponding filtered artifacts)
@@ -434,6 +498,10 @@ Configured in `nextflow.config`:
 - For single VCF mode, `--mode` must be provided.
 - Reference index (`.fai`) must exist.
 - BAM/CRAM index must exist (`.bai`/`.crai`) for alignment-driven paths.
+- CNVpytor is experimental for long reads and is intended for large CNVs; calls below 100 kb are noisy by default.
+- CNVpytor is used only for whole-genome long-read BAM/CRAM input.
+- `--mode sv` runs CNVpytor in read-depth-only mode; full long-read mode can add SNP/BAF support when SNP calls already exist.
+- CNVpytor is out of scope for mitochondrial CNV interpretation.
 - If using Singularity/Docker profiles, ensure `--annovar_host_path` and `--phenosv_host_path` point to valid host locations.
 
 ## Software/components used

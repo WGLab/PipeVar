@@ -1,0 +1,3 @@
+#RANK 	GENE      	PRIORITY_TIER                	MAX_SCORE 	RANKVAR        	RANKSCORE      	VCF_LINE
+1     	GENE1     	RankVar_AD                   	0.910     	0.91           	.              	chr1	100	.	A	G	.	PASS	Gene=GENE1;SOURCE=rankvar;MODEL=Dominant	GT	0/1
+2     	GENE2     	PhenoSV_AR_Hom               	0.750     	.              	.              	chr2	200	.	C	T	.	PASS	Gene=GENE2;SOURCE=phenosv;MODEL=Recessive	GT	1/1

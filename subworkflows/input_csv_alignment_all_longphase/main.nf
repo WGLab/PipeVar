@@ -7,12 +7,15 @@ include { multi_survivor } from '../../modules/multi_survivor/'
 include { multi_phenosv } from '../../modules/multi_phenosv/'
 include { multi_rankvar } from '../../modules/multi_rankvar/'
 include { multi_sniffles } from '../../modules/multi_sniffles/'
+include { multi_cnvpytor } from '../../modules/multi_cnvpytor/'
+include { multi_merge_longread_sv_callers } from '../../modules/multi_merge_longread_sv_callers/'
 include { multi_clair3 } from '../../modules/multi_clair3/'
 include { multi_nanocaller } from '../../modules/multi_nanocaller/'
 include { multi_nanorepeat } from '../../modules/multi_nanorepeat/'
 include { multi_longphase } from '../../modules/multi_longphase/'
 include { multi_phenotagger } from '../../modules/multi_phenotagger/'
 include { multi_phen2gene_filter } from '../../modules/multi_reduce_region_phen2gene/'
+include { multi_variant_html_report; multi_variant_html_report_with_mito } from '../../modules/variant_html_report/'
 
 
 
@@ -36,6 +39,8 @@ workflow INPUT_CSV_ALIGNMENT_ALL_LONGPHASE {
 	inheritance_mode
 	include_clinvar_report
 	allow_unphased_comphet
+	mito_tsv
+	mito_mode
 
 	main:
 	
@@ -81,11 +86,26 @@ workflow INPUT_CSV_ALIGNMENT_ALL_LONGPHASE {
 	rankscore_result=multi_rankscore(join_annovar_phen2gene,gnomad,rankscore_filter,rankscore_softwares,gq,phen2gene_top_n)
 	rankvar_result=multi_rankvar(join_annovar_hpo,gnomad,gq,ad,rankvar_filter)
 	sniffles_result=multi_sniffles(input_bam_with_bam,ref_fa)
+	cnvpytor_mode = params.cnvpytor ? params.cnvpytor.toString().trim().toLowerCase() : "no"
+	cnvpytor_baf_mode = params.cnvpytor_baf ? params.cnvpytor_baf.toString().trim().toLowerCase() : "yes"
+	if ( cnvpytor_mode == "yes" ) {
+		cnvpytor_input=input_bam_with_bam.join(snp_result).map { out_prefix, bam_file, bai_file, snp_vcf ->
+			tuple(out_prefix, bam_file, bai_file, snp_vcf)
+		}
+		cnvpytor_result=multi_cnvpytor(cnvpytor_input,Channel.value(cnvpytor_baf_mode),Channel.value(params.cnvpytor_bin_sizes),Channel.value(params.cnvpytor_primary_bin),Channel.value(params.cnvpytor_min_size))
+		merged_sv_input=sniffles_result.join(cnvpytor_result.vcf).map { out_prefix, sniffles_vcf, cnvpytor_vcf ->
+			tuple(out_prefix, [sniffles_vcf, cnvpytor_vcf])
+		}
+		sv_result=multi_merge_longread_sv_callers(merged_sv_input)
+	}
+	else {
+		sv_result=sniffles_result
+	}
         if ( target == "yes" ) {
-	        sniffles_result_annovar=sniffles_result.join(phen2gene_result).join(phen2_gene_bed).map { out_prefix, vcf_file, phen2gene_file, bed_file -> tuple(out_prefix, vcf_file, phen2gene_file, bed_file) }
+	        sniffles_result_annovar=sv_result.join(phen2gene_result).join(phen2_gene_bed).map { out_prefix, vcf_file, phen2gene_file, bed_file -> tuple(out_prefix, vcf_file, phen2gene_file, bed_file) }
         }
         else {
-	        sniffles_result_annovar=sniffles_result.join(phen2gene_result).map { out_prefix, vcf_file, phen2gene_file -> tuple(out_prefix, vcf_file, phen2gene_file, target) }
+	        sniffles_result_annovar=sv_result.join(phen2gene_result).map { out_prefix, vcf_file, phen2gene_file -> tuple(out_prefix, vcf_file, phen2gene_file, target) }
         }
 	annovar_sv_result=multi_annovar_sv(sniffles_result_annovar)
 	survivor_result=multi_survivor(annovar_sv_result)
@@ -102,5 +122,35 @@ workflow INPUT_CSV_ALIGNMENT_ALL_LONGPHASE {
 	input_bam_hpo_age=input_bam_no_bam.join(input_age).map { out_prefix, hpo_path, age_of_onset -> tuple(out_prefix, hpo_path, age_of_onset) }
 	join_vcf_bam_rankvar_hpo=join_vcf_bam_rankvar.join(input_bam_hpo_age)
 	multi_longphase(join_vcf_bam_rankvar_hpo,ref_fa,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
+
+	prio_report_input = multi_longphase.out
+		.map { prio_vcf, prio_gene_report, haplotag_bam ->
+			def prefix = prio_vcf.name.replaceFirst(/\.prio\.vcf$/, "")
+			tuple(prefix, prio_vcf, prio_gene_report)
+		}
+		.join(
+			multi_nanorepeat.out.map { repeat_tsv ->
+				def prefix = repeat_tsv.name.replaceFirst(/_nanorepeat_result\.tsv$/, "")
+				tuple(prefix, repeat_tsv)
+			}
+		)
+		.map { out_prefix, prio_vcf, prio_gene_report, repeat_tsv ->
+			tuple(out_prefix, prio_vcf, prio_gene_report, repeat_tsv)
+		}
+	if ( mito_mode == "yes" ) {
+		prio_report_input_with_mito = prio_report_input
+			.join(
+				mito_tsv.map { out_prefix, mito_report ->
+					tuple(out_prefix, mito_report)
+				}
+			)
+			.map { out_prefix, prio_vcf, prio_gene_report, repeat_tsv, mito_report ->
+				tuple(out_prefix, prio_vcf, prio_gene_report, repeat_tsv, mito_report)
+			}
+		multi_variant_html_report_with_mito(prio_report_input_with_mito)
+	}
+	else {
+		multi_variant_html_report(prio_report_input)
+	}
 
 }	

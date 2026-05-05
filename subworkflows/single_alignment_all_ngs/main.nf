@@ -7,6 +7,7 @@ include { Phen2gene } from '../../modules/phen2gene/'
 include { RankVar } from '../../modules/rankvar/'
 include { Manta } from '../../modules/manta/'
 include { scramble } from '../../modules/scramble/'
+include { scramble_ref_prep } from '../../modules/scramble_ref_prep/'
 include { normalize_shortread_alignment } from '../../modules/normalize_shortread_alignment/'
 include { CNVnator } from '../../modules/cnvnator/'
 include { merge_shortread_sv_callers } from '../../modules/merge_shortread_sv_callers/'
@@ -19,6 +20,7 @@ include { phenotagger } from '../../modules/phenotagger/'
 include { eh_filter } from '../../modules/eh_filter/'
 include { phen2gene_filter } from '../../modules/reduce_region_phen2gene/'
 include { ngs_prio } from '../../modules/ngs_prio/'
+include { variant_html_report; variant_html_report_with_mito } from '../../modules/variant_html_report/'
 
 
 // Single sample: short-read full path (SNP + SV + STR) with DeepVariant and Manta.
@@ -42,9 +44,10 @@ workflow SINGLE_ALIGNMENT_ALL_NGS {
 	inheritance_mode
 	include_clinvar_report
 	allow_unphased_comphet
+	mito_tsv
+	mito_mode
 
 	main:
-
 	hpo=note
 	if ( is_note == "yes" ) {
 		phenotagger(note,out_prefix)
@@ -78,10 +81,11 @@ workflow SINGLE_ALIGNMENT_ALL_NGS {
 	scramble_vcf = null
 	if ( scramble_mode == "yes" ) {
 		scramble_ref_meta = ref_fa.map { ref_tuple -> tuple([id: 'reference'], ref_tuple[0], ref_tuple[1]) }
+		scramble_ref_bundle = scramble_ref_prep(scramble_ref_meta)
 		scramble_cluster_input = out_prefix.combine(bam).map { prefix, bam_tuple ->
 			tuple([id: prefix], bam_tuple[0], bam_tuple[1])
 		}
-		scramble(scramble_cluster_input, scramble_ref_meta)
+		scramble(scramble_cluster_input, scramble_ref_bundle.out.ref)
 		scramble_vcf = scramble.out.vcf.map { meta, vcf -> vcf }
 	}
 
@@ -122,5 +126,11 @@ workflow SINGLE_ALIGNMENT_ALL_NGS {
 	ExpansionHunter(bam,out_prefix,ref_fa)
 	eh_filter(out_prefix,ExpansionHunter.out)
 	ngs_prio(out_prefix,RankVar.out,Rankscore_analysis.out.rankscore,Rankscore_analysis.out.clinvar,PhenoSV.out,ANNOVAR_SV.out,ANNOVAR.out.vcf_output,hpo,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
+	if ( mito_mode == "yes" ) {
+		variant_html_report_with_mito(out_prefix, ngs_prio.out[0], ngs_prio.out[1], eh_filter.out, mito_tsv)
+	}
+	else {
+		variant_html_report(out_prefix, ngs_prio.out[0], ngs_prio.out[1], eh_filter.out)
+	}
 
 }

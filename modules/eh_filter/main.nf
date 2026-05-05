@@ -14,13 +14,10 @@ process eh_filter {
 	script:
 
 	"""
-	python3 /filter_eh/filter_eh.py $eh_output > ${out_prefix}.eh.tsv
-	
-	
+	python3 /filter_eh/filter_eh.py "$eh_output" > "${out_prefix}.eh.tsv"
 	"""
 
 
 }
-
 
 

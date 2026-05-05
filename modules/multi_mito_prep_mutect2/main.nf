@@ -12,17 +12,27 @@ process multi_mito_prep_mutect2 {
 	script:
 	"""
 	MITO_CONTIG="${mito_contig}"
-	INPUT_BAM="$bam"
-	INPUT_INDEX="$index_file"
+	CONTIGS="\$(samtools view -H "$bam" | awk 'BEGIN {FS="\\t"} /^@SQ/ {for (i=1; i<=NF; i++) if (\$i ~ /^SN:/) {sub(/^SN:/, "", \$i); print \$i}}')"
 
-	if [[ "$bam" == *.cram ]]; then
-	    # DRAGEN CRAMs must be decoded against the exact original reference bundle.
-	    samtools view -@ ${task.cpus} -b -T "$ref_fa" -o "${out_prefix}.mito.input.unsorted.bam" "$bam"
-	    samtools sort -@ ${task.cpus} -o "${out_prefix}.mito.input.bam" "${out_prefix}.mito.input.unsorted.bam"
-	    samtools index -@ ${task.cpus} "${out_prefix}.mito.input.bam"
-	    INPUT_BAM="${out_prefix}.mito.input.bam"
-	    INPUT_INDEX="${out_prefix}.mito.input.bam.bai"
+	if ! printf '%s\\n' "\$CONTIGS" | grep -qx "\$MITO_CONTIG"; then
+	    if printf '%s\\n' "\$CONTIGS" | grep -qx "MT"; then
+	        MITO_CONTIG="MT"
+	    elif printf '%s\\n' "\$CONTIGS" | grep -qx "chrM"; then
+	        MITO_CONTIG="chrM"
+	    elif printf '%s\\n' "\$CONTIGS" | grep -qx "M"; then
+	        MITO_CONTIG="M"
+	    elif printf '%s\\n' "\$CONTIGS" | grep -qx "chrMT"; then
+	        MITO_CONTIG="chrMT"
+	    else
+	        echo "Unable to find mitochondrial contig in $bam" >&2
+	        exit 1
+	    fi
 	fi
+
+	samtools view -@ ${task.cpus} -b -T "$ref_fa" -o "${out_prefix}.mito.subset.unsorted.bam" "$bam" "\$MITO_CONTIG"
+	samtools sort -@ ${task.cpus} -o "${out_prefix}.mito.subset.bam" "${out_prefix}.mito.subset.unsorted.bam"
+	samtools index -@ ${task.cpus} "${out_prefix}.mito.subset.bam"
+	INPUT_BAM="${out_prefix}.mito.subset.bam"
 
 	if ! samtools view -H "\$INPUT_BAM" | grep -q '^@RG'; then
 	    gatk AddOrReplaceReadGroups \
@@ -35,28 +45,10 @@ process multi_mito_prep_mutect2 {
 	        -RGSM "${out_prefix}" \
 	        --CREATE_INDEX true
 	    INPUT_BAM="${out_prefix}.mito.rg.bam"
-	    INPUT_INDEX="${out_prefix}.mito.rg.bam.bai"
 	fi
 
-	if ! samtools idxstats "\$INPUT_BAM" | cut -f1 | grep -qx "\$MITO_CONTIG"; then
-	    if samtools idxstats "\$INPUT_BAM" | cut -f1 | grep -qx "MT"; then
-	        MITO_CONTIG="MT"
-	    elif samtools idxstats "\$INPUT_BAM" | cut -f1 | grep -qx "chrM"; then
-	        MITO_CONTIG="chrM"
-	    elif samtools idxstats "\$INPUT_BAM" | cut -f1 | grep -qx "M"; then
-	        MITO_CONTIG="M"
-	    elif samtools idxstats "\$INPUT_BAM" | cut -f1 | grep -qx "chrMT"; then
-	        MITO_CONTIG="chrMT"
-	    else
-	        echo "Unable to find mitochondrial contig in \$INPUT_BAM" >&2
-	        exit 1
-	    fi
-	fi
-
-	gatk PrintReads -R "$ref_fa" -I "\$INPUT_BAM" -L "\$MITO_CONTIG" -O "${out_prefix}.mito.subset.bam"
-	samtools index -@ ${task.cpus} "${out_prefix}.mito.subset.bam"
 	gatk RevertSam \
-	    -I "${out_prefix}.mito.subset.bam" \
+	    -I "\$INPUT_BAM" \
 	    -O "${out_prefix}.mito.ubam" \
 	    --REMOVE_ALIGNMENT_INFORMATION true \
 	    --RESTORE_HARDCLIPS false \
@@ -87,5 +79,17 @@ process multi_mito_prep_mutect2 {
 	    --VALIDATION_STRINGENCY SILENT
 
 	mv "${out_prefix}.mito.prepped.bai" "${out_prefix}.mito.prepped.bam.bai"
+	rm -f \
+	    "${out_prefix}.mito.subset.unsorted.bam" \
+	    "${out_prefix}.mito.subset.bam" \
+	    "${out_prefix}.mito.subset.bam.bai" \
+	    "${out_prefix}.mito.rg.bam" \
+	    "${out_prefix}.mito.rg.bai" \
+	    "${out_prefix}.mito.rg.bam.bai" \
+	    "${out_prefix}.mito.ubam" \
+	    "${out_prefix}.mito.aligned.bam" \
+	    "${out_prefix}.mito.merged.bam" \
+	    "${out_prefix}.mito.merged.bai" \
+	    "${out_prefix}.mito.merged.bam.bai"
 	"""
 }

@@ -12,6 +12,7 @@ include { multi_nanocaller } from '../../modules/multi_nanocaller/'
 include { multi_longphase } from '../../modules/multi_longphase/'
 include { multi_phenotagger } from '../../modules/multi_phenotagger/'
 include { multi_phen2gene_filter } from '../../modules/multi_reduce_region_phen2gene/'
+include { multi_variant_html_report } from '../../modules/variant_html_report/'
 
 
 
@@ -84,5 +85,21 @@ workflow INPUT_CSV_ALIGNMENT_ALL_LIGHT_LONGPHASE {
 	input_bam_hpo_age=input_bam_no_bam.join(input_age).map { out_prefix, hpo_path, age_of_onset -> tuple(out_prefix, hpo_path, age_of_onset) }
 	join_vcf_bam_rankvar_hpo=join_vcf_bam_rankvar.join(input_bam_hpo_age)
 	multi_longphase(join_vcf_bam_rankvar_hpo,ref_fa,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
+
+	prio_report_input = multi_longphase.out
+		.map { prio_vcf, prio_gene_report, haplotag_bam ->
+			def prefix = prio_vcf.name.replaceFirst(/\.prio\.vcf$/, "")
+			tuple(prefix, prio_vcf, prio_gene_report)
+		}
+		.join(
+			multi_nanorepeat.out.map { repeat_tsv ->
+				def prefix = repeat_tsv.name.replaceFirst(/_nanorepeat_result\.tsv$/, "")
+				tuple(prefix, repeat_tsv)
+			}
+		)
+		.map { out_prefix, prio_vcf, prio_gene_report, repeat_tsv ->
+			tuple(out_prefix, prio_vcf, prio_gene_report, repeat_tsv)
+		}
+	multi_variant_html_report(prio_report_input)
 
 }	

@@ -18,7 +18,7 @@ process multi_manta {
 
 	/manta/bin/configManta.py --bam=$bam --referenceFasta=$ref_fa --runDir ${out_prefix}_manta
 	
-	${out_prefix}_manta/runWorkflow.py -j 4 -g 64 -m local
+	${out_prefix}_manta/runWorkflow.py -j ${task.cpus} -g ${task.memory.toGiga()} -m local
 	
 	gunzip ${out_prefix}_manta/results/variants/diploidSV.vcf.gz
 
@@ -28,6 +28,5 @@ process multi_manta {
 
 
 }
-
 
 

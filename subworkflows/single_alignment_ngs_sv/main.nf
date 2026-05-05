@@ -5,6 +5,7 @@ include { PhenoSV } from '../../modules/phenosv/'
 include { Phen2gene } from '../../modules/phen2gene/'
 include { Manta } from '../../modules/manta/'
 include { scramble } from '../../modules/scramble/'
+include { scramble_ref_prep } from '../../modules/scramble_ref_prep/'
 include { normalize_shortread_alignment } from '../../modules/normalize_shortread_alignment/'
 include { CNVnator } from '../../modules/cnvnator/'
 include { merge_shortread_sv_callers } from '../../modules/merge_shortread_sv_callers/'
@@ -40,10 +41,11 @@ workflow SINGLE_ALIGNMENT_NGS_SV {
 	scramble_vcf = null
 	if ( scramble_mode == "yes" ) {
 		scramble_ref_meta = ref_fa.map { ref_tuple -> tuple([id: 'reference'], ref_tuple[0], ref_tuple[1]) }
+		scramble_ref_bundle = scramble_ref_prep(scramble_ref_meta)
 		scramble_cluster_input = out_prefix.combine(bam).map { prefix, bam_tuple ->
 			tuple([id: prefix], bam_tuple[0], bam_tuple[1])
 		}
-		scramble(scramble_cluster_input, scramble_ref_meta)
+		scramble(scramble_cluster_input, scramble_ref_bundle.out.ref)
 		scramble_vcf = scramble.out.vcf.map { meta, vcf -> vcf }
 	}
 

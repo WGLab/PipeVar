@@ -13,6 +13,7 @@ include { Rankscore_analysis } from '../../modules/rankscore_analysis/'
 include { phenotagger } from '../../modules/phenotagger/'
 include { longphase } from '../../modules/longphase/'
 include { phen2gene_filter } from '../../modules/reduce_region_phen2gene/'
+include { variant_html_report } from '../../modules/variant_html_report/'
 
 
 // Single sample: light long-read full path (SNP + SV + STR) with NanoCaller and longphase.
@@ -62,5 +63,6 @@ workflow SINGLE_ALIGNMENT_ALL_LIGHT_LONGPHASE {
 	PhenoSV(SURVIVOR.out,out_prefix,hpo)
 	NanoRepeat(bam,out_prefix,ref_fa)
 	longphase(bam,ANNOVAR.out.vcf_output,ANNOVAR_SV.out,PhenoSV.out,rankscore_result.rankscore,rankscore_result.clinvar,RankVar.out,hpo,out_prefix,ref_fa,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
+	variant_html_report(out_prefix, longphase.out[0], longphase.out[1], NanoRepeat.out)
 
 }

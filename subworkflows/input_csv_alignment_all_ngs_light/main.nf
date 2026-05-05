@@ -14,6 +14,7 @@ include { multi_prep_gatk } from '../../modules/multi_prep_gatk/'
 include { multi_phenotagger } from '../../modules/multi_phenotagger/'
 include { multi_phen2gene_filter } from '../../modules/multi_reduce_region_phen2gene/'
 include { multi_ngs_prio } from '../../modules/multi_ngs_prio/'
+include { multi_variant_html_report } from '../../modules/variant_html_report/'
 
 
 // CSV batch: short-read full path using light SNP caller (HaplotypeCaller) plus SV path.
@@ -37,7 +38,6 @@ workflow INPUT_CSV_ALIGNMENT_ALL_NGS_LIGHT {
 	allow_unphased_comphet
 
 	main:
-
 	input_bam_no_bam =  input_bam.map { out_prefix, bam_file, bai_file, note_file -> return tuple ( out_prefix,note_file ) }
         input_bam_with_bam= input_bam.map { out_prefix, bam_file, bai_file, note_file -> return tuple (out_prefix, bam_file, bai_file) }
 	ref_fa_no_dict = ref_fa.map { ref_fa, fai_file, dict_file -> return tuple ( ref_fa, fai_file ) }
@@ -89,5 +89,27 @@ workflow INPUT_CSV_ALIGNMENT_ALL_NGS_LIGHT {
 	            tuple(out_prefix, snv_rankvar, snv_rankscore, snv_pathogenic, sv_pathogenic, sv_vcf_path, snv_vcf_path, hpo_path, age_of_onset)
 	        }
 	        multi_ngs_prio(rankvar_join_hpo_ordered,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
+
+	prio_report_input = multi_ngs_prio.out[0]
+		.map { prio_vcf ->
+			def prefix = prio_vcf.name.replaceFirst(/\.prio\.vcf$/, "")
+			tuple(prefix, prio_vcf)
+		}
+		.join(
+			multi_ngs_prio.out[1].map { prio_gene_report ->
+				def prefix = prio_gene_report.name.replaceFirst(/\.prio_gene\.vcf$/, "")
+				tuple(prefix, prio_gene_report)
+			}
+		)
+		.join(
+			multi_eh_filter.out.map { repeat_tsv ->
+				def prefix = repeat_tsv.name.replaceFirst(/\.eh\.tsv$/, "")
+				tuple(prefix, repeat_tsv)
+			}
+		)
+		.map { out_prefix, prio_vcf, prio_gene_report, repeat_tsv ->
+			tuple(out_prefix, prio_vcf, prio_gene_report, repeat_tsv)
+		}
+	multi_variant_html_report(prio_report_input)
 
 }	

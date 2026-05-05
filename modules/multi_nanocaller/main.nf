@@ -21,9 +21,9 @@ process multi_nanocaller {
         conda activate nanocaller
 
 	if [ $bed_file != "null" ]; then
-		NanoCaller --bam $bam --ref $ref_fa --cpu 4 --output $out_prefix $args --bed $bed_file
+		NanoCaller --bam $bam --ref $ref_fa --cpu ${task.cpus} --output $out_prefix $args --bed $bed_file
 	else
-		NanoCaller --bam $bam --ref $ref_fa --cpu 4 --output $out_prefix $args
+		NanoCaller --bam $bam --ref $ref_fa --cpu ${task.cpus} --output $out_prefix $args
 	fi
 
 
@@ -38,6 +38,5 @@ process multi_nanocaller {
 
 
 }
-
 
 

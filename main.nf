@@ -104,24 +104,42 @@ FILTERING OPTIONS
                            Include ClinVar-only calls in final prioritized report outputs. Default: yes
   --allow_unphased_comphet <yes|no>
                            Treat unphased 0/1 or 1/0 AR het pairs as compound het in final prioritization. Default: no
+  --prioritize_sv_only <yes|no>
+                           In combined final prioritization, report only SV/PhenoSV evidence. Default: no
   --rankscore <FLOAT>      Minimum RankScore cutoff. Default: 0.50
   --rankscore_softwares <CSV> Comma-separated RankScore software list. Default: all
   --rankvar <FLOAT>        Minimum RankVar score cutoff. Default: 0.05
+  --phenosv_score <FLOAT>  Minimum PhenoSV score cutoff. Default: 0.50
   --gq <INT>               Minimum genotype quality. Default: 20
   --ad <INT>               Minimum allele depth. Default: 15
   --phen2gene_filter <INT> Number of top Phen2Gene genes used for targeted mode. Default: 500
+  --gene <SYMBOLS|FILE>    Restrict final prioritization to comma-separated genes or one-gene-per-line file.
   --target <yes|no>        If yes, run targeted calling in phenotype-derived gene regions.
   --cnvnator <yes|no>      Add CNVnator to short-read SV/all-NGS calling. Default: yes
   --cnvnator_bin_size <INT>
                            CNVnator read-depth bin size. Default: 100
+  --cnvpytor <yes|no>      Add experimental CNVpytor to long-read SV/all-longphase BAM/CRAM paths. Default: no
+  --cnvpytor_baf <yes|no>  Use SNP/BAF support for CNVpytor when long-read SNP calls exist. Default: yes
+  --cnvpytor_bin_sizes <STRING>
+                           Space-separated CNVpytor bin sizes. Default: "100000"
+  --cnvpytor_primary_bin <INT>
+                           CNVpytor export bin size used for final TSV/VCF. Default: 100000
+  --cnvpytor_min_size <INT>
+                           Minimum CNV size retained from CNVpytor output. Default: 100000
   --scramble <yes|no>      Add SCRAMBLE mobile-element calling to short-read SV/all-NGS BAM/CRAM paths. Default: no
-  --mito <yes|no>          Add mitochondrial Mutect2 + mtDNA annotation branch for short-read BAM/CRAM. Default: no
-                           Requires BWA-indexed reference sidecars alongside --ref_fa.
+  --mito <yes|no>          Add mitochondrial analysis for BAM/CRAM input. Default: no
+                           Uses Mutect2 for short reads and Clair3 for long reads.
   --mito_contig <STRING>   Preferred mitochondrial contig alias. Default: chrM
   --mito_min_vaf <FLOAT>   Minimum heteroplasmy/allele fraction retained in mito prioritization. Default: 0.01
   --mito_min_depth <INT>   Minimum depth retained in mito prioritization. Default: 50
   --mito_min_alt_reads <INT>
                            Minimum alternate read count retained in mito prioritization. Default: 5
+  --mito_gui_min_af <FLOAT>
+                           Minimum strict mtDNA allele fraction for final report mitochondrial rows. Default: 0.5
+  --mito_gui_min_apogee2 <FLOAT>
+                           Minimum strict APOGEE2 score for final report mitochondrial rows. Default: 0.5
+  --mito_gui_min_mitotip <FLOAT>
+                           Minimum strict MitoTip score for final report mitochondrial rows. Default: 12.66
 
 --------------------------------------------------------------------------------
 OUTPUT / GENERAL
@@ -168,14 +186,38 @@ EXAMPLES
        --ref_fa /refs/hg38.fa \\
        --note /data/note.txt
 
+  5) Long-read SV with experimental CNVpytor (RD-only):
+     nextflow run main.nf \\
+       -profile standard \\
+       --bam /data/sample.ont.bam \\
+       --ref_fa /refs/hg38.fa \\
+       --hpo /data/sample.hpo.txt \\
+       --type ont \\
+       --mode sv \\
+       --cnvpytor yes \\
+       --out_prefix patient_sv
+
+  6) Long-read full analysis with CNVpytor SNP/BAF support:
+     nextflow run main.nf \\
+       -profile standard \\
+       --bam /data/sample.hifi.bam \\
+       --ref_fa /refs/hg38.fa \\
+       --hpo /data/sample.hpo.txt \\
+       --type pacbio \\
+       --cnvpytor yes \\
+       --cnvpytor_baf yes \\
+       --out_prefix patient_full
+
 NOTES
   - BAM mode requires index files (.bai for BAM, .crai for CRAM).
   - Reference FASTA index (.fai) must exist.
-  - Mito mode also requires the matching `.dict` and BWA sidecars:
+  - Short-read mito mode also requires the matching `.dict` and BWA sidecars:
     `.amb`, `.ann`, `.bwt`, `.pac`, `.sa`.
   - The DRAGEN CRAM compatibility path uses `RevertSam --RESTORE_HARDCLIPS false`.
   - For VCF single-file mode, provide --mode snp or --mode sv.
   - For single-file mode, at least one of --note <FILE> or --hpo <FILE> is required.
+  - CNVpytor is experimental for long reads and is intended for large CNVs; calls below 100 kb are noisy by default.
+  - CNVpytor is whole-genome long-read only; do not use it for targeted or mitochondrial CNV interpretation.
   
 ================================================================================
 """
@@ -204,8 +246,22 @@ def clean_note   = params.note   ? params.note.trim().toLowerCase()   : 'no'
 def clean_inheritance_mode = params.inheritance_mode ? params.inheritance_mode.trim().toLowerCase() : 'ml'
 def clean_include_clinvar_report = params.include_clinvar_report ? params.include_clinvar_report.trim().toLowerCase() : 'yes'
 def clean_allow_unphased_comphet = params.allow_unphased_comphet ? params.allow_unphased_comphet.trim().toLowerCase() : 'no'
+def clean_prioritize_sv_only = params.prioritize_sv_only ? params.prioritize_sv_only.toString().trim().toLowerCase() : 'no'
 def clean_rankscore_softwares = params.rankscore_softwares ? params.rankscore_softwares.toString().trim() : ""
+def clean_gene_filter = params.gene ? params.gene.toString().trim() : ""
+if (clean_gene_filter) {
+    def gene_filter_file = file(clean_gene_filter)
+    if (gene_filter_file.exists()) {
+        params.gene = gene_filter_file
+            .readLines()
+            .collect { it.trim() }
+            .findAll { it && !it.startsWith('#') }
+            .join(',')
+    }
+}
 def clean_cnvnator = params.cnvnator ? params.cnvnator.toString().trim().toLowerCase() : 'yes'
+def clean_cnvpytor = params.cnvpytor ? params.cnvpytor.toString().trim().toLowerCase() : 'no'
+def clean_cnvpytor_baf = params.cnvpytor_baf ? params.cnvpytor_baf.toString().trim().toLowerCase() : 'yes'
 def clean_scramble = params.scramble ? params.scramble.toString().trim().toLowerCase() : 'no'
 def clean_mito = params.mito ? params.mito.toString().trim().toLowerCase() : 'no'
 
@@ -296,6 +352,34 @@ if (!valid_yes_no.contains(clean_scramble)) {
     """
 }
 
+if (!valid_yes_no.contains(clean_cnvpytor)) {
+    error """
+    ================================================================
+    ERROR: Invalid CNVpytor Toggle
+    ================================================================
+    You provided: --cnvpytor "${params.cnvpytor}"
+
+    Valid options are:
+      --cnvpytor yes
+      --cnvpytor no
+    ================================================================
+    """
+}
+
+if (!valid_yes_no.contains(clean_cnvpytor_baf)) {
+    error """
+    ================================================================
+    ERROR: Invalid CNVpytor BAF Toggle
+    ================================================================
+    You provided: --cnvpytor_baf "${params.cnvpytor_baf}"
+
+    Valid options are:
+      --cnvpytor_baf yes
+      --cnvpytor_baf no
+    ================================================================
+    """
+}
+
 if (clean_scramble == 'yes') {
     if (params.vcf) {
         error """
@@ -340,16 +424,6 @@ if (clean_mito == 'yes') {
         """
     }
 
-    if (clean_type != 'short') {
-        error """
-        ================================================================
-        ERROR: Mitochondrial analysis is short-read only
-        ================================================================
-        --mito yes currently supports only --type short.
-        ================================================================
-        """
-    }
-
     if (clean_mode == 'sv') {
         error """
         ================================================================
@@ -358,6 +432,53 @@ if (clean_mito == 'yes') {
         Use --mode snp or omit --mode when running --mito yes.
         ================================================================
         """
+    }
+
+    if (clean_type != 'short' && clean_light == 'yes') {
+        error """
+        ================================================================
+        ERROR: Long-read mitochondrial analysis requires Clair3
+        ================================================================
+        --mito yes is not available when --light yes selects NanoCaller.
+        Use standard long-read mode or --type short.
+        ================================================================
+        """
+    }
+}
+
+if (clean_cnvpytor == 'yes') {
+    if (params.vcf) {
+        error """
+        ================================================================
+        ERROR: CNVpytor requires BAM/CRAM input
+        ================================================================
+        --cnvpytor yes is only supported for BAM/CRAM input.
+        ================================================================
+        """
+    }
+
+    if (clean_type == 'short') {
+        error """
+        ================================================================
+        ERROR: CNVpytor is long-read only
+        ================================================================
+        --cnvpytor yes currently supports only --type ont or --type pacbio.
+        ================================================================
+        """
+    }
+
+    if (clean_mode == 'snp') {
+        error """
+        ================================================================
+        ERROR: CNVpytor is not available with --mode snp
+        ================================================================
+        Use --mode sv or omit --mode when running --cnvpytor yes.
+        ================================================================
+        """
+    }
+
+    if (clean_mode == 'sv' && clean_cnvpytor_baf == 'yes') {
+        println "WARNING: --cnvpytor_baf yes was requested with --mode sv; CNVpytor will run in RD-only mode for the SV-only long-read branch."
     }
 }
 
@@ -374,6 +495,58 @@ if (!(params.cnvnator_bin_size.toString() ==~ /[1-9][0-9]*/)) {
     ================================================================
     """
 }
+
+if (!(params.cnvpytor_primary_bin.toString() ==~ /[1-9][0-9]*/)) {
+    error """
+    ================================================================
+    ERROR: Invalid CNVpytor Primary Bin
+    ================================================================
+    You provided: --cnvpytor_primary_bin "${params.cnvpytor_primary_bin}"
+
+    Provide a positive integer, for example:
+      --cnvpytor_primary_bin 100000
+    ================================================================
+    """
+}
+
+if (!(params.cnvpytor_min_size.toString() ==~ /[1-9][0-9]*/)) {
+    error """
+    ================================================================
+    ERROR: Invalid CNVpytor Minimum Size
+    ================================================================
+    You provided: --cnvpytor_min_size "${params.cnvpytor_min_size}"
+
+    Provide a positive integer, for example:
+      --cnvpytor_min_size 100000
+    ================================================================
+    """
+}
+
+def clean_cnvpytor_bin_sizes = params.cnvpytor_bin_sizes ? params.cnvpytor_bin_sizes.toString().trim() : "100000"
+if (!clean_cnvpytor_bin_sizes || !(clean_cnvpytor_bin_sizes ==~ /[1-9][0-9]*(\s+[1-9][0-9]*)*/)) {
+    error """
+    ================================================================
+    ERROR: Invalid CNVpytor Bin Sizes
+    ================================================================
+    You provided: --cnvpytor_bin_sizes "${params.cnvpytor_bin_sizes}"
+
+    Provide one or more positive integers separated by spaces, for example:
+      --cnvpytor_bin_sizes "100000"
+      --cnvpytor_bin_sizes "50000 100000"
+    ================================================================
+    """
+}
+
+params.mode = clean_mode
+params.type = clean_type
+params.light = clean_light
+params.genome = clean_genome
+params.cnvnator = clean_cnvnator
+params.cnvpytor = clean_cnvpytor
+params.cnvpytor_baf = clean_cnvpytor_baf
+params.cnvpytor_bin_sizes = clean_cnvpytor_bin_sizes
+params.scramble = clean_scramble
+params.mito = clean_mito
 
 // CHECK 3: Validate Genome
 if (!valid_genomes.contains(clean_genome)) {
@@ -434,6 +607,33 @@ if (!valid_yes_no.contains(clean_allow_unphased_comphet)) {
     Valid options are:
       --allow_unphased_comphet yes
       --allow_unphased_comphet no
+    ================================================================
+    """
+}
+
+if (!valid_yes_no.contains(clean_prioritize_sv_only)) {
+    error """
+    ================================================================
+    ERROR: Invalid SV-only final prioritization toggle
+    ================================================================
+    You provided: --prioritize_sv_only "${params.prioritize_sv_only}"
+
+    Valid options are:
+      --prioritize_sv_only yes
+      --prioritize_sv_only no
+    ================================================================
+    """
+}
+
+if (!(params.phenosv_score.toString() ==~ /([0-9]+([.][0-9]+)?|[.][0-9]+)/)) {
+    error """
+    ================================================================
+    ERROR: Invalid PhenoSV Score Threshold
+    ================================================================
+    You provided: --phenosv_score "${params.phenosv_score}"
+
+    Provide a numeric threshold, for example:
+      --phenosv_score 0.50
     ================================================================
     """
 }
@@ -500,7 +700,7 @@ if (params.ref_fa) {
         Please index your reference: samtools faidx ${params.ref_fa}
         """
     }
-    if (clean_mito == 'yes') {
+    if (clean_mito == 'yes' && clean_type == 'short') {
         def ref_dict = file("${file(params.ref_fa).parent}/${file(params.ref_fa).baseName}.dict")
         if (!ref_dict.exists()) {
             error """
@@ -538,6 +738,7 @@ if (params.ref_fa) {
 
 include { SINGLE_ALIGNMENT_ALL_LONGPHASE } from './subworkflows/single_alignment_all_longphase' 
 include { SINGLE_ALIGNMENT_ALL_NGS } from './subworkflows/single_alignment_all_ngs'
+include { SINGLE_ALIGNMENT_LONG_MITO } from './subworkflows/single_alignment_long_mito'
 include { SINGLE_ALIGNMENT_NGS_MITO } from './subworkflows/single_alignment_ngs_mito'
 include { SINGLE_ALIGNMENT_LONG_SNP } from './subworkflows/single_alignment_long_snp'
 include { SINGLE_ALIGNMENT_LONG_SV } from './subworkflows/single_alignment_long_sv'
@@ -548,6 +749,7 @@ include { SINGLE_ALIGNMENT_VCF_SV } from './subworkflows/single_alignment_vcf_sv
 
 include { INPUT_CSV_ALIGNMENT_ALL_LONGPHASE } from './subworkflows/input_csv_alignment_all_longphase'
 include { INPUT_CSV_ALIGNMENT_ALL_NGS } from './subworkflows/input_csv_alignment_all_ngs'
+include { INPUT_CSV_ALIGNMENT_LONG_MITO } from './subworkflows/input_csv_alignment_long_mito'
 include { INPUT_CSV_ALIGNMENT_NGS_MITO } from './subworkflows/input_csv_alignment_ngs_mito'
 include { INPUT_CSV_ALIGNMENT_LONG_SNP } from './subworkflows/input_csv_alignment_long_snp'
 include { INPUT_CSV_ALIGNMENT_LONG_SV } from './subworkflows/input_csv_alignment_long_sv'
@@ -690,7 +892,7 @@ Channel
                 out_prefix=Channel.value(params.out_prefix)
         }
 	//Need to add dict file in case there is we are running haplotypecaller!!!!
-	if (params.ref_fa != null && params.light == 'yes' && params.type == 'short' ) {
+	if (params.ref_fa != null && clean_light == 'yes' && clean_type == 'short' ) {
 ref_fa = Channel
     .fromPath(params.ref_fa)
     .map { fa_file ->
@@ -709,7 +911,7 @@ ref_fa = Channel
     }
     .first()
         }
-	if (params.ref_fa != null && clean_mito == 'yes' && params.type == 'short') {
+	if (params.ref_fa != null && clean_mito == 'yes' && clean_type == 'short') {
 mito_ref_fa = Channel
     .fromPath(params.ref_fa)
     .map { fa_file ->
@@ -753,7 +955,7 @@ mito_ref_fa = Channel
         if ( !output_directory_check.exists() ) {
 	output_directory_check.mkdirs()
         }
-	type=Channel.value(params.type)
+	type=Channel.value(clean_type)
 	mito_contig=Channel.value(params.mito_contig)
 	def inheritance_mode_script = (clean_inheritance_mode == 'gnomad') ? 'LOEUF' : 'OMIM'
 	inheritance_mode=Channel.value(inheritance_mode_script)
@@ -774,74 +976,88 @@ mito_ref_fa = Channel
 	}
 	if ( params.input_csv ) {
         if ( input_vcf != null ) {
-            if ( params.mode == 'sv' ) {
+            if ( clean_mode == 'sv' ) {
                 INPUT_CSV_ALIGNMENT_VCF_SV(input_vcf, input_age, ref_fa, phen2gene_top_n, is_note, target, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
             }
-            else if ( params.mode == 'snp' ) {
+            else if ( clean_mode == 'snp' ) {
                 INPUT_CSV_ALIGNMENT_VCF_SNP(input_vcf, input_age, ref_fa, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
             }
         }
-        else if ( input_bam != null ) {
-	            if ( clean_mito == 'yes' && params.type == 'short' ) {
-	                INPUT_CSV_ALIGNMENT_NGS_MITO(input_bam, mito_ref_fa, mito_contig)
-	            }
-	            if ( params.type == 'short' ) {
-	                    if ( params.mode == 'sv' ) {
-	                        INPUT_CSV_ALIGNMENT_NGS_SV(input_bam, input_age, ref_fa,  is_note, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
-	                    }
-	                    else if ( params.mode == 'snp' ) {
+	        else if ( input_bam != null ) {
+		            if ( clean_type == 'short' ) {
+		                    mito_report_tsv = Channel.empty()
+		                    if ( clean_mito == 'yes' ) {
+		                        INPUT_CSV_ALIGNMENT_NGS_MITO(input_bam, mito_ref_fa, mito_contig)
+		                        mito_report_tsv = INPUT_CSV_ALIGNMENT_NGS_MITO.out.prioritized_tsv
+		                    }
+		                    if ( clean_mode == 'sv' ) {
+		                        INPUT_CSV_ALIGNMENT_NGS_SV(input_bam, input_age, ref_fa,  is_note, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
+		                    }
+	                    else if ( clean_mode == 'snp' ) {
                         INPUT_CSV_NGS_SNP(input_bam, input_age, ref_fa,  rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 				}
 				else {
-                                INPUT_CSV_ALIGNMENT_ALL_NGS(input_bam, input_age, ref_fa,  rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
+                                INPUT_CSV_ALIGNMENT_ALL_NGS(input_bam, input_age, ref_fa,  rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_report_tsv, clean_mito)
 	                        }
 	            }
 	            else { // Long reads
-	                    if ( params.mode == 'sv' ) {
+	                    mito_report_tsv = Channel.empty()
+	                    if ( clean_mito == 'yes' ) {
+	                        INPUT_CSV_ALIGNMENT_LONG_MITO(input_bam, ref_fa, mito_contig)
+	                        mito_report_tsv = INPUT_CSV_ALIGNMENT_LONG_MITO.out.prioritized_tsv
+	                    }
+	                    if ( clean_mode == 'sv' ) {
 	                        INPUT_CSV_ALIGNMENT_LONG_SV(input_bam, input_age, ref_fa,  is_note, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 	                    }
-	                    else if ( params.mode == 'snp' ) {
+	                    else if ( clean_mode == 'snp' ) {
                         INPUT_CSV_ALIGNMENT_LONG_SNP(input_bam, input_age, ref_fa,  rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 	                    }
 	                    else {
-                        INPUT_CSV_ALIGNMENT_ALL_LONGPHASE(input_bam, input_age, ref_fa,  rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
+                        INPUT_CSV_ALIGNMENT_ALL_LONGPHASE(input_bam, input_age, ref_fa,  rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_report_tsv, clean_mito)
 	                    }
 	            }
 	        }
 	    }
     else { // Single File Mode
         if ( params.vcf ) {
-            if ( params.mode == 'sv' ) {
+            if ( clean_mode == 'sv' ) {
                 SINGLE_ALIGNMENT_VCF_SV(vcf, out_prefix, ref_fa,  note, phen2gene_top_n, is_note, target, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
             }
-            else if ( params.mode == 'snp' ) {
+            else if ( clean_mode == 'snp' ) {
                 SINGLE_ALIGNMENT_VCF_SNP(vcf, out_prefix, ref_fa,  note, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
             }
         }
         else if ( params.bam != null ) {
-	            if ( clean_mito == 'yes' && params.type == 'short' ) {
-	                SINGLE_ALIGNMENT_NGS_MITO(bam, out_prefix, mito_ref_fa, mito_contig)
-	            }
-	            if ( params.type == 'short' ) {
-	                    if ( params.mode == 'sv' ) {
+	            if ( clean_type == 'short' ) {
+	                    mito_report_tsv = Channel.empty()
+	                    if ( clean_mito == 'yes' ) {
+	                        SINGLE_ALIGNMENT_NGS_MITO(bam, out_prefix, mito_ref_fa, mito_contig)
+	                        mito_report_tsv = SINGLE_ALIGNMENT_NGS_MITO.out.prioritized_tsv
+	                    }
+	                    if ( clean_mode == 'sv' ) {
 	                        SINGLE_ALIGNMENT_NGS_SV(bam, out_prefix, ref_fa,  note, is_note, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 	                    }
-	                    else if ( params.mode == 'snp' ) {
+	                    else if ( clean_mode == 'snp' ) {
                         SINGLE_ALIGNMENT_NGS_SNP(bam, out_prefix, ref_fa,  note, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 	                    }
 			    else {
-			                SINGLE_ALIGNMENT_ALL_NGS(bam, out_prefix, ref_fa,  note, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
+			                SINGLE_ALIGNMENT_ALL_NGS(bam, out_prefix, ref_fa,  note, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_report_tsv, clean_mito)
 			    }
 	            }
 	            else { // Long reads
-	                    if ( params.mode == 'sv' ) {
+	                    mito_report_tsv = Channel.empty()
+	                    if ( clean_mito == 'yes' ) {
+	                        SINGLE_ALIGNMENT_LONG_MITO(bam, out_prefix, ref_fa, mito_contig)
+	                        mito_report_tsv = SINGLE_ALIGNMENT_LONG_MITO.out.prioritized_tsv
+	                    }
+	                    if ( clean_mode == 'sv' ) {
 	                        SINGLE_ALIGNMENT_LONG_SV(bam, out_prefix, ref_fa,  note, is_note, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 	                    }
-	                    else if ( params.mode == 'snp' ) {
+	                    else if ( clean_mode == 'snp' ) {
                         SINGLE_ALIGNMENT_LONG_SNP(bam, out_prefix, ref_fa,  note, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 	                    }
 	                    else {
-                        SINGLE_ALIGNMENT_ALL_LONGPHASE(bam, out_prefix, ref_fa,  note, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
+                        SINGLE_ALIGNMENT_ALL_LONGPHASE(bam, out_prefix, ref_fa,  note, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_report_tsv, clean_mito)
 	                    }
 	            }
 	        }

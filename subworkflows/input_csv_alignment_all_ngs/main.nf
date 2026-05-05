@@ -8,6 +8,7 @@ include { multi_phenosv } from '../../modules/multi_phenosv/'
 include { multi_rankvar } from '../../modules/multi_rankvar/'
 include { multi_manta } from '../../modules/multi_manta/'
 include { multi_scramble } from '../../modules/multi_scramble/'
+include { scramble_ref_prep } from '../../modules/scramble_ref_prep/'
 include { multi_normalize_shortread_alignment } from '../../modules/multi_normalize_shortread_alignment/'
 include { multi_cnvnator } from '../../modules/multi_cnvnator/'
 include { multi_merge_shortread_sv_callers } from '../../modules/multi_merge_shortread_sv_callers/'
@@ -19,6 +20,7 @@ include { multi_prep_gatk } from '../../modules/multi_prep_gatk/'
 include { multi_phenotagger } from '../../modules/multi_phenotagger/'
 include { multi_phen2gene_filter } from '../../modules/multi_reduce_region_phen2gene/'
 include { multi_ngs_prio } from '../../modules/multi_ngs_prio/'
+include { multi_variant_html_report; multi_variant_html_report_with_mito } from '../../modules/variant_html_report/'
 
 
 // CSV batch: short-read full path (SNP + SV + STR) with DeepVariant and Manta.
@@ -41,9 +43,10 @@ workflow INPUT_CSV_ALIGNMENT_ALL_NGS {
 	inheritance_mode
 	include_clinvar_report
 	allow_unphased_comphet
+	mito_tsv
+	mito_mode
 
 	main:
-
 	input_bam_no_bam =  input_bam.map { out_prefix, bam_file, bai_file, note_file -> return tuple ( out_prefix,note_file ) }
         input_bam_with_bam= input_bam.map { out_prefix, bam_file, bai_file, note_file -> return tuple (out_prefix, bam_file, bai_file) }	
 	if ( is_note == "yes" ) {
@@ -88,10 +91,11 @@ workflow INPUT_CSV_ALIGNMENT_ALL_NGS {
 	scramble_vcf = null
 	if ( scramble_mode == "yes" ) {
 		scramble_ref_meta = ref_fa.map { ref_tuple -> tuple([id: 'reference'], ref_tuple[0], ref_tuple[1]) }
+		scramble_ref_bundle = scramble_ref_prep(scramble_ref_meta)
 		scramble_cluster_input = input_bam_with_bam.map { out_prefix, bam_file, index_file ->
 			tuple([id: out_prefix], bam_file, index_file)
 		}
-		multi_scramble(scramble_cluster_input, scramble_ref_meta)
+		multi_scramble(scramble_cluster_input, scramble_ref_bundle.out.ref)
 		scramble_vcf = multi_scramble.out.vcf.map { meta, vcf -> tuple(meta.id, vcf) }
 	}
 
@@ -143,5 +147,41 @@ workflow INPUT_CSV_ALIGNMENT_ALL_NGS {
 	    tuple(out_prefix, snv_rankvar, snv_rankscore, snv_pathogenic, sv_pathogenic, sv_vcf_path, snv_vcf_path, hpo_path, age_of_onset)
 	}
 	multi_ngs_prio(rankvar_join_hpo_ordered,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
+
+	prio_report_input = multi_ngs_prio.out[0]
+		.map { prio_vcf ->
+			def prefix = prio_vcf.name.replaceFirst(/\.prio\.vcf$/, "")
+			tuple(prefix, prio_vcf)
+		}
+		.join(
+			multi_ngs_prio.out[1].map { prio_gene_report ->
+				def prefix = prio_gene_report.name.replaceFirst(/\.prio_gene\.vcf$/, "")
+				tuple(prefix, prio_gene_report)
+			}
+		)
+		.join(
+			multi_eh_filter.out.map { repeat_tsv ->
+				def prefix = repeat_tsv.name.replaceFirst(/\.eh\.tsv$/, "")
+				tuple(prefix, repeat_tsv)
+			}
+		)
+		.map { out_prefix, prio_vcf, prio_gene_report, repeat_tsv ->
+			tuple(out_prefix, prio_vcf, prio_gene_report, repeat_tsv)
+		}
+	if ( mito_mode == "yes" ) {
+		prio_report_input_with_mito = prio_report_input
+			.join(
+				mito_tsv.map { out_prefix, mito_report ->
+					tuple(out_prefix, mito_report)
+				}
+			)
+			.map { out_prefix, prio_vcf, prio_gene_report, repeat_tsv, mito_report ->
+				tuple(out_prefix, prio_vcf, prio_gene_report, repeat_tsv, mito_report)
+			}
+		multi_variant_html_report_with_mito(prio_report_input_with_mito)
+	}
+	else {
+		multi_variant_html_report(prio_report_input)
+	}
 
 }	
