@@ -1,7 +1,7 @@
 
 // Phase SNV/SV evidence and aggregate ranked evidence into final prioritized VCF.
 process longphase {
-	container ='beoungl/docker_test:longphase_0.2.24'
+	container ='beoungl/docker_test:longphase_0.2.28'
 
 	input:
 	tuple path(bam_path), path(index)

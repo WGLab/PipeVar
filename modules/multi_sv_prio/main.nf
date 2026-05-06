@@ -1,7 +1,7 @@
 
 // Batch SV evidence merging (PhenoSV + SV annotation) to prioritized VCF.
 process multi_sv_prio {
-	container ='beoungl/docker_test:longphase_0.2.24'
+	container ='beoungl/docker_test:longphase_0.2.28'
 
 	input:
 	tuple val(out_prefix), path(sv_pathogenic), path(annovar_sv_vcf), path(hpo_path), val(age_of_onset)

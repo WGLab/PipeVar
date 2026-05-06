@@ -263,7 +263,8 @@ Expected CSV columns:
 - `--mode <snp|sv>`: restrict to SNP or SV branch
 - `--type <ont|pacbio|short>`: sequencing type for BAM/CRAM flows
 - `--light <yes|no>`: enable lightweight models/callers where supported
-- `--genome <hg38|grch38>`: genome build for ExpansionHunter catalog selection
+- `--genome <hg38|grch38>`: genome build for default ExpansionHunter catalog selection
+- `--expansionhunter_variant_catalog <FILE>`: optional ExpansionHunter catalog override for short-read BAM/CRAM workflows
 - `--target <yes|no>`: restrict SNP calling to phenotype-derived gene BED
 - `--scramble <yes|no>`: enable SCRAMBLE MEI calling in short-read SV/all-NGS BAM/CRAM paths (default: `no`)
 - `--cnvpytor <yes|no>`: enable experimental CNVpytor calling in long-read SV/all-longphase BAM/CRAM paths (default: `no`)
@@ -307,10 +308,13 @@ The workflow now uses unified subworkflows and switches SNP caller internally by
 
 ### ExpansionHunter catalog selection
 
-Catalog path is selected from `--genome` for both single and batch modes:
+ExpansionHunter catalogs are staged as Nextflow process inputs for both single and batch short-read modes.
+By default, PipeVar_mito selects a repo-provided catalog from `--genome`:
 
-- `hg38` -> `/hg38/variant_catalog.json`
-- `grch38` -> `/EH_grch38/variant_catalog.json`
+- `hg38` -> `PipeVar_mito/data/variant_catalog.json`
+- `grch38` -> `PipeVar_mito/data/variant_catalog_grch38.json`
+
+Use `--expansionhunter_variant_catalog /path/to/variant_catalog.json` to override the default.
 
 ## Example commands
 

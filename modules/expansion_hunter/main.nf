@@ -8,22 +8,18 @@ process ExpansionHunter {
         tuple path(bam), path(index)
 	val out_prefix
 	tuple path(ref_fa), path(fa_index)
+	path variant_catalog
 
 	output:
 	path "${out_prefix}.json"
 
 	script:
-	def args = task.ext.args ?: ''
 
 	"""
-	ExpansionHunter --reads $bam --reference $ref_fa --variant-catalog $args --output-prefix $out_prefix
-
-		
-	
+	ExpansionHunter --reads "$bam" --reference "$ref_fa" --variant-catalog "$variant_catalog" --output-prefix "$out_prefix"
 	"""
 
 
 }
-
 
 

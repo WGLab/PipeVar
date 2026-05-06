@@ -92,6 +92,10 @@ CORE OPTIONS
                            Sequencing type for BAM/CRAM flows. Default: ont
   --light <yes|no>         Use lightweight SNP/SV models where supported. Default: no
   --genome <hg38|grch38>   Genome build for ExpansionHunter catalog. Default: hg38
+  --expansionhunter_variant_catalog <FILE>
+                           Optional ExpansionHunter catalog override. Defaults to
+                           PipeVar_mito/data/variant_catalog.json for hg38 and
+                           PipeVar_mito/data/variant_catalog_grch38.json for grch38.
 
 --------------------------------------------------------------------------------
 FILTERING OPTIONS
@@ -736,6 +740,25 @@ if (params.ref_fa) {
     }
 }
 
+def is_expansionhunter_mode = clean_type == 'short' && (
+    params.bam || (params.input_csv && params.bam)
+)
+def default_eh_catalog = clean_genome == 'grch38' ? "${projectDir}/data/variant_catalog_grch38.json" : "${projectDir}/data/variant_catalog.json"
+def selected_eh_catalog = params.expansionhunter_variant_catalog ?: default_eh_catalog
+
+if (is_expansionhunter_mode) {
+    def eh_catalog = file(selected_eh_catalog)
+    if (!eh_catalog.exists()) {
+        error """
+        ERROR: ExpansionHunter variant catalog not found.
+        Expected at: ${eh_catalog}
+        Provide a valid file with:
+          --expansionhunter_variant_catalog <path/to/variant_catalog.json>
+        or ensure the default PipeVar_mito/data catalog exists for --genome ${clean_genome}.
+        """
+    }
+}
+
 include { SINGLE_ALIGNMENT_ALL_LONGPHASE } from './subworkflows/single_alignment_all_longphase' 
 include { SINGLE_ALIGNMENT_ALL_NGS } from './subworkflows/single_alignment_all_ngs'
 include { SINGLE_ALIGNMENT_LONG_MITO } from './subworkflows/single_alignment_long_mito'
@@ -764,6 +787,7 @@ include { INPUT_CSV_ALIGNMENT_VCF_SV } from './subworkflows/input_csv_alignment_
 workflow {
 	def input_age = null
 	def mito_ref_fa = null
+	def eh_variant_catalog = null
 	if ( params.input_csv ) {
 		input_age = Channel
     .fromPath( params.input_csv )
@@ -926,6 +950,11 @@ mito_ref_fa = Channel
     }
     .first()
 	}
+	if (is_expansionhunter_mode) {
+eh_variant_catalog = Channel
+    .fromPath(selected_eh_catalog)
+    .first()
+	}
 	// `is_note` controls whether subworkflows run phenotagger ("yes") or treat the input as HPO IDs ("no").
 	def is_note = "no"
 	if ( params.input_csv ) {
@@ -991,13 +1020,13 @@ mito_ref_fa = Channel
 		                        mito_report_tsv = INPUT_CSV_ALIGNMENT_NGS_MITO.out.prioritized_tsv
 		                    }
 		                    if ( clean_mode == 'sv' ) {
-		                        INPUT_CSV_ALIGNMENT_NGS_SV(input_bam, input_age, ref_fa,  is_note, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
+		                        INPUT_CSV_ALIGNMENT_NGS_SV(input_bam, input_age, ref_fa, eh_variant_catalog, is_note, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 		                    }
 	                    else if ( clean_mode == 'snp' ) {
-                        INPUT_CSV_NGS_SNP(input_bam, input_age, ref_fa,  rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
+                        INPUT_CSV_NGS_SNP(input_bam, input_age, ref_fa, eh_variant_catalog, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 				}
 				else {
-                                INPUT_CSV_ALIGNMENT_ALL_NGS(input_bam, input_age, ref_fa,  rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_report_tsv, clean_mito)
+                                INPUT_CSV_ALIGNMENT_ALL_NGS(input_bam, input_age, ref_fa, eh_variant_catalog, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_report_tsv, clean_mito)
 	                        }
 	            }
 	            else { // Long reads
@@ -1035,13 +1064,13 @@ mito_ref_fa = Channel
 	                        mito_report_tsv = SINGLE_ALIGNMENT_NGS_MITO.out.prioritized_tsv
 	                    }
 	                    if ( clean_mode == 'sv' ) {
-	                        SINGLE_ALIGNMENT_NGS_SV(bam, out_prefix, ref_fa,  note, is_note, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
+	                        SINGLE_ALIGNMENT_NGS_SV(bam, out_prefix, ref_fa, eh_variant_catalog, note, is_note, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 	                    }
 	                    else if ( clean_mode == 'snp' ) {
-                        SINGLE_ALIGNMENT_NGS_SNP(bam, out_prefix, ref_fa,  note, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
+                        SINGLE_ALIGNMENT_NGS_SNP(bam, out_prefix, ref_fa, eh_variant_catalog, note, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 	                    }
 			    else {
-			                SINGLE_ALIGNMENT_ALL_NGS(bam, out_prefix, ref_fa,  note, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_report_tsv, clean_mito)
+			                SINGLE_ALIGNMENT_ALL_NGS(bam, out_prefix, ref_fa, eh_variant_catalog, note, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_report_tsv, clean_mito)
 			    }
 	            }
 	            else { // Long reads

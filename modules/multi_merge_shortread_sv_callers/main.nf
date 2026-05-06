@@ -1,6 +1,6 @@
 // Batch merge of short-read SV/MEI VCFs keyed by sample prefix.
 process multi_merge_shortread_sv_callers {
-	container = 'beoungl/docker_test:longphase_0.2.17'
+	container = 'beoungl/docker_test:longphase_0.2.28'
 
 	input:
 	tuple val(out_prefix), path(sv_vcfs)

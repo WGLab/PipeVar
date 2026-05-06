@@ -1,7 +1,7 @@
 
 // Batch filter of ExpansionHunter outputs for pathogenic repeat expansions.
 process multi_eh_filter {
-	container ='beoungl/docker_test:eh_filter'
+	container ='beoungl/docker_test:eh_filter_0.1'
 
 
         input:
@@ -18,5 +18,4 @@ process multi_eh_filter {
 
 
 }
-
 

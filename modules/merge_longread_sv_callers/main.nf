@@ -1,6 +1,6 @@
 // Merge long-read raw SV VCFs into a single VCF before SV annotation.
 process merge_longread_sv_callers {
-	container = 'beoungl/docker_test:longphase_0.2.17'
+	container = 'beoungl/docker_test:longphase_0.2.28'
 
 	input:
 	path sv_vcfs
