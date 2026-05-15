@@ -1,7 +1,7 @@
 
 // Batch short-read SNP/indel calling with DeepVariant.
 process multi_deepvariant {
-	container ='google/deepvariant:1.9.0'
+	container "google/deepvariant:${params.deepvariant_version}${params.deepvariant_gpu?.toString()?.trim()?.toLowerCase() == 'yes' ? '-gpu' : ''}"
 
         input:
 	tuple val(out_prefix), path(bam), path(index_file)
@@ -16,9 +16,9 @@ process multi_deepvariant {
 	"""
 
 	if [ $bed_file != "null" ]; then
-		/opt/deepvariant/bin/run_deepvariant --model_type=WGS --ref=$ref_fa --reads=$bam --output_vcf=${out_prefix}.deepvariant.vcf.gz --regions=$bed_file
+		/opt/deepvariant/bin/run_deepvariant --model_type=WGS --ref=$ref_fa --reads=$bam --output_vcf=${out_prefix}.deepvariant.vcf.gz --regions=$bed_file --num_shards=${task.cpus}
 	else
-		/opt/deepvariant/bin/run_deepvariant --model_type=WGS --ref=$ref_fa --reads=$bam --output_vcf=${out_prefix}.deepvariant.vcf.gz
+		/opt/deepvariant/bin/run_deepvariant --model_type=WGS --ref=$ref_fa --reads=$bam --output_vcf=${out_prefix}.deepvariant.vcf.gz --num_shards=${task.cpus}
 	fi
 
 
@@ -27,6 +27,5 @@ process multi_deepvariant {
 
 
 }
-
 
 

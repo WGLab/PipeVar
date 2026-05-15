@@ -5,7 +5,7 @@ process multi_annovar_sv {
 
 
         input:
-	tuple val(out_prefix), path(vcf), path(phen2gene), val(bed_file)
+	tuple val(out_prefix), path(vcf), path(phen2gene), val(bed_file), val(sv_annotation_mode)
 
 	output:
 	tuple val(out_prefix), path("${out_prefix}.exonic.vcf")
@@ -19,7 +19,11 @@ process multi_annovar_sv {
 
 
 
-        perl /annovar/table_annovar.pl $vcf /annovar/humandb/ -buildver hg38 -out ${out_prefix}_sv -remove -protocol refGene -operation gx -nastring . -vcfinput -polish $bed_arg
+	if [[ "$sv_annotation_mode" == "preannotated" ]]; then
+		cp $vcf ${out_prefix}_sv.hg38_multianno.vcf
+	else
+		perl /annovar/table_annovar.pl $vcf /annovar/humandb/ -buildver hg38 -out ${out_prefix}_sv -remove -protocol refGene -operation gx -nastring . -vcfinput -polish $bed_arg
+	fi
 
 	bash /phen2gene_filter.sh $phen2gene ${out_prefix}_sv.hg38_multianno.vcf $out_prefix
 

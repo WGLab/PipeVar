@@ -102,10 +102,10 @@ workflow INPUT_CSV_ALIGNMENT_ALL_LONGPHASE {
 		sv_result=sniffles_result
 	}
         if ( target == "yes" ) {
-	        sniffles_result_annovar=sv_result.join(phen2gene_result).join(phen2_gene_bed).map { out_prefix, vcf_file, phen2gene_file, bed_file -> tuple(out_prefix, vcf_file, phen2gene_file, bed_file) }
+	        sniffles_result_annovar=sv_result.join(phen2gene_result).join(phen2_gene_bed).map { out_prefix, vcf_file, phen2gene_file, bed_file -> tuple(out_prefix, vcf_file, phen2gene_file, bed_file, "called") }
         }
         else {
-	        sniffles_result_annovar=sv_result.join(phen2gene_result).map { out_prefix, vcf_file, phen2gene_file -> tuple(out_prefix, vcf_file, phen2gene_file, target) }
+	        sniffles_result_annovar=sv_result.join(phen2gene_result).map { out_prefix, vcf_file, phen2gene_file -> tuple(out_prefix, vcf_file, phen2gene_file, target, "called") }
         }
 	annovar_sv_result=multi_annovar_sv(sniffles_result_annovar)
 	survivor_result=multi_survivor(annovar_sv_result)

@@ -87,7 +87,7 @@ workflow SINGLE_ALIGNMENT_ALL_LONGPHASE {
 		sv_vcf = sniffles.out
 	}
 	annovar_sv_bed = (target == "yes") ? phen2_gene_bed : target
-	ANNOVAR_SV(sv_vcf,out_prefix,Phen2gene.out,annovar_sv_bed)
+	ANNOVAR_SV(sv_vcf,out_prefix,Phen2gene.out,annovar_sv_bed,"called")
 	SURVIVOR(ANNOVAR_SV.out,out_prefix)
 	PhenoSV(SURVIVOR.out,out_prefix,hpo)
 	NanoRepeat(bam,out_prefix,ref_fa)

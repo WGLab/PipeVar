@@ -151,35 +151,35 @@ nextflow run main.nf \
   --out_prefix sample1_ont
 ```
 
-## SCRAMBLE mobile-element analysis
+## xTEA mobile-element analysis
 
-PipeVar_mito also supports an opt-in SCRAMBLE branch for nuclear short-read SV/MEI analysis:
+PipeVar_mito also supports an opt-in xTEA branch for nuclear short-read SV/MEI analysis:
 
-- enable with `--scramble yes`
+- enable with `--xtea yes`
 - supported only with `--type short`
 - supported only with BAM/CRAM input, not VCF-only mode
 - supported with `--mode sv` or when `--mode` is omitted
 - executed per sample in both single-sample and CSV batch BAM/CRAM modes
 
-PipeVar runs SCRAMBLE as one internal short-read subworkflow step that performs:
+PipeVar runs xTEA as one internal short-read subworkflow step that performs:
 
-- soft-clipped cluster identification
-- cluster analysis into MEI/deletion outputs
+- xTEA input-list generation
+- local xTEA execution and VCF normalization
 
-The shared SCRAMBLE image is expected to provide:
+The shared xTEA image is expected to provide:
 
-- `cluster_identifier`
-- `cluster_analysis/bin/SCRAMble.R`
-- `cluster_analysis/resources/MEI_consensus_seqs.fa`
+- the `xtea` command
+- xTEA Python scripts under `/opt/xTea/xtea`
+- the decompressed repeat library under `/opt/xtea/rep_lib_annotation`
+- the GENCODE GFF3 annotation at `/opt/xtea/gencode.gff3`
 
 Important notes:
 
-- SCRAMBLE is intended for short-read WGS MEI discovery/genotyping.
+- xTEA is intended for short-read WGS MEI discovery/genotyping.
 - BAM and CRAM must be indexed.
 - CRAM runs require the matching reference FASTA.
-- PipeVar now builds the reference BLAST database SCRAMBLE needs from `--ref_fa`, so users do not need to prepare `.nhr/.nin/.nsq` sidecar files ahead of time.
-- SCRAMBLE CRAM support remains provisional because upstream `cluster_identifier` reference resolution still needs dedicated validation.
-- SCRAMBLE download/build is handled outside this repo; the shared image should already contain the bundled assets.
+- xTEA repeat and gene-annotation resources are baked into the shared image, not supplied as runtime parameters.
+- xTEA download/build is handled outside this repo; the shared image should already contain the bundled assets.
 
 ## Input modes
 
@@ -266,7 +266,7 @@ Expected CSV columns:
 - `--genome <hg38|grch38>`: genome build for default ExpansionHunter catalog selection
 - `--expansionhunter_variant_catalog <FILE>`: optional ExpansionHunter catalog override for short-read BAM/CRAM workflows
 - `--target <yes|no>`: restrict SNP calling to phenotype-derived gene BED
-- `--scramble <yes|no>`: enable SCRAMBLE MEI calling in short-read SV/all-NGS BAM/CRAM paths (default: `no`)
+- `--xtea <yes|no>`: enable xTEA MEI calling in short-read SV/all-NGS BAM/CRAM paths (default: `no`)
 - `--cnvpytor <yes|no>`: enable experimental CNVpytor calling in long-read SV/all-longphase BAM/CRAM paths (default: `no`)
 - `--cnvpytor_baf <yes|no>`: allow CNVpytor to use long-read SNP/BAF support in full long-read mode when SNP calls exist (default: `yes`)
 - `--cnvpytor_bin_sizes <STRING>`: space-separated CNVpytor bin sizes (default: `100000`)
@@ -371,7 +371,7 @@ nextflow run main.nf \
   --light yes
 ```
 
-### Single-sample short-read SV analysis with SCRAMBLE
+### Single-sample short-read SV analysis with xTEA
 
 ```bash
 nextflow run main.nf \
@@ -382,7 +382,7 @@ nextflow run main.nf \
   --out_prefix p2_sv \
   --type short \
   --mode sv \
-  --scramble yes
+  --xtea yes
 ```
 
 ### Single-sample VCF SNP re-annotation/prioritization
@@ -410,7 +410,7 @@ nextflow run main.nf \
   --type short
 ```
 
-### CSV batch short-read SV mode with SCRAMBLE
+### CSV batch short-read SV mode with xTEA
 
 ```bash
 nextflow run main.nf \
@@ -421,7 +421,7 @@ nextflow run main.nf \
   --ref_fa /refs/hg38.fa \
   --type short \
   --mode sv \
-  --scramble yes
+  --xtea yes
 ```
 
 ### CSV batch VCF mode (SV only)
@@ -461,7 +461,7 @@ Exact files depend on `--mode`, `--type`, and input type.
 
 - short-read SV:
   - `*_manta.vcf`
-  - `*_scramble.vcf` when `--scramble yes`
+  - `*_xtea.vcf` when `--xtea yes`
   - `*.shortread_sv.merged.vcf` when multiple short-read SV/MEI callers are merged
 - long-read SV:
   - `*.sniffles.vcf.gz`

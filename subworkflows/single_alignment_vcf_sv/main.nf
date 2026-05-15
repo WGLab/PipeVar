@@ -38,7 +38,7 @@ workflow SINGLE_ALIGNMENT_VCF_SV {
 		else {
 			annovar_sv_bed = target
 		}
-		ANNOVAR_SV(vcf,out_prefix,Phen2gene.out,annovar_sv_bed)
+		ANNOVAR_SV(vcf,out_prefix,Phen2gene.out,annovar_sv_bed,"called")
 		SURVIVOR(ANNOVAR_SV.out,out_prefix)
 		PhenoSV(SURVIVOR.out,out_prefix,hpo)
 		sv_prio(out_prefix,PhenoSV.out,ANNOVAR_SV.out,hpo,inheritance_mode,include_clinvar_report,allow_unphased_comphet)

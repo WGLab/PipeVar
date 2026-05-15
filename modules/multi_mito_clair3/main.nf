@@ -18,7 +18,7 @@ process multi_mito_clair3 {
 	conda activate clair3
 
 	MITO_CONTIG="${mito_contig}"
-	if ! samtools idxstats "$bam" | cut -f1 | grep -qx "$MITO_CONTIG"; then
+	if ! samtools idxstats "$bam" | cut -f1 | grep -qx "\$MITO_CONTIG"; then
 	    if samtools idxstats "$bam" | cut -f1 | grep -qx "MT"; then
 	        MITO_CONTIG="MT"
 	    elif samtools idxstats "$bam" | cut -f1 | grep -qx "chrM"; then
@@ -44,7 +44,7 @@ process multi_mito_clair3 {
 	    --threads="${task.cpus}" \\
 	    $args \\
 	    --output="${out_prefix}_mito_clair3" \\
-	    --ctg_name="$MITO_CONTIG" \\
+	    --ctg_name="\$MITO_CONTIG" \\
 	    --haploid_sensitive \\
 	    --snp_min_af=0.01 \\
 	    --indel_min_af=0.05 \\

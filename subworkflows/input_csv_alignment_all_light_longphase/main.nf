@@ -65,10 +65,10 @@ workflow INPUT_CSV_ALIGNMENT_ALL_LIGHT_LONGPHASE {
 	rankvar_result=multi_rankvar(join_annovar_hpo,gnomad,gq,ad,rankvar_filter)
 	sniffles_result=multi_sniffles(input_bam_with_bam,ref_fa)
         if ( target == "yes" ) {
-	        sniffles_result_annovar=sniffles_result.join(phen2gene_result).join(phen2_gene_bed).map { out_prefix, vcf_file, phen2gene_file, bed_file -> tuple(out_prefix, vcf_file, phen2gene_file, bed_file) }
+	        sniffles_result_annovar=sniffles_result.join(phen2gene_result).join(phen2_gene_bed).map { out_prefix, vcf_file, phen2gene_file, bed_file -> tuple(out_prefix, vcf_file, phen2gene_file, bed_file, "called") }
         }
         else {
-	        sniffles_result_annovar=sniffles_result.join(phen2gene_result).map { out_prefix, vcf_file, phen2gene_file -> tuple(out_prefix, vcf_file, phen2gene_file, target) }
+	        sniffles_result_annovar=sniffles_result.join(phen2gene_result).map { out_prefix, vcf_file, phen2gene_file -> tuple(out_prefix, vcf_file, phen2gene_file, target, "called") }
         }
 	annovar_sv_result=multi_annovar_sv(sniffles_result_annovar)
 	survivor_result=multi_survivor(annovar_sv_result)

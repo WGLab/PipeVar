@@ -43,7 +43,7 @@ workflow INPUT_CSV_ALIGNMENT_LONG_SV {
 	else {
 		sv_result=sniffles_result
 	}
-	sniffles_result_annovar=sv_result.join(phen2gene_result).map { out_prefix, vcf_file, phen2gene_file -> tuple(out_prefix, vcf_file, phen2gene_file, "null") }
+	sniffles_result_annovar=sv_result.join(phen2gene_result).map { out_prefix, vcf_file, phen2gene_file -> tuple(out_prefix, vcf_file, phen2gene_file, "null", "called") }
 	annovar_sv_result=multi_annovar_sv(sniffles_result_annovar)
 	survivor_result=multi_survivor(annovar_sv_result)
 	phenosv_input=survivor_result.join(input_bam_no_bam)
