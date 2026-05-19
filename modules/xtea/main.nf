@@ -17,6 +17,8 @@ process xtea {
 	def gencode = task.ext.gencode_gff3 ?: '/opt/xtea/gencode.gff3'
 	def xteaScripts = task.ext.xtea_scripts ?: '/opt/xTea/xtea'
 	def xteaCmd = task.ext.xtea_cmd ?: 'xtea'
+	def bamDotIndex = bam.name.endsWith('.cram') ? "${bam.name}.crai" : "${bam.name}.bai"
+	def bamBaseIndex = bam.name.endsWith('.cram') ? bam.name.replaceFirst(/\.cram$/, '.crai') : bam.name.replaceFirst(/\.bam$/, '.bai')
 	"""
 	set -euo pipefail
 
@@ -37,18 +39,17 @@ process xtea {
 	fi
 
 	if [[ "$bam" == *.cram ]]; then
-	    [[ "$index" == "${bam}.crai" ]] || ln -sf "$index" "${bam}.crai"
-	    cram_index="\${bam%.cram}.crai"
-	    [[ "$index" == "\$cram_index" ]] || ln -sf "$index" "\$cram_index"
+	    [[ "$index" == "${bamDotIndex}" ]] || ln -sf "$index" "${bamDotIndex}"
+	    [[ "$index" == "${bamBaseIndex}" ]] || ln -sf "$index" "${bamBaseIndex}"
 	else
-	    [[ "$index" == "${bam}.bai" ]] || ln -sf "$index" "${bam}.bai"
-	    bam_index="\${bam%.bam}.bai"
-	    [[ "$index" == "\$bam_index" ]] || ln -sf "$index" "\$bam_index"
+	    [[ "$index" == "${bamDotIndex}" ]] || ln -sf "$index" "${bamDotIndex}"
+	    [[ "$index" == "${bamBaseIndex}" ]] || ln -sf "$index" "${bamBaseIndex}"
 	fi
 
 	printf '%s\\n' "${meta.id}" > sample_id.txt
 	printf '%s\\t%s\\n' "${meta.id}" "$bam" > illumina_bam_list.txt
 
+	set +u
 	${xteaCmd} \\
 	    -i sample_id.txt \\
 	    -b illumina_bam_list.txt \\
@@ -67,13 +68,16 @@ process xtea {
 	    -n ${task.cpus} \\
 	    -m 25 \\
 	    $args
+	set -u
 
 	run_script=\$(find "\$XTEA_WORK" -type f -name 'run_xTea_pipeline.sh' | sort | head -n 1)
 	if [[ -z "\$run_script" ]]; then
 	    echo "xTEA did not generate run_xTea_pipeline.sh under \$XTEA_WORK" >&2
 	    exit 1
 	fi
-	sh "\$run_script"
+	set +u
+	bash "\$run_script"
+	set -u
 
 	xtea_vcf=\$(find "\$XTEA_WORK" -type f \\( -name '*.vcf' -o -name '*.gvcf' -o -name '*.vcf.gz' -o -name '*.gvcf.gz' \\) | sort | head -n 1)
 	if [[ -n "\$xtea_vcf" ]]; then
@@ -100,7 +104,7 @@ process xtea {
 
 	cat <<-END_VERSIONS > versions.yml
 	"${task.process}":
-	  xtea: "\$(${xteaCmd} --help 2>&1 | head -n 1 | sed 's/:$//' || true)"
+	  xtea: "unknown"
 	END_VERSIONS
 	"""
 

@@ -33,7 +33,7 @@ process multi_mito_clair3 {
 	    fi
 	fi
 
-	if ! grep -Eq "^>\${MITO_CONTIG}([[:space:]]|$)" "$ref_fa"; then
+	if ! grep -Eq "^>\${MITO_CONTIG}([[:space:]]|\$)" "$ref_fa"; then
 	    echo "Mitochondrial contig \${MITO_CONTIG} not found in $ref_fa" >&2
 	    exit 1
 	fi
