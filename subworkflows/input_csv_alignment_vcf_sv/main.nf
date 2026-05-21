@@ -1,5 +1,6 @@
 
 include { multi_annovar_sv } from '../../modules/multi_annovar_sv/'
+include { multi_common_sv_filter } from '../../modules/multi_common_sv_filter/'
 include { multi_survivor } from '../../modules/multi_survivor/'
 include { multi_phenosv } from '../../modules/multi_phenosv/'
 include { multi_phen2gene } from '../../modules/multi_phen2gene/'
@@ -38,10 +39,15 @@ workflow INPUT_CSV_ALIGNMENT_VCF_SV {
 	        sv_result_annovar=input_vcf.join(phen2gene_result).map { out_prefix, vcf_file, phen2gene_file -> tuple(out_prefix, vcf_file, phen2gene_file, target, "called") }
         }
 	annovar_sv_result=multi_annovar_sv(sv_result_annovar)
-        survivor_result=multi_survivor(annovar_sv_result)
+	annovar_sv_for_downstream = annovar_sv_result
+	if ( params.common_sv_filter.toString().trim().toLowerCase() == "yes" ) {
+		multi_common_sv_filter(annovar_sv_result)
+		annovar_sv_for_downstream = multi_common_sv_filter.out.filtered_vcf
+	}
+        survivor_result=multi_survivor(annovar_sv_for_downstream)
         phenosv_input=survivor_result.join(input_vcf_no_vcf)
         phenosv_result=multi_phenosv(phenosv_input)
-	sv_prio_input=phenosv_result.join(annovar_sv_result)
+	sv_prio_input=phenosv_result.join(annovar_sv_for_downstream)
 	input_vcf_hpo_age=input_vcf_no_vcf.join(input_age).map { out_prefix, hpo_path, age_of_onset -> tuple(out_prefix, hpo_path, age_of_onset) }
 	sv_prio_input_hpo=sv_prio_input.join(input_vcf_hpo_age)
 	multi_sv_prio(sv_prio_input_hpo,inheritance_mode,include_clinvar_report,allow_unphased_comphet)

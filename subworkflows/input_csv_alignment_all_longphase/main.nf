@@ -3,6 +3,7 @@ include { multi_annovar } from '../../modules/multi_annovar/'
 include { multi_phen2gene } from '../../modules/multi_phen2gene/'
 include { multi_rankscore } from '../../modules/multi_rankscore/'
 include { multi_annovar_sv } from '../../modules/multi_annovar_sv/'
+include { multi_common_sv_filter } from '../../modules/multi_common_sv_filter/'
 include { multi_survivor } from '../../modules/multi_survivor/'
 include { multi_phenosv } from '../../modules/multi_phenosv/'
 include { multi_rankvar } from '../../modules/multi_rankvar/'
@@ -108,12 +109,17 @@ workflow INPUT_CSV_ALIGNMENT_ALL_LONGPHASE {
 	        sniffles_result_annovar=sv_result.join(phen2gene_result).map { out_prefix, vcf_file, phen2gene_file -> tuple(out_prefix, vcf_file, phen2gene_file, target, "called") }
         }
 	annovar_sv_result=multi_annovar_sv(sniffles_result_annovar)
-	survivor_result=multi_survivor(annovar_sv_result)
+	annovar_sv_for_downstream = annovar_sv_result
+	if ( params.common_sv_filter.toString().trim().toLowerCase() == "yes" ) {
+		multi_common_sv_filter(annovar_sv_result)
+		annovar_sv_for_downstream = multi_common_sv_filter.out.filtered_vcf
+	}
+	survivor_result=multi_survivor(annovar_sv_for_downstream)
 	phenosv_input=survivor_result.join(input_bam_no_bam)
 	phenosv_result=multi_phenosv(phenosv_input)
 	multi_nanorepeat(input_bam_with_bam,ref_fa)
 	annovar_join=annovar_result.map { item -> tuple(item[0], item[2]) }
-	annovar_sv_join=annovar_sv_result.map { item -> tuple(item[0], item[1]) }
+	annovar_sv_join=annovar_sv_for_downstream.map { item -> tuple(item[0], item[1]) }
 	join_vcf_bam=annovar_join.join(input_bam_with_bam)
 	join_vcf_bam_sv=annovar_sv_join.join(join_vcf_bam)
 	join_vcf_bam_phenosv=phenosv_result.join(join_vcf_bam_sv)

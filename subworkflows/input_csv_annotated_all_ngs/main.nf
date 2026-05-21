@@ -6,6 +6,7 @@ include { multi_eh_filter } from '../../modules/multi_eh_filter/'
 include { multi_phenotagger } from '../../modules/multi_phenotagger/'
 include { multi_ngs_prio } from '../../modules/multi_ngs_prio/'
 include { multi_annovar_sv } from '../../modules/multi_annovar_sv/'
+include { multi_common_sv_filter } from '../../modules/multi_common_sv_filter/'
 include { multi_survivor } from '../../modules/multi_survivor/'
 include { multi_phenosv } from '../../modules/multi_phenosv/'
 include { validate_preannotated_annovar_pair } from '../../modules/validate_preannotated_annovar_pair/'
@@ -72,13 +73,18 @@ workflow INPUT_CSV_ANNOTATED_ALL_NGS {
 		tuple(out_prefix, vcf_file, phen2gene_file, "null", "preannotated")
 	}
 	annovar_sv_result = multi_annovar_sv(sv_result_annovar)
-	survivor_result = multi_survivor(annovar_sv_result)
+	annovar_sv_for_downstream = annovar_sv_result
+	if ( params.common_sv_filter.toString().trim().toLowerCase() == "yes" ) {
+		multi_common_sv_filter(annovar_sv_result)
+		annovar_sv_for_downstream = multi_common_sv_filter.out.filtered_vcf
+	}
+	survivor_result = multi_survivor(annovar_sv_for_downstream)
 	phenosv_input = survivor_result.join(hpo_paths)
 	phenosv_result = multi_phenosv(phenosv_input)
 
 	validated_annovar_vcf = validated_annovar.map { out_prefix, annovar_txt, annovar_vcf -> tuple(out_prefix, annovar_vcf) }
 	phenosv_annovar_snv = phenosv_result.join(validated_annovar_vcf)
-	sv_join = phenosv_annovar_snv.join(annovar_sv_result)
+	sv_join = phenosv_annovar_snv.join(annovar_sv_for_downstream)
 	rankscore_join = sv_join.join(rankscore_result)
 	rankvar_join = rankscore_join.join(rankvar_result)
 	hpo_with_age = hpo_paths.join(input_age).map { out_prefix, hpo_path, age_of_onset -> tuple(out_prefix, hpo_path, age_of_onset) }

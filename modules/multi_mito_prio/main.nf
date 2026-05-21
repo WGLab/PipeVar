@@ -1,5 +1,5 @@
 process multi_mito_prio {
-	container = 'beoungl/docker_test:mito_annotation_0.3'
+	container = 'beoungl/docker_test:mito_annotation_0.4.1'
 
 	input:
 	tuple val(out_prefix), path(annotated_tsv), path(annotated_vcf), path(annotated_tbi)

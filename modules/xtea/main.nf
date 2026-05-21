@@ -1,6 +1,6 @@
 // Single-sample xTEA wrapper for short-read mobile-element insertion calling.
 process xtea {
-	container = 'beoungl/docker_test:xTea'
+	container = 'beoungl/docker_test:xtea'
 
 	input:
 	tuple val(meta), path(bam), path(index)
@@ -22,8 +22,42 @@ process xtea {
 	"""
 	set -euo pipefail
 
-	XTEA_WORK="${meta.id}_xtea_work"
+	TASK_DIR="\$PWD"
+	XTEA_WORK="\$TASK_DIR/${meta.id}_xtea_work"
+	BAM_ABS="\$TASK_DIR/$bam"
+	INDEX_ABS="\$TASK_DIR/$index"
+	REF_ABS="\$TASK_DIR/$ref_fa"
+	FA_INDEX_ABS="\$TASK_DIR/$fa_index"
 	mkdir -p "\$XTEA_WORK"
+
+	check_readable() {
+	    local label="\$1"
+	    local file_path="\$2"
+	    if [[ ! -r "\$file_path" ]]; then
+	        echo "xTEA input not readable: \${label} at \${file_path}" >&2
+	        exit 1
+	    fi
+	}
+
+	dump_xtea_context() {
+	    echo "xTEA diagnostic context:" >&2
+	    echo "  PWD=\$PWD" >&2
+	    echo "  TASK_DIR=\$TASK_DIR" >&2
+	    echo "  XTEA_WORK=\$XTEA_WORK" >&2
+	    if [[ -e submit_jobs.sh ]]; then
+	        echo "  submit_jobs.sh=present" >&2
+	    else
+	        echo "  submit_jobs.sh=absent" >&2
+	    fi
+	    echo "  TASK_DIR listing:" >&2
+	    find "\$TASK_DIR" -maxdepth 2 -mindepth 1 -printf '    %p\\n' 2>/dev/null | sort | head -n 80 >&2 || true
+	    echo "  XTEA_WORK listing:" >&2
+	    find "\$XTEA_WORK" -maxdepth 4 -mindepth 1 -printf '    %p\\n' 2>/dev/null | sort | head -n 120 >&2 || true
+	    if [[ -s xtea.generate.log ]]; then
+	        echo "  xtea.generate.log tail:" >&2
+	        tail -n 80 xtea.generate.log >&2
+	    fi
+	}
 
 	if [[ ! -d "${repLib}" ]]; then
 	    echo "xTEA repeat library directory not found at ${repLib}" >&2
@@ -39,25 +73,30 @@ process xtea {
 	fi
 
 	if [[ "$bam" == *.cram ]]; then
-	    [[ "$index" == "${bamDotIndex}" ]] || ln -sf "$index" "${bamDotIndex}"
-	    [[ "$index" == "${bamBaseIndex}" ]] || ln -sf "$index" "${bamBaseIndex}"
+	    [[ "$index" == "${bamDotIndex}" ]] || ln -sf "\$INDEX_ABS" "${bamDotIndex}"
+	    [[ "$index" == "${bamBaseIndex}" ]] || ln -sf "\$INDEX_ABS" "${bamBaseIndex}"
 	else
-	    [[ "$index" == "${bamDotIndex}" ]] || ln -sf "$index" "${bamDotIndex}"
-	    [[ "$index" == "${bamBaseIndex}" ]] || ln -sf "$index" "${bamBaseIndex}"
+	    [[ "$index" == "${bamDotIndex}" ]] || ln -sf "\$INDEX_ABS" "${bamDotIndex}"
+	    [[ "$index" == "${bamBaseIndex}" ]] || ln -sf "\$INDEX_ABS" "${bamBaseIndex}"
 	fi
 
+	check_readable "BAM/CRAM" "\$BAM_ABS"
+	check_readable "BAM/CRAM index" "\$INDEX_ABS"
+	check_readable "reference FASTA" "\$REF_ABS"
+	check_readable "reference FASTA index" "\$FA_INDEX_ABS"
+
 	printf '%s\\n' "${meta.id}" > sample_id.txt
-	printf '%s\\t%s\\n' "${meta.id}" "$bam" > illumina_bam_list.txt
+	printf '%s\\t%s\\n' "${meta.id}" "\$BAM_ABS" > illumina_bam_list.txt
 
 	set +u
-	${xteaCmd} \\
+	if ! ${xteaCmd} \\
 	    -i sample_id.txt \\
 	    -b illumina_bam_list.txt \\
 	    -x null \\
 	    -p "\$XTEA_WORK" \\
 	    -o submit_jobs.sh \\
 	    -l "${repLib}" \\
-	    -r "$ref_fa" \\
+	    -r "\$REF_ABS" \\
 	    -g "${gencode}" \\
 	    --xtea "${xteaScripts}" \\
 	    -f 5907 \\
@@ -67,16 +106,37 @@ process xtea {
 	    -q local \\
 	    -n ${task.cpus} \\
 	    -m 25 \\
-	    $args
+	    $args > xtea.generate.log 2>&1
+	then
+	    set -u
+	    echo "xTEA command failed while generating run_xTea_pipeline.sh" >&2
+	    dump_xtea_context
+	    exit 1
+	fi
 	set -u
 
-	run_script=\$(find "\$XTEA_WORK" -type f -name 'run_xTea_pipeline.sh' | sort | head -n 1)
+	run_script=\$(
+	    {
+	        find "\$XTEA_WORK" -type f -name 'run_xTea_pipeline.sh' 2>/dev/null
+	        find "\$TASK_DIR" -type f -name 'run_xTea_pipeline.sh' 2>/dev/null
+	    } | sort -u | head -n 1
+	)
 	if [[ -z "\$run_script" ]]; then
-	    echo "xTEA did not generate run_xTea_pipeline.sh under \$XTEA_WORK" >&2
+	    echo "xTEA did not generate run_xTea_pipeline.sh under \$XTEA_WORK or \$TASK_DIR" >&2
+	    dump_xtea_context
 	    exit 1
 	fi
 	set +u
-	bash "\$run_script"
+	if ! bash "\$run_script" > xtea.run.log 2>&1; then
+	    set -u
+	    echo "xTEA generated run script failed: \$run_script" >&2
+	    dump_xtea_context
+	    if [[ -s xtea.run.log ]]; then
+	        echo "  xtea.run.log tail:" >&2
+	        tail -n 80 xtea.run.log >&2
+	    fi
+	    exit 1
+	fi
 	set -u
 
 	xtea_vcf=\$(find "\$XTEA_WORK" -type f \\( -name '*.vcf' -o -name '*.gvcf' -o -name '*.vcf.gz' -o -name '*.gvcf.gz' \\) | sort | head -n 1)

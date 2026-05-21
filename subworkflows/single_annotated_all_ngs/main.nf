@@ -8,6 +8,7 @@ include { Rankscore_analysis } from '../../modules/rankscore_analysis/'
 include { phenotagger } from '../../modules/phenotagger/'
 include { eh_filter } from '../../modules/eh_filter/'
 include { ngs_prio } from '../../modules/ngs_prio/'
+include { common_sv_filter } from '../../modules/common_sv_filter/'
 include { validate_preannotated_annovar_pair } from '../../modules/validate_preannotated_annovar_pair/'
 include { mito_prep_mutect2 } from '../../modules/mito_prep_mutect2/'
 include { mito_mutect2 } from '../../modules/mito_mutect2/'
@@ -62,11 +63,16 @@ workflow SINGLE_ANNOTATED_ALL_NGS {
 	rankscore_result = Rankscore_analysis(validated_annovar_txt, Phen2gene.out, out_prefix, gnomad, rankscore_filter, rankscore_softwares, gq, phen2gene_top_n)
 
 	ANNOVAR_SV(annovar_sv_vcf, out_prefix, Phen2gene.out, "null", "preannotated")
-	SURVIVOR(ANNOVAR_SV.out, out_prefix)
+	annovar_sv_for_downstream = ANNOVAR_SV.out
+	if ( params.common_sv_filter.toString().trim().toLowerCase() == "yes" ) {
+		common_sv_filter(ANNOVAR_SV.out, out_prefix)
+		annovar_sv_for_downstream = common_sv_filter.out.filtered_vcf
+	}
+	SURVIVOR(annovar_sv_for_downstream, out_prefix)
 	PhenoSV(SURVIVOR.out, out_prefix, hpo)
 	ExpansionHunter(bam, out_prefix, eh_ref_fa, eh_variant_catalog)
 	eh_filter(out_prefix, ExpansionHunter.out)
-	ngs_prio(out_prefix, RankVar.out, rankscore_result.out.rankscore, rankscore_result.out.clinvar, PhenoSV.out, ANNOVAR_SV.out, validated_annovar_vcf, hpo, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
+	ngs_prio(out_prefix, RankVar.out, rankscore_result.out.rankscore, rankscore_result.out.clinvar, PhenoSV.out, annovar_sv_for_downstream, validated_annovar_vcf, hpo, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 
 	if ( mito_ref_fa != null ) {
 		mutect2_ref_fa = mito_ref_fa.map { fa_file, fai_file, dict_file, bwa_amb, bwa_ann, bwa_bwt, bwa_pac, bwa_sa ->

@@ -8,6 +8,7 @@ include { PhenoSV } from '../../modules/phenosv/'
 include { Phen2gene } from '../../modules/phen2gene/'
 include { NanoRepeat } from '../../modules/nanorepeat/'
 include { ANNOVAR_SV } from '../../modules/annovar_sv/'
+include { common_sv_filter } from '../../modules/common_sv_filter/'
 include { phenotagger } from '../../modules/phenotagger/'
 include { sv_prio } from '../../modules/sv_prio/'
 
@@ -47,8 +48,13 @@ workflow SINGLE_ALIGNMENT_LONG_SV {
 		sv_vcf = sniffles.out
 	}
 	ANNOVAR_SV(sv_vcf,out_prefix,Phen2gene.out,"null","called")
-	SURVIVOR(ANNOVAR_SV.out,out_prefix)
+	annovar_sv_for_downstream = ANNOVAR_SV.out
+	if ( params.common_sv_filter.toString().trim().toLowerCase() == "yes" ) {
+		common_sv_filter(ANNOVAR_SV.out,out_prefix)
+		annovar_sv_for_downstream = common_sv_filter.out.filtered_vcf
+	}
+	SURVIVOR(annovar_sv_for_downstream,out_prefix)
 	PhenoSV(SURVIVOR.out,out_prefix,hpo)
 	NanoRepeat(bam,out_prefix,ref_fa)
-	sv_prio(out_prefix,PhenoSV.out,ANNOVAR_SV.out,hpo,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
+	sv_prio(out_prefix,PhenoSV.out,annovar_sv_for_downstream,hpo,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
 }

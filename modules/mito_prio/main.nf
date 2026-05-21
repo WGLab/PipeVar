@@ -1,5 +1,5 @@
 process mito_prio {
-	container = 'beoungl/docker_test:mito_annotation_0.3'
+	container = 'beoungl/docker_test:mito_annotation_0.4.1'
 
 	input:
 	path annotated_tsv

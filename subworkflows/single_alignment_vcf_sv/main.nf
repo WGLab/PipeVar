@@ -4,6 +4,7 @@ include { SURVIVOR } from '../../modules/survivor/'
 include { PhenoSV } from '../../modules/phenosv/'
 include { Phen2gene } from '../../modules/phen2gene/'
 include { ANNOVAR_SV } from '../../modules/annovar_sv/'
+include { common_sv_filter } from '../../modules/common_sv_filter/'
 include { phenotagger } from '../../modules/phenotagger/'
 include { phen2gene_filter } from '../../modules/reduce_region_phen2gene/'
 include { sv_prio } from '../../modules/sv_prio/'
@@ -39,7 +40,12 @@ workflow SINGLE_ALIGNMENT_VCF_SV {
 			annovar_sv_bed = target
 		}
 		ANNOVAR_SV(vcf,out_prefix,Phen2gene.out,annovar_sv_bed,"called")
-		SURVIVOR(ANNOVAR_SV.out,out_prefix)
+		annovar_sv_for_downstream = ANNOVAR_SV.out
+		if ( params.common_sv_filter.toString().trim().toLowerCase() == "yes" ) {
+			common_sv_filter(ANNOVAR_SV.out,out_prefix)
+			annovar_sv_for_downstream = common_sv_filter.out.filtered_vcf
+		}
+		SURVIVOR(annovar_sv_for_downstream,out_prefix)
 		PhenoSV(SURVIVOR.out,out_prefix,hpo)
-		sv_prio(out_prefix,PhenoSV.out,ANNOVAR_SV.out,hpo,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
+		sv_prio(out_prefix,PhenoSV.out,annovar_sv_for_downstream,hpo,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
 }

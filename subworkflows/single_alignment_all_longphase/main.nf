@@ -12,6 +12,7 @@ include { Phen2gene } from '../../modules/phen2gene/'
 include { RankVar } from '../../modules/rankvar/'
 include { NanoRepeat } from '../../modules/nanorepeat/'
 include { ANNOVAR_SV } from '../../modules/annovar_sv/'
+include { common_sv_filter } from '../../modules/common_sv_filter/'
 include { Rankscore_analysis } from '../../modules/rankscore_analysis/'
 include { phenotagger } from '../../modules/phenotagger/'
 include { longphase } from '../../modules/longphase/'
@@ -88,10 +89,15 @@ workflow SINGLE_ALIGNMENT_ALL_LONGPHASE {
 	}
 	annovar_sv_bed = (target == "yes") ? phen2_gene_bed : target
 	ANNOVAR_SV(sv_vcf,out_prefix,Phen2gene.out,annovar_sv_bed,"called")
-	SURVIVOR(ANNOVAR_SV.out,out_prefix)
+	annovar_sv_for_downstream = ANNOVAR_SV.out
+	if ( params.common_sv_filter.toString().trim().toLowerCase() == "yes" ) {
+		common_sv_filter(ANNOVAR_SV.out,out_prefix)
+		annovar_sv_for_downstream = common_sv_filter.out.filtered_vcf
+	}
+	SURVIVOR(annovar_sv_for_downstream,out_prefix)
 	PhenoSV(SURVIVOR.out,out_prefix,hpo)
 	NanoRepeat(bam,out_prefix,ref_fa)
-	longphase(bam,ANNOVAR.out.vcf_output,ANNOVAR_SV.out,PhenoSV.out,rankscore_result.rankscore,rankscore_result.clinvar,RankVar.out,hpo,out_prefix,ref_fa,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
+	longphase(bam,ANNOVAR.out.vcf_output,annovar_sv_for_downstream,PhenoSV.out,rankscore_result.rankscore,rankscore_result.clinvar,RankVar.out,hpo,out_prefix,ref_fa,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
 	if ( mito_mode == "yes" ) {
 		variant_html_report_with_mito(out_prefix, longphase.out[0], longphase.out[1], NanoRepeat.out, mito_tsv)
 	}

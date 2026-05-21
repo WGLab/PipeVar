@@ -1,0 +1,8 @@
+##fileformat=VCFv4.2
+##contig=<ID=chr1,length=1000000>
+##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Structural variant type">
+##INFO=<ID=END,Number=1,Type=Integer,Description="End coordinate">
+##INFO=<ID=SVLEN,Number=1,Type=Integer,Description="Structural variant length">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO
+chr1	1050	.	N	<DEL>	50	PASS	SVTYPE=DEL;END=2050;SVLEN=-1000
+chr1	8000	cnvnator_dup_1	N	<DUP>	40	PASS	SVTYPE=DUP;END=9200;SVLEN=1200

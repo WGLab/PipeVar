@@ -132,6 +132,17 @@ FILTERING OPTIONS
   --rankscore_softwares <CSV> Comma-separated RankScore software list. Default: all
   --rankvar <FLOAT>        Minimum RankVar score cutoff. Default: 0.05
   --phenosv_score <FLOAT>  Minimum PhenoSV score cutoff. Default: 0.50
+  --common_sv_filter <yes|no>
+                           Remove common SVs before PhenoSV and final SV prioritization. Default: no
+  --common_sv_af <FLOAT>   Minimum AF used to treat baked common SV database records as common. Default: 0.01
+  --common_sv_reciprocal_overlap <FLOAT>
+                           Minimum reciprocal overlap for interval SV common matching. Default: 0.5
+  --common_sv_distance <INT>
+                           Breakpoint fallback distance for interval SV common matching. Default: 1000
+  --common_sv_ins_distance <INT>
+                           Insertion position window for common matching. Default: 500
+  --common_sv_ins_identity <FLOAT>
+                           Insertion sequence identity threshold when inserted sequence is available. Default: 0.8
   --gq <INT>               Minimum genotype quality. Default: 20
   --ad <INT>               Minimum allele depth. Default: 15
   --phen2gene_filter <INT> Number of top Phen2Gene genes used for targeted mode. Default: 500
@@ -269,6 +280,7 @@ def clean_inheritance_mode = params.inheritance_mode ? params.inheritance_mode.t
 def clean_include_clinvar_report = params.include_clinvar_report ? params.include_clinvar_report.trim().toLowerCase() : 'yes'
 def clean_allow_unphased_comphet = params.allow_unphased_comphet ? params.allow_unphased_comphet.trim().toLowerCase() : 'no'
 def clean_prioritize_sv_only = params.prioritize_sv_only ? params.prioritize_sv_only.toString().trim().toLowerCase() : 'no'
+def clean_common_sv_filter = params.common_sv_filter ? params.common_sv_filter.toString().trim().toLowerCase() : 'no'
 def clean_rankscore_softwares = params.rankscore_softwares ? params.rankscore_softwares.toString().trim() : ""
 def clean_gene_filter = params.gene ? params.gene.toString().trim() : ""
 if (clean_gene_filter) {
@@ -816,6 +828,20 @@ if (!valid_yes_no.contains(clean_prioritize_sv_only)) {
     """
 }
 
+if (!valid_yes_no.contains(clean_common_sv_filter)) {
+    error """
+    ================================================================
+    ERROR: Invalid Common SV Filter Toggle
+    ================================================================
+    You provided: --common_sv_filter "${params.common_sv_filter}"
+
+    Valid options are:
+      --common_sv_filter yes
+      --common_sv_filter no
+    ================================================================
+    """
+}
+
 if (!(params.phenosv_score.toString() ==~ /([0-9]+([.][0-9]+)?|[.][0-9]+)/)) {
     error """
     ================================================================
@@ -827,6 +853,26 @@ if (!(params.phenosv_score.toString() ==~ /([0-9]+([.][0-9]+)?|[.][0-9]+)/)) {
       --phenosv_score 0.50
     ================================================================
     """
+}
+
+if (!(params.common_sv_af.toString() ==~ /([0-9]+([.][0-9]+)?|[.][0-9]+)/)) {
+    error "ERROR: Invalid --common_sv_af '${params.common_sv_af}'. Provide a numeric threshold, for example 0.01."
+}
+
+if (!(params.common_sv_reciprocal_overlap.toString() ==~ /([0-9]+([.][0-9]+)?|[.][0-9]+)/)) {
+    error "ERROR: Invalid --common_sv_reciprocal_overlap '${params.common_sv_reciprocal_overlap}'. Provide a numeric threshold, for example 0.5."
+}
+
+if (!(params.common_sv_distance.toString() ==~ /[0-9]+/)) {
+    error "ERROR: Invalid --common_sv_distance '${params.common_sv_distance}'. Provide an integer distance, for example 1000."
+}
+
+if (!(params.common_sv_ins_distance.toString() ==~ /[0-9]+/)) {
+    error "ERROR: Invalid --common_sv_ins_distance '${params.common_sv_ins_distance}'. Provide an integer distance, for example 500."
+}
+
+if (!(params.common_sv_ins_identity.toString() ==~ /([0-9]+([.][0-9]+)?|[.][0-9]+)/)) {
+    error "ERROR: Invalid --common_sv_ins_identity '${params.common_sv_ins_identity}'. Provide a numeric threshold, for example 0.8."
 }
 
 if (clean_rankscore_softwares && clean_rankscore_softwares.split(",").every { it.trim().isEmpty() }) {

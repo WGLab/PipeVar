@@ -9,10 +9,11 @@ include { Manta } from '../../modules/manta/'
 include { xtea } from '../../modules/xtea/'
 include { normalize_shortread_alignment } from '../../modules/normalize_shortread_alignment/'
 include { CNVnator } from '../../modules/cnvnator/'
-include { merge_shortread_sv_callers } from '../../modules/merge_shortread_sv_callers/'
+include { truvari_shortread_sv_merge } from '../../modules/truvari_shortread_sv_merge/'
 include { deepvariant } from '../../modules/deepvariant/'
 include { haplotypecaller } from '../../modules/haplotypecaller/'
 include { ANNOVAR_SV } from '../../modules/annovar_sv/'
+include { common_sv_filter } from '../../modules/common_sv_filter/'
 include { ExpansionHunter } from '../../modules/expansion_hunter/'
 include { Rankscore_analysis } from '../../modules/rankscore_analysis/'
 include { phenotagger } from '../../modules/phenotagger/'
@@ -94,8 +95,8 @@ workflow SINGLE_ALIGNMENT_ALL_NGS {
 		sv_merge_inputs = Manta.out.combine(CNVnator.out.vcf).combine(xtea_vcf).map { combined_vcfs ->
 			combined_vcfs.flatten()
 		}
-		merge_shortread_sv_callers(sv_merge_inputs,out_prefix)
-		sv_vcf=merge_shortread_sv_callers.out
+		truvari_shortread_sv_merge(sv_merge_inputs,ref_fa,out_prefix)
+		sv_vcf=truvari_shortread_sv_merge.out.merged_vcf
 	}
 	else if ( cnvnator_mode != "no" ) {
 		normalize_shortread_alignment(bam,out_prefix,ref_fa)
@@ -103,15 +104,15 @@ workflow SINGLE_ALIGNMENT_ALL_NGS {
 		sv_merge_inputs = Manta.out.combine(CNVnator.out.vcf).map { combined_vcfs ->
 			combined_vcfs.flatten()
 		}
-		merge_shortread_sv_callers(sv_merge_inputs,out_prefix)
-		sv_vcf=merge_shortread_sv_callers.out
+		truvari_shortread_sv_merge(sv_merge_inputs,ref_fa,out_prefix)
+		sv_vcf=truvari_shortread_sv_merge.out.merged_vcf
 	}
 	else if ( xtea_mode == "yes" ) {
 		sv_merge_inputs = Manta.out.combine(xtea_vcf).map { combined_vcfs ->
 			combined_vcfs.flatten()
 		}
-		merge_shortread_sv_callers(sv_merge_inputs,out_prefix)
-		sv_vcf=merge_shortread_sv_callers.out
+		truvari_shortread_sv_merge(sv_merge_inputs,ref_fa,out_prefix)
+		sv_vcf=truvari_shortread_sv_merge.out.merged_vcf
 	}
 	else {
 		sv_vcf=Manta.out
@@ -119,11 +120,16 @@ workflow SINGLE_ALIGNMENT_ALL_NGS {
 
 	sv_annovar_bed = (target == "yes") ? phen2_gene_bed : target
 	ANNOVAR_SV(sv_vcf,out_prefix,Phen2gene.out,sv_annovar_bed,"called")
-	SURVIVOR(ANNOVAR_SV.out,out_prefix)
+	annovar_sv_for_downstream = ANNOVAR_SV.out
+	if ( params.common_sv_filter.toString().trim().toLowerCase() == "yes" ) {
+		common_sv_filter(ANNOVAR_SV.out,out_prefix)
+		annovar_sv_for_downstream = common_sv_filter.out.filtered_vcf
+	}
+	SURVIVOR(annovar_sv_for_downstream,out_prefix)
 	PhenoSV(SURVIVOR.out,out_prefix,hpo)
 	ExpansionHunter(bam,out_prefix,ref_fa,eh_variant_catalog)
 	eh_filter(out_prefix,ExpansionHunter.out)
-	ngs_prio(out_prefix,RankVar.out,Rankscore_analysis.out.rankscore,Rankscore_analysis.out.clinvar,PhenoSV.out,ANNOVAR_SV.out,ANNOVAR.out.vcf_output,hpo,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
+	ngs_prio(out_prefix,RankVar.out,Rankscore_analysis.out.rankscore,Rankscore_analysis.out.clinvar,PhenoSV.out,annovar_sv_for_downstream,ANNOVAR.out.vcf_output,hpo,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
 	if ( mito_mode == "yes" ) {
 		variant_html_report_with_mito(out_prefix, ngs_prio.out[0], ngs_prio.out[1], eh_filter.out, mito_tsv)
 	}

@@ -5,7 +5,7 @@
 - `--xtea yes` is rejected for VCF-only input, `--type ont|pacbio`, and `--mode snp`.
 - PipeVar runs xTEA as one internal short-read step that generates xTEA inputs, runs the local wrapper, and normalizes the per-sample VCF.
 - The shared xTEA image must already include the `xtea` command, xTEA scripts, repeat library, and GENCODE GFF3.
-- xTEA outputs a plain `*_xtea.vcf`, which is merged into the short-read SV callset before ANNOVAR, SURVIVOR, PhenoSV, and final prioritization.
+- xTEA outputs a plain `*_xtea.vcf`, which is Truvari-merged and deduplicated with Manta and optional CNVnator before ANNOVAR, SURVIVOR, PhenoSV, and final prioritization.
 - Enable mitochondrial calling with `--mito yes` only for BAM/CRAM runs.
 - `--mito yes` is rejected for VCF-only input, `--mode sv`, and long-read `--light yes` runs.
 - Short-read mito uses the existing Mutect2 branch and requires a fully indexed reference bundle next to `--ref_fa`: `.fai`, `.dict`, `.amb`, `.ann`, `.bwt`, `.pac`, and `.sa`.

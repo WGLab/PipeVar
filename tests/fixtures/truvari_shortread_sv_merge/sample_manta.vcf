@@ -1,0 +1,9 @@
+##fileformat=VCFv4.2
+##contig=<ID=chr1,length=1000000>
+##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Structural variant type">
+##INFO=<ID=END,Number=1,Type=Integer,Description="End coordinate">
+##INFO=<ID=SVLEN,Number=1,Type=Integer,Description="Structural variant length">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	sample
+chr1	1000	manta_del_1	N	<DEL>	80	PASS	SVTYPE=DEL;END=2000;SVLEN=-1000	GT	0/1
+chr1	5000	manta_dup_1	N	<DUP>	60	PASS	SVTYPE=DUP;END=6200;SVLEN=1200	GT	0/1

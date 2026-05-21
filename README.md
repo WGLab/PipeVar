@@ -462,7 +462,8 @@ Exact files depend on `--mode`, `--type`, and input type.
 - short-read SV:
   - `*_manta.vcf`
   - `*_xtea.vcf` when `--xtea yes`
-  - `*.shortread_sv.merged.vcf` when multiple short-read SV/MEI callers are merged
+  - `*.shortread_sv.merged.vcf` when multiple short-read SV/MEI callers are Truvari-merged and deduplicated
+  - `*.shortread_sv.truvari_collapsed.vcf` audit file for calls collapsed into kept short-read SV representatives
 - long-read SV:
   - `*.sniffles.vcf.gz`
   - `*.cnvpytor.vcf`
