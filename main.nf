@@ -91,7 +91,9 @@ INPUT MODES
        --annovar_txt <ANNOVAR multianno TXT>
        --vcf <matching ANNOVAR multianno VCF>
        --note <FILE> or --hpo <FILE>
-     To add annotated SV/STR/optional mito from short-read BAM/CRAM:
+     To call SV/STR/optional mito from short-read BAM/CRAM while reusing annotated SNV:
+       --bam <BAM|CRAM> --ref_fa <FILE> --type short
+     To import annotated SV instead of calling SV from BAM/CRAM:
        --bam <BAM|CRAM> --annotated_sv yes --annovar_sv_vcf <SV multianno VCF>
        --ref_fa <FILE> --type short
      CSV unified columns:
@@ -321,6 +323,8 @@ def manifestInputKinds = [] as Set
 def manifestPhenotypeFormats = [] as Set
 def manifestAnnotatedRowsWithAlignment = 0
 def manifestAnnotatedRowsWithoutAlignment = 0
+def manifestAnnotatedRowsWithPreannotatedSv = 0
+def manifestAnnotatedRowsWithCalledSv = 0
 
 if (params.input_csv) {
     def manifestFile = file(params.input_csv)
@@ -385,13 +389,16 @@ if (params.input_csv) {
                     error "ERROR: Unified input CSV sample '${sample}' cannot mix annotated_snv fields with vcf_path."
                 }
                 if (alignmentPath) {
-                    if (!svVcfPath) {
-                        error "ERROR: Unified input CSV sample '${sample}' requires sv_vcf_path when alignment_path is provided for input_kind=annotated_snv."
-                    }
                     if (!(alignmentPath.endsWith('.bam') || alignmentPath.endsWith('.cram'))) {
                         error "ERROR: Unified input CSV sample '${sample}' requires alignment_path ending in .bam or .cram when provided with input_kind=annotated_snv."
                     }
                     manifestAnnotatedRowsWithAlignment += 1
+                    if (svVcfPath) {
+                        manifestAnnotatedRowsWithPreannotatedSv += 1
+                    }
+                    else {
+                        manifestAnnotatedRowsWithCalledSv += 1
+                    }
                 }
                 else {
                     if (svVcfPath) {
@@ -445,6 +452,9 @@ if (params.input_csv) {
         }
         if (manifestAnnotatedRowsWithAlignment > 0 && manifestAnnotatedRowsWithoutAlignment > 0) {
             error "ERROR: Unified annotated_snv manifests must either provide alignment_path for every row or for none of them in v1."
+        }
+        if (manifestAnnotatedRowsWithPreannotatedSv > 0 && manifestAnnotatedRowsWithCalledSv > 0) {
+            error "ERROR: Unified annotated_snv manifests with alignment_path must either provide sv_vcf_path for every row or leave it blank for every row in v1."
         }
     }
 }
@@ -940,12 +950,6 @@ if (clean_annotated_snv == 'yes') {
     if (params.bam && clean_type != 'short') {
         error "ERROR: Annotated-SNV plus BAM/CRAM currently supports only --type short."
     }
-    if (params.bam && clean_annotated_sv != 'yes') {
-        error "ERROR: Annotated-SNV plus BAM/CRAM requires --annotated_sv yes and --annovar_sv_vcf <FILE>."
-    }
-    if (params.bam && !params.input_csv && !params.annovar_sv_vcf) {
-        error "ERROR: Annotated-SNV plus BAM/CRAM requires --annovar_sv_vcf <FILE>."
-    }
 }
 
 if (clean_annotated_sv == 'yes') {
@@ -1067,6 +1071,7 @@ include { SINGLE_ALIGNMENT_VCF_SNP } from './subworkflows/single_alignment_vcf_s
 include { SINGLE_ALIGNMENT_VCF_SV } from './subworkflows/single_alignment_vcf_sv'
 include { SINGLE_ANNOTATED_SNV_SNP } from './subworkflows/single_annotated_snv_snp'
 include { SINGLE_ANNOTATED_ALL_NGS } from './subworkflows/single_annotated_all_ngs'
+include { SINGLE_ANNOTATED_SNV_CALLED_SV_NGS } from './subworkflows/single_annotated_snv_called_sv_ngs'
 
 include { INPUT_CSV_ALIGNMENT_ALL_LONGPHASE } from './subworkflows/input_csv_alignment_all_longphase'
 include { INPUT_CSV_ALIGNMENT_ALL_NGS } from './subworkflows/input_csv_alignment_all_ngs'
@@ -1080,6 +1085,7 @@ include { INPUT_CSV_ALIGNMENT_VCF_SNP } from './subworkflows/input_csv_alignment
 include { INPUT_CSV_ALIGNMENT_VCF_SV } from './subworkflows/input_csv_alignment_vcf_sv'
 include { INPUT_CSV_ANNOTATED_SNV_SNP } from './subworkflows/input_csv_annotated_snv_snp'
 include { INPUT_CSV_ANNOTATED_ALL_NGS } from './subworkflows/input_csv_annotated_all_ngs'
+include { INPUT_CSV_ANNOTATED_SNV_CALLED_SV_NGS } from './subworkflows/input_csv_annotated_snv_called_sv_ngs'
 
 
 
@@ -1092,6 +1098,7 @@ workflow {
 	def annovar_sv_vcf = null
 	def input_annotated_snv = null
 	def input_annotated_ngs = null
+	def input_annotated_called_ngs = null
 	def csv_manifest_mode = null
 	def csv_manifest_is_note = null
 	if ( params.input_csv ) {
@@ -1127,7 +1134,7 @@ workflow {
     }
 		if ( manifestUsesUnifiedSchema ) {
 		if ( manifestInputKinds == (['annotated_snv'] as Set) ) {
-		if (manifestAnnotatedRowsWithAlignment > 0) {
+		if (manifestAnnotatedRowsWithPreannotatedSv > 0) {
 		input_annotated_ngs = Channel
     .fromPath( params.input_csv )
     .splitCsv( header:true )
@@ -1159,9 +1166,46 @@ workflow {
         )
     }
     input_annotated_snv = null
+    input_annotated_called_ngs = null
     input_vcf = null
     input_bam = null
     csv_manifest_mode = 'annotated_all_ngs'
+		}
+		else if (manifestAnnotatedRowsWithCalledSv > 0) {
+		input_annotated_called_ngs = Channel
+    .fromPath( params.input_csv )
+    .splitCsv( header:true )
+    .map { row ->
+        def bam_file = file(row.alignment_path, checkIfExists: true)
+        def index_path = row.alignment_index_path ? row.alignment_index_path.toString().trim() : ''
+        def bai = index_path ? file(index_path) : null
+        if (bai == null || !bai.exists()) {
+            bai = bam_file.name.endsWith('.cram') ? file("${bam_file}.crai") : file(bam_file.toString().replaceFirst(/\.bam$/, ".bai"))
+            if (bam_file.name.endsWith('.cram') && !bai.exists()) {
+                bai = file(bam_file.toString().replaceFirst(/\.cram$/, ".crai"))
+            }
+            if (bam_file.name.endsWith('.bam') && !bai.exists()) {
+                bai = file("${bam_file}.bai")
+            }
+        }
+        if (!bai.exists()) {
+            error "Index file not found for ${bam_file} from unified CSV sample '${row.sample}'."
+        }
+        return tuple(
+            row.sample,
+            file(row.snv_txt_path, checkIfExists: true),
+            file(row.snv_vcf_path, checkIfExists: true),
+            bam_file,
+            bai,
+            file(row.phenotype_path, checkIfExists: true),
+            row.phenotype_format.toString().trim().toLowerCase()
+        )
+    }
+    input_annotated_snv = null
+    input_annotated_ngs = null
+    input_vcf = null
+    input_bam = null
+    csv_manifest_mode = 'annotated_snv_called_sv_ngs'
 		}
 		else {
 		input_annotated_snv = Channel
@@ -1177,6 +1221,7 @@ workflow {
         )
     }
     input_annotated_ngs = null
+    input_annotated_called_ngs = null
     input_vcf = null
     input_bam = null
     csv_manifest_mode = 'annotated_snv'
@@ -1438,6 +1483,9 @@ eh_variant_catalog = Channel
         if ( input_annotated_ngs != null ) {
             INPUT_CSV_ANNOTATED_ALL_NGS(input_annotated_ngs, input_age, ref_fa, ref_fa, eh_variant_catalog, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_ref_fa, mito_contig)
         }
+        else if ( input_annotated_called_ngs != null ) {
+            INPUT_CSV_ANNOTATED_SNV_CALLED_SV_NGS(input_annotated_called_ngs, input_age, ref_fa, ref_fa, eh_variant_catalog, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_ref_fa, mito_contig)
+        }
         else if ( input_annotated_snv != null ) {
             INPUT_CSV_ANNOTATED_SNV_SNP(input_annotated_snv, input_age, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
         }
@@ -1487,7 +1535,12 @@ eh_variant_catalog = Channel
 	    }
     else { // Single File Mode
         if ( clean_annotated_snv == 'yes' && params.vcf && params.bam != null ) {
-            SINGLE_ANNOTATED_ALL_NGS(bam, annovar_txt, vcf, annovar_sv_vcf, out_prefix, ref_fa, ref_fa, eh_variant_catalog, note, is_note, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_ref_fa, mito_contig)
+            if ( clean_annotated_sv == 'yes' ) {
+                SINGLE_ANNOTATED_ALL_NGS(bam, annovar_txt, vcf, annovar_sv_vcf, out_prefix, ref_fa, ref_fa, eh_variant_catalog, note, is_note, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_ref_fa, mito_contig)
+            }
+            else {
+                SINGLE_ANNOTATED_SNV_CALLED_SV_NGS(bam, annovar_txt, vcf, out_prefix, ref_fa, ref_fa, eh_variant_catalog, note, is_note, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_ref_fa, mito_contig)
+            }
         }
         else if ( clean_annotated_snv == 'yes' && params.vcf ) {
             SINGLE_ANNOTATED_SNV_SNP(annovar_txt, vcf, out_prefix, note, is_note, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, inheritance_mode, include_clinvar_report, allow_unphased_comphet)

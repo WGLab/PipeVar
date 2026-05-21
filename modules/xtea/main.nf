@@ -115,28 +115,39 @@ process xtea {
 	fi
 	set -u
 
-	run_script=\$(
+	mapfile -t run_scripts < <(
 	    {
 	        find "\$XTEA_WORK" -type f -name 'run_xTea_pipeline.sh' 2>/dev/null
 	        find "\$TASK_DIR" -type f -name 'run_xTea_pipeline.sh' 2>/dev/null
-	    } | sort -u | head -n 1
+	    } | sort -u
 	)
-	if [[ -z "\$run_script" ]]; then
-	    echo "xTEA did not generate run_xTea_pipeline.sh under \$XTEA_WORK or \$TASK_DIR" >&2
+	if (( \${#run_scripts[@]} == 0 )); then
+	    echo "xTEA did not generate any run_xTea_pipeline.sh under \$XTEA_WORK or \$TASK_DIR" >&2
 	    dump_xtea_context
 	    exit 1
 	fi
+	printf 'xTEA run scripts discovered:\\n' > xtea.run.log
+	printf '  %s\\n' "\${run_scripts[@]}" >> xtea.run.log
+
 	set +u
-	if ! bash "\$run_script" > xtea.run.log 2>&1; then
-	    set -u
-	    echo "xTEA generated run script failed: \$run_script" >&2
-	    dump_xtea_context
-	    if [[ -s xtea.run.log ]]; then
-	        echo "  xtea.run.log tail:" >&2
-	        tail -n 80 xtea.run.log >&2
+	for run_script in "\${run_scripts[@]}"; do
+	    run_dir="\$(dirname "\$run_script")"
+	    run_name="\${run_script##*/}"
+	    {
+	        echo
+	        echo "Running xTEA generated script: \$run_script"
+	    } >> xtea.run.log
+	    if ! ( cd "\$run_dir" && bash "./\$run_name" ) >> xtea.run.log 2>&1; then
+	        set -u
+	        echo "xTEA generated run script failed: \$run_script" >&2
+	        dump_xtea_context
+	        if [[ -s xtea.run.log ]]; then
+	            echo "  xtea.run.log tail:" >&2
+	            tail -n 80 xtea.run.log >&2
+	        fi
+	        exit 1
 	    fi
-	    exit 1
-	fi
+	done
 	set -u
 
 	xtea_vcf=\$(find "\$XTEA_WORK" -type f \\( -name '*.vcf' -o -name '*.gvcf' -o -name '*.vcf.gz' -o -name '*.gvcf.gz' \\) | sort | head -n 1)
