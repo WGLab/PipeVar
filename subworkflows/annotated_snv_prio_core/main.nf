@@ -22,12 +22,10 @@ workflow ANNOTATED_SNV_PRIO_CORE {
 	allow_unphased_comphet
 
 	main:
-	validator_script = Channel.value(file("${projectDir}/scripts/validate_preannotated_annovar_pair.py"))
 	validated_annovar = validate_preannotated_annovar_pair(
 		input_annotated_snv.map { out_prefix, annovar_txt, annovar_vcf, phenotype_path, phenotype_format ->
 			tuple(out_prefix, annovar_txt, annovar_vcf)
-		},
-		validator_script
+		}
 	)
 
 	clinical_note_input = input_annotated_snv

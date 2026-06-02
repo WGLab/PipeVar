@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 
-SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "filter_common_svs.py"
+IMAGE = "beoungl/docker_test:common_sv_filter_0.2"
 
 
 COMMON_VCF = """##fileformat=VCFv4.2
@@ -31,7 +31,7 @@ def patient_vcf(body: str) -> str:
 """ + body
 
 
-class FilterCommonSVsTest(unittest.TestCase):
+class FilterCommonSVsImageSmokeTest(unittest.TestCase):
     def run_filter(self, sample_text: str):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp = Path(tmpdir)
@@ -44,18 +44,22 @@ class FilterCommonSVsTest(unittest.TestCase):
             sample.write_text(sample_text)
             subprocess.run(
                 [
-                    "python3",
-                    str(SCRIPT),
+                    "docker",
+                    "run",
+                    "--rm",
+                    "-v",
+                    f"{tmp}:/work",
+                    IMAGE,
                     "--input-vcf",
-                    str(sample),
+                    "/work/sample.vcf",
                     "--common-vcf",
-                    str(common),
+                    "/work/common.vcf",
                     "--output-vcf",
-                    str(kept),
+                    "/work/kept.vcf",
                     "--removed-vcf",
-                    str(removed),
+                    "/work/removed.vcf",
                     "--summary-tsv",
-                    str(summary),
+                    "/work/summary.tsv",
                     "--common-af",
                     "0.01",
                 ],

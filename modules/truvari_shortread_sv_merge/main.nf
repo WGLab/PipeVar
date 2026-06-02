@@ -27,6 +27,25 @@ process truvari_shortread_sv_merge {
 	mkdir -p truvari_inputs
 	prepared_vcfs=()
 	caller_names=(manta cnvnator xtea)
+	manta_vcf=""
+
+	for vcf in "\${vcf_files[@]}"; do
+	    if [[ "\$(basename "\$vcf")" == *manta* ]]; then
+	        manta_vcf="\$vcf"
+	        break
+	    fi
+	done
+
+	if [[ -z "\$manta_vcf" ]]; then
+	    echo "Manta VCF is required to prepare short-read SV headers" >&2
+	    exit 1
+	fi
+
+	if [[ "\$manta_vcf" == *.gz ]]; then
+	    gzip -cd "\$manta_vcf"
+	else
+	    cat "\$manta_vcf"
+	fi | awk '/^##/ { print; next } /^#CHROM/ { print; exit }' > truvari_inputs/manta.header.vcf
 
 	for idx in "\${!vcf_files[@]}"; do
 	    vcf="\${vcf_files[\$idx]}"
@@ -41,7 +60,14 @@ process truvari_shortread_sv_merge {
 	    normalized="truvari_inputs/\${caller}.normalized.vcf"
 	    prepared="truvari_inputs/\${caller}.prepared.vcf.gz"
 
-	    if [[ "\$vcf" == *.gz ]]; then
+	    if [[ "\$caller" == "cnvnator" ]]; then
+	        cat truvari_inputs/manta.header.vcf
+	        if [[ "\$vcf" == *.gz ]]; then
+	            gzip -cd "\$vcf"
+	        else
+	            cat "\$vcf"
+	        fi | awk '!/^#/'
+	    elif [[ "\$vcf" == *.gz ]]; then
 	        gzip -cd "\$vcf"
 	    else
 	        cat "\$vcf"

@@ -1,6 +1,6 @@
 // Single-sample xTEA wrapper for short-read mobile-element insertion calling.
 process xtea {
-	container = 'beoungl/docker_test:xtea'
+	container = 'beoungl/docker_test:xtea_0.1'
 
 	input:
 	tuple val(meta), path(bam), path(index)
@@ -23,7 +23,10 @@ process xtea {
 	set -euo pipefail
 
 	TASK_DIR="\$PWD"
-	XTEA_WORK="\$TASK_DIR/${meta.id}_xtea_work"
+	XTEA_WORK_NAME="${meta.id}_xtea_work"
+	XTEA_NATIVE_WORK_NAME="${meta.id}_work"
+	XTEA_WORK="\$TASK_DIR/\$XTEA_WORK_NAME"
+	XTEA_NATIVE_WORK="\$TASK_DIR/\$XTEA_NATIVE_WORK_NAME"
 	BAM_ABS="\$TASK_DIR/$bam"
 	INDEX_ABS="\$TASK_DIR/$index"
 	REF_ABS="\$TASK_DIR/$ref_fa"
@@ -44,6 +47,7 @@ process xtea {
 	    echo "  PWD=\$PWD" >&2
 	    echo "  TASK_DIR=\$TASK_DIR" >&2
 	    echo "  XTEA_WORK=\$XTEA_WORK" >&2
+	    echo "  XTEA_NATIVE_WORK=\$XTEA_NATIVE_WORK" >&2
 	    if [[ -e submit_jobs.sh ]]; then
 	        echo "  submit_jobs.sh=present" >&2
 	    else
@@ -53,6 +57,8 @@ process xtea {
 	    find "\$TASK_DIR" -maxdepth 2 -mindepth 1 -printf '    %p\\n' 2>/dev/null | sort | head -n 80 >&2 || true
 	    echo "  XTEA_WORK listing:" >&2
 	    find "\$XTEA_WORK" -maxdepth 4 -mindepth 1 -printf '    %p\\n' 2>/dev/null | sort | head -n 120 >&2 || true
+	    echo "  XTEA_NATIVE_WORK listing:" >&2
+	    find "\$XTEA_NATIVE_WORK" -maxdepth 4 -mindepth 1 -printf '    %p\\n' 2>/dev/null | sort | head -n 120 >&2 || true
 	    if [[ -s xtea.generate.log ]]; then
 	        echo "  xtea.generate.log tail:" >&2
 	        tail -n 80 xtea.generate.log >&2
@@ -99,7 +105,7 @@ process xtea {
 	    -r "\$REF_ABS" \\
 	    -g "${gencode}" \\
 	    --xtea "${xteaScripts}" \\
-	    -f 5907 \\
+	    -f 4883 \\
 	    -y 7 \\
 	    --slurm \\
 	    -t 0-72:00 \\
@@ -109,7 +115,7 @@ process xtea {
 	    $args > xtea.generate.log 2>&1
 	then
 	    set -u
-	    echo "xTEA command failed while generating run_xTea_pipeline.sh" >&2
+	    echo "xTEA command failed while generating run_xTEA_pipeline.sh" >&2
 	    dump_xtea_context
 	    exit 1
 	fi
@@ -117,12 +123,16 @@ process xtea {
 
 	mapfile -t run_scripts < <(
 	    {
-	        find "\$XTEA_WORK" -type f -name 'run_xTea_pipeline.sh' 2>/dev/null
-	        find "\$TASK_DIR" -type f -name 'run_xTea_pipeline.sh' 2>/dev/null
+	        if [[ -s submit_jobs.sh ]]; then
+	            grep -o '[^[:space:]]*run_xTEA_pipeline[.]sh' submit_jobs.sh || true
+	        fi
+	        for search_root in "\$XTEA_WORK" "\$XTEA_NATIVE_WORK" "\$TASK_DIR"; do
+	            [[ -e "\$search_root" ]] && find "\$search_root" -name 'run_xTEA_pipeline.sh' 2>/dev/null
+	        done
 	    } | sort -u
 	)
 	if (( \${#run_scripts[@]} == 0 )); then
-	    echo "xTEA did not generate any run_xTea_pipeline.sh under \$XTEA_WORK or \$TASK_DIR" >&2
+	    echo "xTEA did not generate any run_xTEA_pipeline.sh under \$XTEA_WORK, \$XTEA_NATIVE_WORK, or \$TASK_DIR" >&2
 	    dump_xtea_context
 	    exit 1
 	fi
@@ -150,7 +160,11 @@ process xtea {
 	done
 	set -u
 
-	xtea_vcf=\$(find "\$XTEA_WORK" -type f \\( -name '*.vcf' -o -name '*.gvcf' -o -name '*.vcf.gz' -o -name '*.gvcf.gz' \\) | sort | head -n 1)
+	xtea_vcf=\$(
+	    for search_root in "\$XTEA_WORK" "\$XTEA_NATIVE_WORK"; do
+	        [[ -e "\$search_root" ]] && find "\$search_root" -type f \\( -name '*.vcf' -o -name '*.gvcf' -o -name '*.vcf.gz' -o -name '*.gvcf.gz' \\) 2>/dev/null
+	    done | sort | head -n 1
+	)
 	if [[ -n "\$xtea_vcf" ]]; then
 	    if [[ "\$xtea_vcf" == *.gz ]]; then
 	        gzip -cd "\$xtea_vcf" > ${meta.id}_xtea.vcf
@@ -171,6 +185,13 @@ process xtea {
 	if ! grep -q '^#CHROM' ${meta.id}_xtea.vcf; then
 	    echo "xTEA output is not a valid VCF: missing #CHROM header" >&2
 	    exit 1
+	fi
+
+	if [[ -d "\$XTEA_NATIVE_WORK_NAME" && -d "\$XTEA_WORK_NAME" ]] && ! find "\$XTEA_WORK_NAME" -mindepth 1 -print -quit | grep -q .; then
+	    rmdir "\$XTEA_WORK_NAME"
+	    ln -s "\$XTEA_NATIVE_WORK_NAME" "\$XTEA_WORK_NAME"
+	elif [[ ! -e "\$XTEA_WORK_NAME" && -e "\$XTEA_NATIVE_WORK_NAME" ]]; then
+	    ln -s "\$XTEA_NATIVE_WORK_NAME" "\$XTEA_WORK_NAME"
 	fi
 
 	cat <<-END_VERSIONS > versions.yml

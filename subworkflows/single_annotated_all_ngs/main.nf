@@ -43,12 +43,10 @@ workflow SINGLE_ANNOTATED_ALL_NGS {
 	mito_contig
 
 	main:
-	validator_script = Channel.value(file("${projectDir}/scripts/validate_preannotated_annovar_pair.py"))
 	validated_annovar = validate_preannotated_annovar_pair(
 		out_prefix.combine(annovar_txt).combine(snv_vcf).map { prefix, annovar_txt_file, annovar_vcf_file ->
 			tuple(prefix, annovar_txt_file, annovar_vcf_file)
-		},
-		validator_script
+		}
 	)
 	validated_annovar_txt = validated_annovar.map { prefix, validated_txt, validated_vcf -> validated_txt }
 	validated_annovar_vcf = validated_annovar.map { prefix, validated_txt, validated_vcf -> validated_vcf }

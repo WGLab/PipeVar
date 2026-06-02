@@ -38,11 +38,10 @@ workflow INPUT_CSV_ANNOTATED_ALL_NGS {
 	mito_contig
 
 	main:
-	validator_script = Channel.value(file("${projectDir}/scripts/validate_preannotated_annovar_pair.py"))
 	validate_input = input_annotated_ngs.map { out_prefix, annovar_txt, annovar_vcf, annovar_sv_vcf, bam_file, bai_file, phenotype_path, phenotype_format ->
 		tuple(out_prefix, annovar_txt, annovar_vcf)
 	}
-	validated_annovar = validate_preannotated_annovar_pair(validate_input, validator_script)
+	validated_annovar = validate_preannotated_annovar_pair(validate_input)
 
 	clinical_note_input = input_annotated_ngs
 		.filter { out_prefix, annovar_txt, annovar_vcf, annovar_sv_vcf, bam_file, bai_file, phenotype_path, phenotype_format -> phenotype_format == 'clinical_note' }
