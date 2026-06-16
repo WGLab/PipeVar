@@ -144,6 +144,7 @@ flowchart TD
 
     subgraph longRead["Long-read mtDNA calling"]
         clair3["Clair3 haploid-sensitive calling on mtDNA contig"]
+        longRaw["Raw Clair3 mtDNA VCF\n*.mito.clair3.raw.vcf.gz"]
         longNorm["bcftools normalization"]
         adapt["clair3_mito_adapt.py\nadapt long-read VCF to mtDNA annotation contract"]
     end
@@ -163,7 +164,7 @@ flowchart TD
     contig --> subset
     contig --> clair3
     subset --> rg --> revert --> fastq --> realign --> merge --> markdup --> mutect --> filter --> shortNorm --> mitoVcf
-    clair3 --> longNorm --> adapt --> mitoVcf
+    clair3 --> longRaw --> longNorm --> adapt --> mitoVcf
     mitoVcf --> annotation --> annotated --> prioritize --> prioritized --> report
 ```
 
@@ -352,6 +353,7 @@ flowchart TD
     report["variant_html_report"]
     reportMito["variant_html_report_with_mito"]
     mitoClair3["mito_clair3"]
+    mitoClair3Post["mito_clair3_postprocess"]
     mitoAnno["mito_annotation"]
     mitoPrio["mito_prio"]
 
@@ -381,7 +383,7 @@ flowchart TD
     html -->|"no"| report
     html -->|"yes"| reportMito
 
-    input -.->|"--mito yes, SNP/full only, not --light yes"| mitoClair3 --> mitoAnno --> mitoPrio --> reportMito
+    input -.->|"--mito yes, SNP/full only, not --light yes"| mitoClair3 --> mitoClair3Post --> mitoAnno --> mitoPrio --> reportMito
 ```
 
 ### Mitochondrial Calling and Annotation Detail
@@ -411,6 +413,7 @@ flowchart TD
 
     subgraph long["Long-read variant calling"]
         clair["run_clair3.sh haploid-sensitive on mito contig"]
+        rawLong["*.mito.clair3.raw.vcf.gz"]
         normLong["bcftools norm split multiallelics"]
         adapt["clair3_mito_adapt.py"]
         longVcf["*.mito.vcf.gz + .tbi"]
@@ -434,7 +437,7 @@ flowchart TD
     readType -->|"--type ont/pacbio, not --light yes"| clair
 
     subset --> rg --> revert --> fastq --> realign --> merge --> markdup --> mutect --> filter --> normShort --> shortVcf
-    clair --> normLong --> adapt --> longVcf
+    clair --> rawLong --> normLong --> adapt --> longVcf
     shortVcf --> anno
     longVcf --> anno
     anno --> annoTsv --> prio

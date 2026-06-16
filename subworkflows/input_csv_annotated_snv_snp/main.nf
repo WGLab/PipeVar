@@ -4,7 +4,7 @@ include { ANNOTATED_SNV_PRIO_CORE } from '../annotated_snv_prio_core'
 workflow INPUT_CSV_ANNOTATED_SNV_SNP {
 	take:
 	input_annotated_snv
-	input_age
+	input_meta
 	rankscore_filter
 	rankscore_softwares
 	phen2gene_top_n
@@ -19,7 +19,7 @@ workflow INPUT_CSV_ANNOTATED_SNV_SNP {
 	main:
 	ANNOTATED_SNV_PRIO_CORE(
 		input_annotated_snv,
-		input_age,
+		input_meta,
 		rankscore_filter,
 		rankscore_softwares,
 		phen2gene_top_n,

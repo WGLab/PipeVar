@@ -9,7 +9,7 @@ include { validate_preannotated_annovar_pair } from '../../modules/validate_prea
 workflow ANNOTATED_SNV_PRIO_CORE {
 	take:
 	input_annotated_snv
-	input_age
+	input_meta
 	rankscore_filter
 	rankscore_softwares
 	phen2gene_top_n
@@ -50,7 +50,7 @@ workflow ANNOTATED_SNV_PRIO_CORE {
 
 	validated_annovar_vcf = validated_annovar.map { out_prefix, annovar_txt, annovar_vcf -> tuple(out_prefix, annovar_vcf) }
 	snp_prio_input = rankscore_rankvar_join.join(validated_annovar_vcf)
-	hpo_with_age = hpo_paths.join(input_age).map { out_prefix, hpo_path, age_of_onset -> tuple(out_prefix, hpo_path, age_of_onset) }
+	hpo_with_age = hpo_paths.join(input_meta).map { out_prefix, hpo_path, age_of_onset, sex -> tuple(out_prefix, hpo_path, age_of_onset, sex) }
 	snp_prio_input_hpo = snp_prio_input.join(hpo_with_age)
 	multi_snp_prio(snp_prio_input_hpo, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 

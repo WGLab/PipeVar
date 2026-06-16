@@ -1,6 +1,6 @@
 // Batch xTEA wrapper keyed by sample prefix for short-read mobile-element insertion calling.
 process multi_xtea {
-	container = 'beoungl/docker_test:xtea_0.1'
+	container = 'beoungl/docker_test:xtea_0.2'
 
 	input:
 	tuple val(meta), path(bam), path(index)
@@ -63,6 +63,18 @@ process multi_xtea {
 	        echo "  xtea.generate.log tail:" >&2
 	        tail -n 80 xtea.generate.log >&2
 	    fi
+	    if [[ -s xtea.run.log ]]; then
+	        echo "  xtea.run.log tail:" >&2
+	        tail -n 120 xtea.run.log >&2
+	    fi
+	    echo "  nested xTEA log tails:" >&2
+	    find "\$XTEA_WORK" "\$XTEA_NATIVE_WORK" -type f \\( -name '*.log' -o -name '*.err' -o -name '*.out' -o -name '*.std_out' \\) 2>/dev/null \
+	        | sort \
+	        | head -n 40 \
+	        | while IFS= read -r log_file; do
+	            echo "    >>> \$log_file" >&2
+	            tail -n 40 "\$log_file" >&2 || true
+	          done
 	}
 
 	if [[ ! -d "${repLib}" ]]; then
@@ -90,6 +102,7 @@ process multi_xtea {
 	check_readable "BAM/CRAM index" "\$INDEX_ABS"
 	check_readable "reference FASTA" "\$REF_ABS"
 	check_readable "reference FASTA index" "\$FA_INDEX_ABS"
+	export PYTHONFAULTHANDLER=1
 
 	printf '%s\\n' "${meta.id}" > sample_id.txt
 	printf '%s\\t%s\\n' "${meta.id}" "\$BAM_ABS" > illumina_bam_list.txt
@@ -111,7 +124,7 @@ process multi_xtea {
 	    -t 0-72:00 \\
 	    -q local \\
 	    -n ${task.cpus} \\
-	    -m 25 \\
+	    -m ${task.memory.toGiga()} \\
 	    $args > xtea.generate.log 2>&1
 	then
 	    set -u
@@ -147,14 +160,10 @@ process multi_xtea {
 	        echo
 	        echo "Running xTEA generated script: \$run_script"
 	    } >> xtea.run.log
-	    if ! ( cd "\$run_dir" && bash "./\$run_name" ) >> xtea.run.log 2>&1; then
+	    if ! ( cd "\$run_dir" && bash -Ee -o pipefail -x "./\$run_name" ) >> xtea.run.log 2>&1; then
 	        set -u
 	        echo "xTEA generated run script failed: \$run_script" >&2
 	        dump_xtea_context
-	        if [[ -s xtea.run.log ]]; then
-	            echo "  xtea.run.log tail:" >&2
-	            tail -n 80 xtea.run.log >&2
-	        fi
 	        exit 1
 	    fi
 	done

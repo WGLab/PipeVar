@@ -27,6 +27,19 @@ is_valid_compact_age() {
   [[ -z "$age" || "$age" =~ ^[0-9]+([dDmMyY])?$ ]]
 }
 
+normalize_sex() {
+  local sex="$1"
+  sex="$(trim_spaces "$sex")"
+  sex="${sex,,}"
+  echo "${sex:-unknown}"
+}
+
+is_valid_sex() {
+  local sex
+  sex="$(normalize_sex "$1")"
+  [[ "$sex" == "unknown" || "$sex" == "male" || "$sex" == "female" ]]
+}
+
 reject_csv_field() {
   local label="$1"
   local value="$2"
@@ -162,6 +175,20 @@ prompt_age() {
   done
 }
 
+prompt_sex() {
+  local sample="$1"
+  local sex_in
+  while true; do
+    printf "Sex for sample '%s' [unknown|male|female, default unknown]: " "$sample" > /dev/tty
+    read -r sex_in < /dev/tty
+    if is_valid_sex "$sex_in"; then
+      normalize_sex "$sex_in"
+      return
+    fi
+    echo "Invalid sex value. Use unknown, male, or female." > /dev/tty
+  done
+}
+
 select_age_prompting() {
   INCLUDE_AGE="no"
   PROMPT_AGE="no"
@@ -177,6 +204,25 @@ select_age_prompting() {
     if [[ "$PROMPT_AGE" == "yes" && ! -r /dev/tty ]]; then
       echo "WARNING: no interactive TTY available; disabling per-sample age prompts." >&2
       PROMPT_AGE="no"
+    fi
+  fi
+}
+
+select_sex_prompting() {
+  INCLUDE_SEX="no"
+  PROMPT_SEX="no"
+  read -r -p "Include optional sex column? (values: unknown/male/female) [y/N]: " INCLUDE_SEX
+  INCLUDE_SEX="$(trim_spaces "$INCLUDE_SEX")"
+  INCLUDE_SEX="${INCLUDE_SEX,,}"
+  if [[ "$INCLUDE_SEX" == "y" || "$INCLUDE_SEX" == "yes" ]]; then
+    INCLUDE_SEX="yes"
+    read -r -p "Prompt for sex per sample? [y/N]: " PROMPT_SEX
+    PROMPT_SEX="$(trim_spaces "$PROMPT_SEX")"
+    PROMPT_SEX="${PROMPT_SEX,,}"
+    [[ "$PROMPT_SEX" == "y" || "$PROMPT_SEX" == "yes" ]] && PROMPT_SEX="yes" || PROMPT_SEX="no"
+    if [[ "$PROMPT_SEX" == "yes" && ! -r /dev/tty ]]; then
+      echo "WARNING: no interactive TTY available; disabling per-sample sex prompts." >&2
+      PROMPT_SEX="no"
     fi
   fi
 }
@@ -249,6 +295,7 @@ MSG
   out_csv="${out_csv:-input_csv_generated.csv}"
   reject_csv_field "output path" "$out_csv"
   select_age_prompting
+  select_sex_prompting
 
   declare -A note_map=()
   note_prefixes=()
@@ -257,14 +304,18 @@ MSG
 
   local data_count=0 match_count=0 missing_count=0
   {
-    if [[ "$INCLUDE_AGE" == "yes" ]]; then
+    if [[ "$INCLUDE_AGE" == "yes" && "$INCLUDE_SEX" == "yes" ]]; then
+      csv_join_row "sample" "file_path" "note_path" "age_of_onset" "sex"
+    elif [[ "$INCLUDE_AGE" == "yes" ]]; then
       csv_join_row "sample" "file_path" "note_path" "age_of_onset"
+    elif [[ "$INCLUDE_SEX" == "yes" ]]; then
+      csv_join_row "sample" "file_path" "note_path" "sex"
     else
       csv_join_row "sample" "file_path" "note_path"
     fi
     while IFS= read -r data_path; do
       data_count=$((data_count + 1))
-      local data_name sample note_path matched_prefix age_value
+      local data_name sample note_path matched_prefix age_value sex_value
       data_name="$(basename "$data_path")"
       sample="$(normalize_prefix_from_suffix "$data_name" "$data_suffix")"
       reject_csv_field "sample" "$sample"
@@ -288,8 +339,14 @@ MSG
       match_count=$((match_count + 1))
       age_value=""
       [[ "$PROMPT_AGE" == "yes" ]] && age_value="$(prompt_age "$sample")"
-      if [[ "$INCLUDE_AGE" == "yes" ]]; then
+      sex_value="unknown"
+      [[ "$PROMPT_SEX" == "yes" ]] && sex_value="$(prompt_sex "$sample")"
+      if [[ "$INCLUDE_AGE" == "yes" && "$INCLUDE_SEX" == "yes" ]]; then
+        csv_join_row "$sample" "$data_path" "$note_path" "$age_value" "$sex_value"
+      elif [[ "$INCLUDE_AGE" == "yes" ]]; then
         csv_join_row "$sample" "$data_path" "$note_path" "$age_value"
+      elif [[ "$INCLUDE_SEX" == "yes" ]]; then
+        csv_join_row "$sample" "$data_path" "$note_path" "$sex_value"
       else
         csv_join_row "$sample" "$data_path" "$note_path"
       fi
@@ -356,6 +413,7 @@ generate_unified_csv() {
   out_csv="${out_csv:-input_csv_generated.csv}"
   reject_csv_field "output path" "$out_csv"
   select_age_prompting
+  select_sex_prompting
 
   declare -A phenotype_map=()
   phenotype_prefixes=()
@@ -440,8 +498,12 @@ MSG
 
   local data_count=0 match_count=0 missing_count=0
   {
-    csv_join_row sample input_kind phenotype_path phenotype_format age_of_onset snv_txt_path snv_vcf_path sv_vcf_path vcf_path alignment_path alignment_index_path
-    local sample primary_path phenotype_path snv_txt_path snv_vcf_path sv_vcf_path vcf_path alignment_path alignment_index_path age_value
+    if [[ "$INCLUDE_SEX" == "yes" ]]; then
+      csv_join_row sample input_kind phenotype_path phenotype_format age_of_onset sex snv_txt_path snv_vcf_path sv_vcf_path vcf_path alignment_path alignment_index_path
+    else
+      csv_join_row sample input_kind phenotype_path phenotype_format age_of_onset snv_txt_path snv_vcf_path sv_vcf_path vcf_path alignment_path alignment_index_path
+    fi
+    local sample primary_path phenotype_path snv_txt_path snv_vcf_path sv_vcf_path vcf_path alignment_path alignment_index_path age_value sex_value
     for sample in "${primary_prefixes[@]}"; do
       data_count=$((data_count + 1))
       primary_path="${primary_map[$sample]}"
@@ -472,7 +534,13 @@ MSG
       fi
       age_value=""
       [[ "$PROMPT_AGE" == "yes" ]] && age_value="$(prompt_age "$sample")"
-      csv_join_row "$sample" "$INPUT_KIND" "$phenotype_path" "$PHENOTYPE_FORMAT" "$age_value" "$snv_txt_path" "$snv_vcf_path" "$sv_vcf_path" "$vcf_path" "$alignment_path" "$alignment_index_path"
+      sex_value="unknown"
+      [[ "$PROMPT_SEX" == "yes" ]] && sex_value="$(prompt_sex "$sample")"
+      if [[ "$INCLUDE_SEX" == "yes" ]]; then
+        csv_join_row "$sample" "$INPUT_KIND" "$phenotype_path" "$PHENOTYPE_FORMAT" "$age_value" "$sex_value" "$snv_txt_path" "$snv_vcf_path" "$sv_vcf_path" "$vcf_path" "$alignment_path" "$alignment_index_path"
+      else
+        csv_join_row "$sample" "$INPUT_KIND" "$phenotype_path" "$PHENOTYPE_FORMAT" "$age_value" "$snv_txt_path" "$snv_vcf_path" "$sv_vcf_path" "$vcf_path" "$alignment_path" "$alignment_index_path"
+      fi
       match_count=$((match_count + 1))
     done
   } > "$out_csv"

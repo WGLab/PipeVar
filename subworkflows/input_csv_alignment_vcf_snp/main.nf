@@ -12,7 +12,7 @@ include { multi_snp_prio } from '../../modules/multi_snp_prio/'
 workflow INPUT_CSV_ALIGNMENT_VCF_SNP {
 	take:
 	input_vcf
-	input_age
+	input_meta
 	ref_fa
 	rankscore_filter
 	rankscore_softwares
@@ -53,7 +53,7 @@ workflow INPUT_CSV_ALIGNMENT_VCF_SNP {
 	rankscore_rankvar_join=rankscore_result.join(rankvar_result)
 	annovar_result_vcf=annovar_result.map { item -> tuple(item[0], item[2]) }
 	snp_prio_input=rankscore_rankvar_join.join(annovar_result_vcf)
-	input_vcf_hpo_age=input_vcf_no_vcf.join(input_age).map { out_prefix, hpo_path, age_of_onset -> tuple(out_prefix, hpo_path, age_of_onset) }
+	input_vcf_hpo_age=input_vcf_no_vcf.join(input_meta).map { out_prefix, hpo_path, age_of_onset, sex -> tuple(out_prefix, hpo_path, age_of_onset, sex) }
 	snp_prio_input_hpo=snp_prio_input.join(input_vcf_hpo_age)
 	multi_snp_prio(snp_prio_input_hpo,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
 }	

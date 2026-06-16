@@ -29,11 +29,11 @@ workflow SINGLE_ANNOTATED_SNV_SNP {
 			tuple(prefix, annovar_txt_file, annovar_vcf_file, phenotype_path, phenotype_kind)
 		}
 
-	input_age = out_prefix.map { prefix -> tuple(prefix, "") }
+	input_meta = out_prefix.map { prefix -> tuple(prefix, "", "unknown") }
 
 	ANNOTATED_SNV_PRIO_CORE(
 		input_annotated_snv,
-		input_age,
+		input_meta,
 		rankscore_filter,
 		rankscore_softwares,
 		phen2gene_top_n,

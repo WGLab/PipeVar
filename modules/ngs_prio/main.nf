@@ -1,7 +1,7 @@
 
 // Integrate NGS SNV/SV evidence and produce a prioritized VCF.
 process ngs_prio {
-	container ='beoungl/docker_test:longphase_0.2.28'
+	container ='beoungl/docker_test:longphase_0.2.29'
 
 	input:
 	val(out_prefix)

@@ -20,7 +20,7 @@ include { multi_variant_html_report; multi_variant_html_report_with_mito } from 
 workflow INPUT_CSV_ANNOTATED_ALL_NGS {
 	take:
 	input_annotated_ngs
-	input_age
+	input_meta
 	ref_fa
 	eh_ref_fa
 	eh_variant_catalog
@@ -86,10 +86,10 @@ workflow INPUT_CSV_ANNOTATED_ALL_NGS {
 	sv_join = phenosv_annovar_snv.join(annovar_sv_for_downstream)
 	rankscore_join = sv_join.join(rankscore_result)
 	rankvar_join = rankscore_join.join(rankvar_result)
-	hpo_with_age = hpo_paths.join(input_age).map { out_prefix, hpo_path, age_of_onset -> tuple(out_prefix, hpo_path, age_of_onset) }
+	hpo_with_age = hpo_paths.join(input_meta).map { out_prefix, hpo_path, age_of_onset, sex -> tuple(out_prefix, hpo_path, age_of_onset, sex) }
 	rankvar_join_hpo = rankvar_join.join(hpo_with_age)
-	rankvar_join_hpo_ordered = rankvar_join_hpo.map { out_prefix, sv_pathogenic, snv_vcf_path, sv_vcf_path, snv_rankscore, snv_pathogenic, snv_rankvar, hpo_path, age_of_onset ->
-		tuple(out_prefix, snv_rankvar, snv_rankscore, snv_pathogenic, sv_pathogenic, sv_vcf_path, snv_vcf_path, hpo_path, age_of_onset)
+	rankvar_join_hpo_ordered = rankvar_join_hpo.map { out_prefix, sv_pathogenic, snv_vcf_path, sv_vcf_path, snv_rankscore, snv_pathogenic, snv_rankvar, hpo_path, age_of_onset, sex ->
+		tuple(out_prefix, snv_rankvar, snv_rankscore, snv_pathogenic, sv_pathogenic, sv_vcf_path, snv_vcf_path, hpo_path, age_of_onset, sex)
 	}
 	multi_ngs_prio(rankvar_join_hpo_ordered, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 

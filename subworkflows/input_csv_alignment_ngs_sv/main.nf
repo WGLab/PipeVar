@@ -20,7 +20,7 @@ include { multi_sv_prio } from '../../modules/multi_sv_prio/'
 workflow INPUT_CSV_ALIGNMENT_NGS_SV {
 	take:
 	input_bam
-	input_age
+	input_meta
 	ref_fa
 	eh_variant_catalog
 	is_note
@@ -90,7 +90,7 @@ workflow INPUT_CSV_ALIGNMENT_NGS_SV {
         phenosv_input=survivor_result.join(input_bam_no_bam)
         phenosv_result=multi_phenosv(phenosv_input)
         sv_prio_input=phenosv_result.join(annovar_sv_for_downstream)
-        input_bam_hpo_age=input_bam_no_bam.join(input_age).map { out_prefix, hpo_path, age_of_onset -> tuple(out_prefix, hpo_path, age_of_onset) }
+        input_bam_hpo_age=input_bam_no_bam.join(input_meta).map { out_prefix, hpo_path, age_of_onset, sex -> tuple(out_prefix, hpo_path, age_of_onset, sex) }
         sv_prio_input_hpo=sv_prio_input.join(input_bam_hpo_age)
         multi_sv_prio(sv_prio_input_hpo,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
 

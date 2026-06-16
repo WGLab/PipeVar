@@ -8,7 +8,7 @@ process multi_mito_clair3 {
 	val mito_contig
 
 	output:
-	tuple val(out_prefix), path("${out_prefix}.mito.vcf.gz"), path("${out_prefix}.mito.vcf.gz.tbi")
+	tuple val(out_prefix), path("${out_prefix}.mito.clair3.raw.vcf.gz")
 
 	script:
 	def args = task.ext.args ?: ''
@@ -51,14 +51,6 @@ process multi_mito_clair3 {
 	    --var_pct_full=0.1 \\
 	    --enable_variant_calling_at_sequence_head_and_tail
 
-	bcftools norm -m -any "${out_prefix}_mito_clair3/merge_output.vcf.gz" -Ov -o "${out_prefix}.mito.split.vcf"
-
-		python3 "${projectDir}/bin/clair3_mito_adapt.py" \\
-		    --input "${out_prefix}.mito.split.vcf" \\
-		    --output "${out_prefix}.mito.raw.vcf"
-
-		bgzip -f -c "${out_prefix}.mito.raw.vcf" > "${out_prefix}.mito.vcf.gz"
-		tabix -f -p vcf "${out_prefix}.mito.vcf.gz"
-		rm -f "${out_prefix}.mito.split.vcf" "${out_prefix}.mito.raw.vcf"
-		"""
-	}
+	mv "${out_prefix}_mito_clair3/merge_output.vcf.gz" "${out_prefix}.mito.clair3.raw.vcf.gz"
+	"""
+}

@@ -66,6 +66,8 @@ INPUT MODES
          empty age is allowed (treated as not provided)
          non-empty age must be xd/xm/xy or integer years
          examples: 10d, 9m, 7y, 7 (normalized to 7y)
+         optional sex metadata is read from --sex_column (default: sex)
+         sex must be unknown, male, or female; empty/missing sex becomes unknown
      Note handling:
        default            -> note_path treated as clinical note (PhenoTagger ON)
        --note no          -> note_path treated as HPO file (PhenoTagger OFF)
@@ -84,6 +86,8 @@ INPUT MODES
          empty age is allowed (treated as not provided)
          non-empty age must be xd/xm/xy or integer years
          examples: 10d, 9m, 7y, 7 (normalized to 7y)
+         optional sex metadata is read from --sex_column (default: sex)
+         sex must be unknown, male, or female; empty/missing sex becomes unknown
 
   5) Annotated SNV / unified manifest mode
      Single-sample required:
@@ -97,7 +101,7 @@ INPUT MODES
        --bam <BAM|CRAM> --annotated_sv yes --annovar_sv_vcf <SV multianno VCF>
        --ref_fa <FILE> --type short
      CSV unified columns:
-       sample,input_kind,phenotype_path,phenotype_format,age_of_onset,
+       sample,input_kind,phenotype_path,phenotype_format,age_of_onset,sex,
        snv_txt_path,snv_vcf_path,sv_vcf_path,vcf_path,alignment_path,alignment_index_path
 
 --------------------------------------------------------------------------------
@@ -145,6 +149,15 @@ FILTERING OPTIONS
                            Insertion position window for common matching. Default: 500
   --common_sv_ins_identity <FLOAT>
                            Insertion sequence identity threshold when inserted sequence is available. Default: 0.8
+  --denovo_filter <yes|no> In CSV mode, filter proband SNV/SV ANNOVAR outputs against father/mother calls. Default: no
+  --denovo_role_column <NAME>
+                           CSV role column for proband/father/mother/sibling. Default: role
+  --denovo_family_column <NAME>
+                           CSV family grouping column. Default: family_id
+  --denovo_vcf_sample_column <NAME>
+                           Optional CSV column for VCF sample names. Default: vcf_sample
+  --denovo_sv_min_reciprocal_overlap <FLOAT>
+                           SV parent/proband reciprocal-overlap threshold. Default: 0.50
   --gq <INT>               Minimum genotype quality. Default: 20
   --ad <INT>               Minimum allele depth. Default: 15
   --phen2gene_filter <INT> Number of top Phen2Gene genes used for targeted mode. Default: 500
@@ -181,6 +194,7 @@ OUTPUT / GENERAL
 --------------------------------------------------------------------------------
   --out_prefix <STRING>    Output prefix. Default: PipeVar
   --output_directory <DIR> Output directory. Default: launch directory
+  --sex_column <STRING>    Optional CSV sex metadata column. Default: sex
   --help                   Print this help text and exit
 
 --------------------------------------------------------------------------------
@@ -1091,7 +1105,7 @@ include { INPUT_CSV_ANNOTATED_SNV_CALLED_SV_NGS } from './subworkflows/input_csv
 
 
 workflow {
-	def input_age = null
+	def input_meta = null
 	def mito_ref_fa = null
 	def eh_variant_catalog = null
 	def annovar_txt = null
@@ -1102,7 +1116,7 @@ workflow {
 	def csv_manifest_mode = null
 	def csv_manifest_is_note = null
 	if ( params.input_csv ) {
-		input_age = Channel
+		input_meta = Channel
     .fromPath( params.input_csv )
     .splitCsv( header:true )
     .map { row ->
@@ -1111,6 +1125,8 @@ workflow {
         def has_age = row.containsKey('age')
         def age_source = has_age_of_onset ? 'age_of_onset' : (has_age ? 'age' : null)
         def age_value = ''
+        def sex_column = params.sex_column ? params.sex_column.toString() : 'sex'
+        def sex_value = 'unknown'
 
         if (age_source != null) {
             def raw_age = row[age_source]
@@ -1130,7 +1146,22 @@ workflow {
             }
         }
 
-        return tuple(out_prefix, age_value)
+        if (row.containsKey(sex_column)) {
+            def raw_sex = row[sex_column]
+            sex_value = raw_sex == null ? 'unknown' : raw_sex.toString().trim().toLowerCase()
+            if (!sex_value) {
+                sex_value = 'unknown'
+            }
+            if (!(sex_value in ['unknown', 'male', 'female'])) {
+                error """
+                ERROR: Invalid sex value in input CSV for sample '${out_prefix}'.
+                Column '${sex_column}' must be empty, 'unknown', 'male', or 'female'.
+                Received: '${raw_sex}'
+                """
+            }
+        }
+
+        return tuple(out_prefix, age_value, sex_value)
     }
 		if ( manifestUsesUnifiedSchema ) {
 		if ( manifestInputKinds == (['annotated_snv'] as Set) ) {
@@ -1481,21 +1512,21 @@ eh_variant_catalog = Channel
 	}
 	if ( params.input_csv ) {
         if ( input_annotated_ngs != null ) {
-            INPUT_CSV_ANNOTATED_ALL_NGS(input_annotated_ngs, input_age, ref_fa, ref_fa, eh_variant_catalog, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_ref_fa, mito_contig)
+            INPUT_CSV_ANNOTATED_ALL_NGS(input_annotated_ngs, input_meta, ref_fa, ref_fa, eh_variant_catalog, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_ref_fa, mito_contig)
         }
         else if ( input_annotated_called_ngs != null ) {
-            INPUT_CSV_ANNOTATED_SNV_CALLED_SV_NGS(input_annotated_called_ngs, input_age, ref_fa, ref_fa, eh_variant_catalog, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_ref_fa, mito_contig)
+            INPUT_CSV_ANNOTATED_SNV_CALLED_SV_NGS(input_annotated_called_ngs, input_meta, ref_fa, ref_fa, eh_variant_catalog, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_ref_fa, mito_contig)
         }
         else if ( input_annotated_snv != null ) {
-            INPUT_CSV_ANNOTATED_SNV_SNP(input_annotated_snv, input_age, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
+            INPUT_CSV_ANNOTATED_SNV_SNP(input_annotated_snv, input_meta, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
         }
         else if ( input_vcf != null ) {
             def effective_csv_mode = clean_mode ?: csv_manifest_mode
             if ( effective_csv_mode == 'sv' ) {
-                INPUT_CSV_ALIGNMENT_VCF_SV(input_vcf, input_age, ref_fa, phen2gene_top_n, is_note, target, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
+                INPUT_CSV_ALIGNMENT_VCF_SV(input_vcf, input_meta, ref_fa, phen2gene_top_n, is_note, target, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
             }
             else if ( effective_csv_mode == 'snp' ) {
-                INPUT_CSV_ALIGNMENT_VCF_SNP(input_vcf, input_age, ref_fa, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
+                INPUT_CSV_ALIGNMENT_VCF_SNP(input_vcf, input_meta, ref_fa, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
             }
         }
 	        else if ( input_bam != null ) {
@@ -1506,13 +1537,13 @@ eh_variant_catalog = Channel
 		                        mito_report_tsv = INPUT_CSV_ALIGNMENT_NGS_MITO.out.prioritized_tsv
 		                    }
 		                    if ( clean_mode == 'sv' ) {
-		                        INPUT_CSV_ALIGNMENT_NGS_SV(input_bam, input_age, ref_fa, eh_variant_catalog, is_note, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
+		                        INPUT_CSV_ALIGNMENT_NGS_SV(input_bam, input_meta, ref_fa, eh_variant_catalog, is_note, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 		                    }
 	                    else if ( clean_mode == 'snp' ) {
-                        INPUT_CSV_NGS_SNP(input_bam, input_age, ref_fa, eh_variant_catalog, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
+                        INPUT_CSV_NGS_SNP(input_bam, input_meta, ref_fa, eh_variant_catalog, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 				}
 				else {
-                                INPUT_CSV_ALIGNMENT_ALL_NGS(input_bam, input_age, ref_fa, eh_variant_catalog, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_report_tsv, clean_mito)
+                                INPUT_CSV_ALIGNMENT_ALL_NGS(input_bam, input_meta, ref_fa, eh_variant_catalog, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_report_tsv, clean_mito)
 	                        }
 	            }
 	            else { // Long reads
@@ -1522,13 +1553,13 @@ eh_variant_catalog = Channel
 	                        mito_report_tsv = INPUT_CSV_ALIGNMENT_LONG_MITO.out.prioritized_tsv
 	                    }
 	                    if ( clean_mode == 'sv' ) {
-	                        INPUT_CSV_ALIGNMENT_LONG_SV(input_bam, input_age, ref_fa,  is_note, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
+	                        INPUT_CSV_ALIGNMENT_LONG_SV(input_bam, input_meta, ref_fa,  is_note, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 	                    }
 	                    else if ( clean_mode == 'snp' ) {
-                        INPUT_CSV_ALIGNMENT_LONG_SNP(input_bam, input_age, ref_fa,  rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
+                        INPUT_CSV_ALIGNMENT_LONG_SNP(input_bam, input_meta, ref_fa,  rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 	                    }
 	                    else {
-                        INPUT_CSV_ALIGNMENT_ALL_LONGPHASE(input_bam, input_age, ref_fa,  rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_report_tsv, clean_mito)
+                        INPUT_CSV_ALIGNMENT_ALL_LONGPHASE(input_bam, input_meta, ref_fa,  rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_report_tsv, clean_mito)
 	                    }
 	            }
 	        }

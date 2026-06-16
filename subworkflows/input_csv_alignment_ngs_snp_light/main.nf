@@ -14,6 +14,7 @@ include { multi_phen2gene_filter } from '../../modules/multi_reduce_region_phen2
 workflow INPUT_CSV_ALIGNMENT_NGS_SNP_LIGHT {
 	take:
 	input_bam
+	input_meta
 	ref_fa
 	rankscore_filter
 	rankscore_softwares
@@ -61,8 +62,8 @@ workflow INPUT_CSV_ALIGNMENT_NGS_SNP_LIGHT {
         rankscore_rankvar_join=rankscore_result.join(rankvar_result)
         annovar_result_vcf=annovar_result.map { item -> tuple(item[0], item[2]) }
         snp_prio_input=rankscore_rankvar_join.join(annovar_result_vcf)
-        snp_prio_input_hpo=snp_prio_input.join(input_bam_no_bam)
+        input_bam_hpo_age=input_bam_no_bam.join(input_meta).map { out_prefix, hpo_path, age_of_onset, sex -> tuple(out_prefix, hpo_path, age_of_onset, sex) }
+        snp_prio_input_hpo=snp_prio_input.join(input_bam_hpo_age)
         multi_snp_prio(snp_prio_input_hpo,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
 
 }	
-

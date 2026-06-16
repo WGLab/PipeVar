@@ -1,6 +1,6 @@
 // Batch filter common structural variants from ANNOVAR SV VCFs.
 process multi_common_sv_filter {
-	container = 'beoungl/docker_test:common_sv_filter_0.2'
+	container = 'beoungl/docker_test:common_sv_filter_0.3'
 
 	input:
 	tuple val(out_prefix), path(vcf)
@@ -16,7 +16,7 @@ process multi_common_sv_filter {
 	def ins_distance = params.common_sv_ins_distance ?: '500'
 	def ins_identity = params.common_sv_ins_identity ?: '0.8'
 	"""
-	filter_common_svs.py \\
+	python3 /usr/local/bin/filter_common_svs.py \\
 	    --input-vcf $vcf \\
 	    --output-vcf ${out_prefix}.common_sv_filtered.vcf \\
 	    --removed-vcf ${out_prefix}.common_sv_removed.vcf \\

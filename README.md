@@ -8,7 +8,7 @@ It keeps the existing nuclear SNP/SV/repeat analysis and adds mtDNA calling, ann
 - Calls and prioritizes SNP/indel variants.
 - Calls and prioritizes structural variants (SV).
 - Runs repeat expansion analysis (short-read and long-read paths).
-- Optionally calls and annotates mitochondrial variants with Mutect2 for short reads or Clair3 for long reads, then applies bundled mtDNA evidence databases.
+- Optionally calls and annotates mitochondrial variants with Mutect2 for short reads or a two-step Clair3-plus-postprocess path for long reads, then applies bundled mtDNA evidence databases.
 - Uses phenotype inputs (`--hpo` or clinical note via `--note`) for phenotype-guided ranking.
 - Supports single-sample mode and CSV batch mode.
 
@@ -111,7 +111,7 @@ PipeVar_mito adds an opt-in mitochondrial branch for BAM/CRAM input:
 - supported only with BAM/CRAM input, not VCF-only mode
 - supported with `--mode snp` or when `--mode` is omitted
 - short reads use Mutect2
-- long reads use a mito-specific Clair3 path adapted to the existing mtDNA annotation contract
+- long reads use a mito-specific Clair3 call step followed by VCF postprocessing adapted to the existing mtDNA annotation contract
 - long-read mito is unavailable with `--light yes` because that path switches to NanoCaller
 
 The mito branch emits separate outputs and does not modify the existing nuclear `.prio.vcf` outputs.
@@ -225,6 +225,10 @@ Expected CSV columns:
   - Empty age is allowed and treated as not provided.
   - Non-empty age must be `xd`/`xm`/`xy` or integer years.
   - Examples: `10d`, `9m`, `7y`, `7` (`7` is normalized to `7y`).
+- Optional sex metadata column for CSV prioritization flows:
+  - The default column name is `sex`; override it with `--sex_column <STRING>`.
+  - Values are normalized to lowercase and must be `unknown`, `male`, or `female`.
+  - Empty or missing sex values are treated as `unknown`.
 
 Phenotype handling in CSV mode:
 
@@ -251,12 +255,17 @@ Expected CSV columns:
   - Empty age is allowed and treated as not provided.
   - Non-empty age must be `xd`/`xm`/`xy` or integer years.
   - Examples: `10d`, `9m`, `7y`, `7` (`7` is normalized to `7y`).
+- Optional sex metadata column for CSV prioritization flows:
+  - The default column name is `sex`; override it with `--sex_column <STRING>`.
+  - Values are normalized to lowercase and must be `unknown`, `male`, or `female`.
+  - Empty or missing sex values are treated as `unknown`.
 
 ## Core parameters
 
 - `--bam <FILE>`: single BAM/CRAM input (mutually exclusive with `--vcf` in single-file mode)
 - `--vcf <FILE>`: single VCF input
 - `--input_csv <FILE>`: manifest for batch processing
+- `--sex_column <STRING>`: optional CSV sex metadata column name (default: `sex`)
 - `--ref_fa <FILE>`: reference FASTA
 - `--out_prefix <STRING>`: output prefix (single-sample mode)
 - `--output_directory <DIR>`: publish directory (default: launch directory)
@@ -291,6 +300,14 @@ Expected CSV columns:
 - `--help`: print help
 
 ## Important behavior updates
+
+### Input CSV generator
+
+Run `scripts/generate_input_csv.sh` to build legacy or unified CSV manifests.
+The generator can add `age_of_onset` and `sex` metadata, with per-sample prompts
+for `unknown`, `male`, or `female` sex values.
+Unified and annotated CSV manifests use the same optional sex metadata rules as
+legacy CSV batch mode.
 
 ### Unified light behavior for SNP/all workflows
 

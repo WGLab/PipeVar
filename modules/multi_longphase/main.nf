@@ -1,10 +1,10 @@
 
 // Batch longphase phasing and evidence aggregation into prioritized VCFs.
 process multi_longphase {
-	container ='beoungl/docker_test:longphase_0.2.28'
+	container ='beoungl/docker_test:longphase_0.2.29'
 
 	input:
-	tuple val(out_prefix), path(snv_rankvar), path(snv_rankscore), path(snv_pathogenic), path(sv_pathogenic), path(sv_vcf_path), path(snv_vcf_path), path(bam_path), path(bam_index), path(hpo_path), val(age_of_onset)
+	tuple val(out_prefix), path(snv_rankvar), path(snv_rankscore), path(snv_pathogenic), path(sv_pathogenic), path(sv_vcf_path), path(snv_vcf_path), path(bam_path), path(bam_index), path(hpo_path), val(age_of_onset), val(sex)
 	tuple path(ref_fa), path(fa_index)
 
 	val(inheritance_mode)
@@ -44,8 +44,8 @@ process multi_longphase {
 	    python3 /assign_dom_or_rec.py ${out_prefix}.clinvar.vcf ${out_prefix}.phenosv.vcf ${out_prefix}.rankscore.vcf ${out_prefix}.rankvar.vcf $hpo_path $age_of_onset $inheritance_mode ${out_prefix}.assigned.vcf --phenosv-score $min_score --genes "$gene_filter"
 	fi
 
-	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio_gene.vcf gene --include-clinvar $include_clinvar_report --allow-unphased-comphet $allow_unphased_comphet --genes "$gene_filter"
-	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio.vcf variant --include-clinvar $include_clinvar_report --allow-unphased-comphet $allow_unphased_comphet --genes "$gene_filter"
+	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio_gene.vcf gene --include-clinvar $include_clinvar_report --allow-unphased-comphet $allow_unphased_comphet --genes "$gene_filter" --sex $sex
+	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio.vcf variant --include-clinvar $include_clinvar_report --allow-unphased-comphet $allow_unphased_comphet --genes "$gene_filter" --sex $sex
 
 
 	"""
