@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1260" height="760" viewBox="0 0 1260 760" role="img" aria-labelledby="title desc">
+  <title id="title">Variant Prioritization Detail</title>
+  <desc id="desc">Focused workflow figure for SNV and SV prioritization with inheritance-aware assignment.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#405d78"/>
+    </marker>
+    <style>
+      .canvas { fill: #f8fafb; }
+      .lane { fill: #f0f4f7; stroke: #9fb5c6; stroke-width: 1.2; }
+      .box { fill: #ffffff; stroke: #405d78; stroke-width: 1.5; rx: 8; }
+      .context { fill: #fbf7e9; stroke: #9c7b35; }
+      .assign { fill: #f5fbf4; stroke: #4c7b57; }
+      .output { fill: #edf6fb; stroke: #336b87; }
+      .label { font-family: Arial, Helvetica, sans-serif; font-size: 17px; font-weight: 700; fill: #173245; }
+      .text { font-family: Arial, Helvetica, sans-serif; font-size: 15px; fill: #223642; }
+      .small { font-family: Arial, Helvetica, sans-serif; font-size: 13px; fill: #415866; }
+      .flow { fill: none; stroke: #405d78; stroke-width: 2; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect class="canvas" x="0" y="0" width="1260" height="760"/>
+  <text class="label" x="40" y="44">Figure 2. Variant Prioritization Detail</text>
+
+  <rect class="box context" x="40" y="92" width="170" height="74"/>
+  <text class="text" x="92" y="123">HPO terms</text>
+  <text class="small" x="70" y="146">phenotype evidence</text>
+
+  <rect class="box context" x="40" y="206" width="170" height="96"/>
+  <text class="text" x="70" y="237">--inheritance_mode</text>
+  <text class="small" x="85" y="262">ml | omim | gnomad</text>
+  <text class="small" x="73" y="282">dominant/recessive</text>
+
+  <rect class="lane" x="255" y="78" width="220" height="236" rx="10"/>
+  <text class="label" x="278" y="110">SNV/indel evidence</text>
+  <rect class="box" x="290" y="132" width="150" height="42"/>
+  <text class="text" x="328" y="158">ANNOVAR</text>
+  <rect class="box" x="290" y="190" width="150" height="42"/>
+  <text class="text" x="338" y="216">ClinVar</text>
+  <rect class="box" x="290" y="248" width="150" height="42"/>
+  <text class="text" x="328" y="274">RankScore</text>
+
+  <rect class="lane" x="255" y="370" width="220" height="192" rx="10"/>
+  <text class="label" x="305" y="402">SV evidence</text>
+  <rect class="box" x="290" y="424" width="150" height="42"/>
+  <text class="text" x="321" y="450">ANNOVAR_SV</text>
+  <rect class="box" x="290" y="482" width="150" height="42"/>
+  <text class="text" x="325" y="508">SURVIVOR</text>
+
+  <rect class="lane assign" x="540" y="95" width="250" height="420" rx="10"/>
+  <text class="label" x="570" y="127">Inheritance assignment</text>
+  <rect class="box" x="575" y="158" width="180" height="56"/>
+  <text class="text" x="596" y="181">assign_dom_or_rec</text>
+  <text class="small" x="626" y="200">SNV-only</text>
+  <rect class="box" x="575" y="250" width="180" height="56"/>
+  <text class="text" x="596" y="273">assign_dom_or_rec</text>
+  <text class="small" x="633" y="292">SV-only</text>
+  <rect class="box" x="575" y="342" width="180" height="56"/>
+  <text class="text" x="596" y="365">assign_dom_or_rec</text>
+  <text class="small" x="623" y="384">combined</text>
+
+  <rect class="lane" x="850" y="96" width="190" height="420" rx="10"/>
+  <text class="label" x="884" y="128">Workflows</text>
+  <rect class="box" x="875" y="158" width="140" height="56"/>
+  <text class="text" x="919" y="181">snp_prio</text>
+  <text class="small" x="919" y="200">SNV-only</text>
+  <rect class="box" x="875" y="250" width="140" height="56"/>
+  <text class="text" x="922" y="273">sv_prio</text>
+  <text class="small" x="926" y="292">SV-only</text>
+  <rect class="box" x="875" y="342" width="140" height="56"/>
+  <text class="text" x="918" y="365">ngs_prio</text>
+  <text class="small" x="899" y="384">short-read full</text>
+  <rect class="box" x="875" y="434" width="140" height="56"/>
+  <text class="text" x="914" y="457">longphase</text>
+  <text class="small" x="902" y="476">long-read full</text>
+
+  <rect class="box output" x="1095" y="248" width="130" height="150"/>
+  <text class="text" x="1131" y="280">Reports</text>
+  <text class="small" x="1123" y="315">variant-level</text>
+  <text class="small" x="1137" y="333">VCF</text>
+  <text class="small" x="1128" y="365">gene-level</text>
+  <text class="small" x="1137" y="383">VCF</text>
+
+  <path class="flow" d="M210,120 H238 V174 H575"/>
+  <path class="flow" d="M210,244 H232 V196 H575"/>
+  <path class="flow" d="M210,138 H246 V354 H575"/>
+  <path class="flow" d="M210,264 H232 V386 H575"/>
+  <path class="flow" d="M440,153 H505 V176 H575"/>
+  <path class="flow" d="M440,205 H520 V188 H575"/>
+  <path class="flow" d="M440,263 H505 V200 H575"/>
+  <path class="flow" d="M440,445 H514 V270 H575"/>
+  <path class="flow" d="M440,497 H528 V286 H575"/>
+  <path class="flow" d="M440,217 H496 V356 H575"/>
+  <path class="flow" d="M440,275 H484 V372 H575"/>
+  <path class="flow" d="M440,509 H500 V388 H575"/>
+  <path class="flow" d="M755,186 H875"/>
+  <path class="flow" d="M755,278 H875"/>
+  <path class="flow" d="M755,362 H875"/>
+  <path class="flow" d="M755,382 H815 V462 H875"/>
+  <path class="flow" d="M1015,186 H1062 V292 H1095"/>
+  <path class="flow" d="M1015,278 H1078 V318 H1095"/>
+  <path class="flow" d="M1015,370 H1050 V344 H1095"/>
+  <path class="flow" d="M1015,462 H1062 V370 H1095"/>
+</svg>

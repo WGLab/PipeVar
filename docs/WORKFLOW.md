@@ -5,6 +5,9 @@ emphasize analytical stages and evidence flow rather than command-line routing
 details. Single-sample and batch execution use the same biological workflow;
 batch mode runs the corresponding `multi_*` modules per sample.
 
+For a focused pair of standalone nuclear workflow figures, see
+[`PIPEVAR_NUCLEAR_FIGURES.md`](PIPEVAR_NUCLEAR_FIGURES.md).
+
 ## Paper-Style Workflow Summary
 
 ```mermaid

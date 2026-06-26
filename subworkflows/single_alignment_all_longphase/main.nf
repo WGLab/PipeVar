@@ -77,7 +77,7 @@ workflow SINGLE_ALIGNMENT_ALL_LONGPHASE {
 	cnvpytor_mode = params.cnvpytor ? params.cnvpytor.toString().trim().toLowerCase() : "no"
 	cnvpytor_baf_mode = params.cnvpytor_baf ? params.cnvpytor_baf.toString().trim().toLowerCase() : "yes"
 	if ( cnvpytor_mode == "yes" ) {
-		CNVpytor(bam,out_prefix,snp_vcf,Channel.value(cnvpytor_baf_mode),Channel.value(params.cnvpytor_bin_sizes),Channel.value(params.cnvpytor_primary_bin),Channel.value(params.cnvpytor_min_size))
+		CNVpytor(bam,out_prefix,ref_fa,snp_vcf,Channel.value(cnvpytor_baf_mode),Channel.value(params.cnvpytor_bin_sizes),Channel.value(params.cnvpytor_primary_bin),Channel.value(params.cnvpytor_min_size))
 		sv_merge_inputs = sniffles.out.combine(CNVpytor.out.vcf).map { combined_vcfs ->
 			combined_vcfs.flatten()
 		}

@@ -6,6 +6,7 @@ process CNVpytor {
 	input:
 	tuple path(bam), path(index)
 	val out_prefix
+	tuple path(ref_fa), path(fa_index)
 	path snp_vcf
 	val use_baf
 	val bin_sizes
@@ -19,14 +20,15 @@ process CNVpytor {
 
 	script:
 	def args = task.ext.args ?: ''
+	def ref_arg = bam.name.endsWith('.cram') ? "-T ${ref_fa}" : ''
 	"""
-	cnvpytor -root ${out_prefix}.pytor -rd $bam $args
+	cnvpytor -root ${out_prefix}.pytor -rd $bam ${ref_arg} $args
 	cnvpytor -root ${out_prefix}.pytor -his ${bin_sizes} $args
 	if [ "$use_baf" = "yes" ] && [ -s "$snp_vcf" ]; then
 		vcf_sample=\$( (gzip -dc "$snp_vcf" 2>/dev/null || cat "$snp_vcf") | awk '/^#CHROM/ {print \$10; exit}' )
 		if [ -n "\$vcf_sample" ]; then
 			cnvpytor -root ${out_prefix}.pytor -snp $snp_vcf -sample "\$vcf_sample" $args
-			cnvpytor -root ${out_prefix}.pytor -pileup $bam $args
+			cnvpytor -root ${out_prefix}.pytor -pileup $bam ${ref_arg} $args
 			cnvpytor -root ${out_prefix}.pytor -baf ${bin_sizes} $args
 		else
 			echo "WARNING: CNVpytor BAF mode requested but no VCF sample column was found for $snp_vcf; continuing with RD-only output." >&2

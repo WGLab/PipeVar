@@ -151,6 +151,7 @@ process xtea {
 	fi
 	printf 'xTEA run scripts discovered:\\n' > xtea.run.log
 	printf '  %s\\n' "\${run_scripts[@]}" >> xtea.run.log
+	printf 'xTEA gVCF step bypassed; using -f 4883\\n' >> xtea.run.log
 
 	set +u
 	for run_script in "\${run_scripts[@]}"; do
@@ -169,27 +170,12 @@ process xtea {
 	done
 	set -u
 
-	xtea_vcf=\$(
-	    for search_root in "\$XTEA_WORK" "\$XTEA_NATIVE_WORK"; do
-	        [[ -e "\$search_root" ]] && find "\$search_root" -type f \\( -name '*.vcf' -o -name '*.gvcf' -o -name '*.vcf.gz' -o -name '*.gvcf.gz' \\) 2>/dev/null
-	    done | sort | head -n 1
-	)
-	if [[ -n "\$xtea_vcf" ]]; then
-	    if [[ "\$xtea_vcf" == *.gz ]]; then
-	        gzip -cd "\$xtea_vcf" > ${meta.id}_xtea.vcf
-	    else
-	        cp "\$xtea_vcf" ${meta.id}_xtea.vcf
-	    fi
-	fi
-
-	if [[ ! -s ${meta.id}_xtea.vcf ]]; then
-	    {
-	        echo '##fileformat=VCFv4.2'
-	        echo "##source=xTEA"
-	        echo "##reference=$ref_fa"
-	        echo -e '#CHROM\\tPOS\\tID\\tREF\\tALT\\tQUAL\\tFILTER\\tINFO'
-	    } > ${meta.id}_xtea.vcf
-	fi
+	xtea_candidates_to_vcf.py \\
+	    --sample-id "${meta.id}" \\
+	    --output ${meta.id}_xtea.vcf \\
+	    --reference "\$REF_ABS" \\
+	    --log xtea.run.log \\
+	    "\$XTEA_WORK" "\$XTEA_NATIVE_WORK"
 
 	if ! grep -q '^#CHROM' ${meta.id}_xtea.vcf; then
 	    echo "xTEA output is not a valid VCF: missing #CHROM header" >&2
