@@ -3,6 +3,7 @@
 PipeVar_mito is a Nextflow DSL2 workflow for rare-disease variant prioritization from short-read and long-read data. It keeps the nuclear SNV/indel, SV/CNV/MEI, repeat-expansion, phenotype-ranking, and reporting paths from PipeVar, and adds an opt-in mitochondrial analysis branch for BAM/CRAM inputs.
 
 ## Overview
+<img width="1104" height="1051" alt="image" src="https://github.com/user-attachments/assets/7c309742-b182-4f02-ac3f-99b124b9c605" />
 
 PipeVar_mito supports:
 
