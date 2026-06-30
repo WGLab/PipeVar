@@ -93,7 +93,8 @@ workflow INPUT_CSV_ALIGNMENT_ALL_LONGPHASE {
 		cnvpytor_input=input_bam_with_bam.join(snp_result).map { out_prefix, bam_file, bai_file, snp_vcf ->
 			tuple(out_prefix, bam_file, bai_file, snp_vcf)
 		}
-		cnvpytor_result=multi_cnvpytor(cnvpytor_input,ref_fa,Channel.value(cnvpytor_baf_mode),Channel.value(params.cnvpytor_bin_sizes),Channel.value(params.cnvpytor_primary_bin),Channel.value(params.cnvpytor_min_size))
+		cnvpytor_reference_conf = Channel.value(params.cnvpytor_reference_conf ? file(params.cnvpytor_reference_conf) : [])
+		cnvpytor_result=multi_cnvpytor(cnvpytor_input,ref_fa,Channel.value(params.cnvpytor_reference_genome),cnvpytor_reference_conf,Channel.value(cnvpytor_baf_mode),Channel.value(params.cnvpytor_bin_sizes),Channel.value(params.cnvpytor_primary_bin),Channel.value(params.cnvpytor_min_size))
 		merged_sv_input=sniffles_result.join(cnvpytor_result.vcf).map { out_prefix, sniffles_vcf, cnvpytor_vcf ->
 			tuple(out_prefix, [sniffles_vcf, cnvpytor_vcf])
 		}

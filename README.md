@@ -1,68 +1,85 @@
 # PipeVar_mito
 
-PipeVar_mito is a Nextflow DSL2 workflow for rare-disease variant prioritization from short-read and long-read data, with an additional opt-in mitochondrial analysis branch for BAM/CRAM inputs.
-It keeps the existing nuclear SNP/SV/repeat analysis and adds mtDNA calling, annotation, and prioritization outputs.
+PipeVar_mito is a Nextflow DSL2 workflow for rare-disease variant prioritization from short-read and long-read data. It keeps the nuclear SNV/indel, SV/CNV/MEI, repeat-expansion, phenotype-ranking, and reporting paths from PipeVar, and adds an opt-in mitochondrial analysis branch for BAM/CRAM inputs.
 
-## What PipeVar does
+## Overview
 
-- Calls and prioritizes SNP/indel variants.
-- Calls and prioritizes structural variants (SV).
-- Runs repeat expansion analysis (short-read and long-read paths).
-- Optionally calls and annotates mitochondrial variants with Mutect2 for short reads or a two-step Clair3-plus-postprocess path for long reads, then applies bundled mtDNA evidence databases.
-- Uses phenotype inputs (`--hpo` or clinical note via `--note`) for phenotype-guided ranking.
-- Supports single-sample mode and CSV batch mode.
+PipeVar_mito supports:
 
-## Runtime model
+- SNV/indel calling, annotation, and prioritization.
+- Structural variant and CNV calling, annotation, and prioritization.
+- Short-read and long-read repeat-expansion analysis.
+- Optional short-read mobile-element analysis with xTEA.
+- Optional mitochondrial analysis with Mutect2 for short reads or Clair3 plus postprocessing for long reads.
+- Phenotype-guided ranking from HPO files or clinical notes processed through PhenoTagger.
+- Single-sample and CSV batch execution.
 
-PipeVar is designed for containerized execution.
+## Quick Start
 
-- Supported container backends:
-  - Singularity
-  - Docker
-- Tested/primary scheduler profile:
-  - SLURM (`standard` / `slurm_singularity`)
-- Also available:
-  - local executor with Singularity
-  - local executor with Docker
-
-## Execution profiles
-
-Defined in `nextflow.config`:
-
-- `standard`
-  - SLURM + Singularity (default profile behavior)
-- `slurm_singularity`
-  - Explicit SLURM + Singularity
-- `local_singularity`
-  - Local executor + Singularity
-- `local_docker`
-  - Local executor + Docker
-
-All Singularity/Docker profiles mount:
-
-- `--annovar_host_path` -> `/annovar`
-- `--phenosv_host_path` -> `/PhenoSV/train_data`
-
-Mitochondrial databases are baked into the mito annotation Docker image and do not require extra runtime bind mounts.
-
-## Setup
-
-### 1) Clone repository
+Clone the repository:
 
 ```bash
-git clone https://github.com/WGLab/PipeVar.git
-cd PipeVar
+git clone https://github.com/WGLab/PipeVar.git PipeVar_mito
+cd ./PipeVar_mito
 ```
 
-### 2) External data/software prerequisites
+Run setup after preparing ANNOVAR and PhenoSV resources:
 
-PipeVar expects ANNOVAR and PhenoSV resources to be available (mounted via profile runtime options).
+```bash
+./setup.sh --annovar-dir=/shared/apps/annovar --phenosv-dir=/shared/data/PhenoSV_model
+```
 
-ANNOVAR registration/download:
+Minimal single-sample BAM/CRAM run:
+
+```bash
+nextflow run main.nf \
+  -profile standard \
+  --bam /data/sample.bam \
+  --ref_fa /refs/hg38.fa \
+  --hpo /data/sample.hpo.txt \
+  --type ont \
+  --out_prefix sample1
+```
+
+Minimal legacy CSV batch run with HPO files in `note_path`:
+
+```bash
+nextflow run main.nf \
+  -profile slurm_singularity \
+  --input_csv /data/samples.csv \
+  --bam true \
+  --note no \
+  --ref_fa /refs/hg38.fa \
+  --type short
+```
+
+## Installation And Runtime
+
+PipeVar_mito is designed for containerized execution. Execution profiles are defined in `nextflow.config`.
+
+| Profile | Executor | Container backend |
+| --- | --- | --- |
+| `standard` | SLURM | Singularity |
+| `slurm_singularity` | SLURM | Singularity |
+| `local_singularity` | local | Singularity |
+| `local_docker` | local | Docker |
+
+All Singularity/Docker profiles mount these host paths:
+
+| Parameter | Container path | Purpose |
+| --- | --- | --- |
+| `--annovar_host_path` | `/annovar` | ANNOVAR installation and databases |
+| `--phenosv_host_path` | `/PhenoSV/train_data` | PhenoSV model resources |
+
+Mitochondrial annotation databases are baked into the mito annotation image and do not require extra runtime bind mounts.
+
+### Setup Script
+
+ANNOVAR must be downloaded through the ANNOVAR registration process:
 
 - https://www.openbioinformatics.org/annovar/annovar_download_form.php
 
-Then run setup script:
+Then run:
 
 ```bash
 # Full setup
@@ -72,270 +89,329 @@ Then run setup script:
 ./setup.sh light
 ```
 
-By default, setup expects:
-
-- ANNOVAR at `./annovar`
-- PhenoSV resources downloaded under `./PhenoSV_model`
-
-You can override both locations (recommended for HPC/shared filesystems):
+By default, setup expects ANNOVAR at `./annovar` and PhenoSV resources under `./PhenoSV_model`. You can override both locations:
 
 ```bash
 ./setup.sh --annovar-dir=/shared/apps/annovar --phenosv-dir=/shared/data/PhenoSV_model
 ```
 
-The setup script prepares required assets and writes host-path references used by runtime mounts.
-It updates the pipeline configuration in place with:
-
-- a persisted default execution profile
-- persisted bind source paths:
-  - `params.annovar_host_path`
-  - `params.phenosv_host_path`
-
-So after setup, users can run without repeatedly passing `-profile` and bind-path params.
+The setup script prepares required assets and can persist the default execution profile plus bind source paths in `nextflow.config`.
 
 Non-interactive setup example:
 
 ```bash
-./setup.sh --non-interactive --profile=local_docker \\
-  --annovar-dir=/data/annovar \\
-  --phenosv-dir=/data/PhenoSV_model \\
-  --annovar-bind=/data/annovar \\
+./setup.sh --non-interactive --profile=local_docker \
+  --annovar-dir=/data/annovar \
+  --phenosv-dir=/data/PhenoSV_model \
+  --annovar-bind=/data/annovar \
   --phenosv-bind=/data/PhenoSV_model
 ```
 
-## Mitochondrial analysis
+## Input Modes
 
-PipeVar_mito adds an opt-in mitochondrial branch for BAM/CRAM input:
-
-- enable with `--mito yes`
-- supported only with BAM/CRAM input, not VCF-only mode
-- supported with `--mode snp` or when `--mode` is omitted
-- short reads use Mutect2
-- long reads use a mito-specific Clair3 call step followed by VCF postprocessing adapted to the existing mtDNA annotation contract
-- long-read mito is unavailable with `--light yes` because that path switches to NanoCaller
-
-The mito branch emits separate outputs and does not modify the existing nuclear `.prio.vcf` outputs.
-
-Bundled mito database sources in the annotation image:
-
-- `MITOMAP`
-- `MitoTip`
-- `t-APOGEE`
-- `MitImpact`
-
-Example:
-
-```bash
-nextflow run main.nf \
-  -profile local_docker \
-  --bam sample.bam \
-  --ref_fa ref.fa \
-  --hpo sample.hpo.txt \
-  --type short \
-  --mode snp \
-  --mito yes \
-  --out_prefix sample1
-```
-
-Long-read example:
-
-```bash
-nextflow run main.nf \
-  -profile local_docker \
-  --bam sample.ont.bam \
-  --ref_fa ref.fa \
-  --hpo sample.hpo.txt \
-  --type ont \
-  --mode snp \
-  --mito yes \
-  --out_prefix sample1_ont
-```
-
-## xTEA mobile-element analysis
-
-PipeVar_mito also supports an opt-in xTEA branch for nuclear short-read SV/MEI analysis:
-
-- enable with `--xtea yes`
-- supported only with `--type short`
-- supported only with BAM/CRAM input, not VCF-only mode
-- supported with `--mode sv` or when `--mode` is omitted
-- executed per sample in both single-sample and CSV batch BAM/CRAM modes
-
-PipeVar runs xTEA as one internal short-read subworkflow step that performs:
-
-- xTEA input-list generation
-- local xTEA execution and VCF normalization
-
-The shared xTEA image is expected to provide:
-
-- the `xtea` command
-- xTEA Python scripts under `/opt/xTea/xtea`
-- the decompressed repeat library under `/opt/xtea/rep_lib_annotation`
-- the GENCODE GFF3 annotation at `/opt/xtea/gencode.gff3`
-
-Important notes:
-
-- xTEA is intended for short-read WGS MEI discovery/genotyping.
-- BAM and CRAM must be indexed.
-- CRAM runs require the matching reference FASTA.
-- xTEA repeat and gene-annotation resources are baked into the shared image, not supplied as runtime parameters.
-- xTEA download/build is handled outside this repo; the shared image should already contain the bundled assets.
-
-## Input modes
-
-## Single-sample BAM/CRAM mode
+### Single BAM/CRAM
 
 Required:
 
 - `--bam <FILE>`
 - `--ref_fa <FILE>`
 - one phenotype source:
-  - `--note <FILE>` (clinical note; PipeVar runs PhenoTagger)
-  - `--hpo <FILE>` (HPO term file)
+  - `--note <FILE>` for a clinical note processed by PhenoTagger
+  - `--hpo <FILE>` for an HPO term file
 
 Optional:
 
-- `--mode <snp|sv>` to run only one branch
+- `--mode snp` or `--mode sv` to run only one branch.
+- omit `--mode` to run the full supported branch set for the selected sequencing type.
+- `--type ont`, `--type pacbio`, or `--type short` to select the sequencing path.
 
-## Single-sample VCF mode
+BAM inputs require a `.bai` index. CRAM inputs require a `.crai` index and the matching reference FASTA.
+
+### Single VCF
 
 Required:
 
 - `--vcf <FILE>`
 - `--ref_fa <FILE>`
-- `--mode <snp|sv>`
-- one phenotype source (`--note` or `--hpo`)
+- `--mode snp` or `--mode sv`
+- one phenotype source: `--note <FILE>` or `--hpo <FILE>`
 
-## CSV batch mode (BAM/CRAM)
+Single VCF mode re-annotates and prioritizes an existing VCF. Mitochondrial analysis, xTEA, and CNVpytor require BAM/CRAM input and are not available in VCF-only mode.
 
-Required:
+### Annotated SNV And Annotated SV
+
+Annotated SNV mode starts from ANNOVAR multianno SNV outputs.
+
+Single-sample annotated SNV required:
+
+- `--annotated_snv yes`
+- `--annovar_txt <ANNOVAR multianno TXT>`
+- `--vcf <matching ANNOVAR multianno VCF>`
+- one phenotype source: `--note <FILE>` or `--hpo <FILE>`
+
+To reuse annotated SNVs while calling SV/STR and optional mito from short-read BAM/CRAM:
+
+```bash
+nextflow run main.nf \
+  --annotated_snv yes \
+  --annovar_txt sample.hg38_multianno.txt \
+  --vcf sample.hg38_multianno.vcf \
+  --bam sample.bam \
+  --ref_fa ref.fa \
+  --type short \
+  --hpo sample.hpo.txt
+```
+
+To import annotated SVs instead of calling SVs from BAM/CRAM, add:
+
+- `--annotated_sv yes`
+- `--annovar_sv_vcf <SV multianno VCF>`
+
+Annotated SNV mode is SNP-led. Use `--mode snp` or omit `--mode`; `--mode sv` is not supported for this input family.
+
+### Legacy CSV
+
+Legacy CSV mode uses `sample,file_path,note_path` rows.
+
+BAM/CRAM CSV required:
 
 - `--input_csv <FILE>`
 - `--bam true`
 - `--ref_fa <FILE>`
 
-Expected CSV columns:
-
-- `sample,file_path,note_path`
-- Optional age column for CSV prioritization flows:
-  - `sample,file_path,note_path,age_of_onset`
-  - `sample,file_path,note_path,age`
-  - If both are present, `age_of_onset` is used.
-  - Age is interpreted per row (per sample), not globally.
-  - Empty age is allowed and treated as not provided.
-  - Non-empty age must be `xd`/`xm`/`xy` or integer years.
-  - Examples: `10d`, `9m`, `7y`, `7` (`7` is normalized to `7y`).
-- Optional sex metadata column for CSV prioritization flows:
-  - The default column name is `sex`; override it with `--sex_column <STRING>`.
-  - Values are normalized to lowercase and must be `unknown`, `male`, or `female`.
-  - Empty or missing sex values are treated as `unknown`.
-
-Phenotype handling in CSV mode:
-
-- default: `note_path` is treated as clinical note (PhenoTagger ON)
-- if `--note no`: `note_path` is treated as HPO file (PhenoTagger OFF)
-
-## CSV batch mode (VCF)
-
-Required:
+VCF CSV required:
 
 - `--input_csv <FILE>`
 - `--vcf true`
 - `--ref_fa <FILE>`
-- `--mode <snp|sv>`
+- `--mode snp` or `--mode sv`
 
-Expected CSV columns:
+Shared legacy CSV columns:
 
-- `sample,file_path,note_path`
-- Optional age column for CSV prioritization flows:
-  - `sample,file_path,note_path,age_of_onset`
-  - `sample,file_path,note_path,age`
-  - If both are present, `age_of_onset` is used.
-  - Age is interpreted per row (per sample), not globally.
-  - Empty age is allowed and treated as not provided.
-  - Non-empty age must be `xd`/`xm`/`xy` or integer years.
-  - Examples: `10d`, `9m`, `7y`, `7` (`7` is normalized to `7y`).
-- Optional sex metadata column for CSV prioritization flows:
-  - The default column name is `sex`; override it with `--sex_column <STRING>`.
-  - Values are normalized to lowercase and must be `unknown`, `male`, or `female`.
-  - Empty or missing sex values are treated as `unknown`.
+| Column | Required | Description |
+| --- | --- | --- |
+| `sample` | yes | Output/sample identifier |
+| `file_path` | yes | BAM/CRAM or VCF path |
+| `note_path` | yes | Clinical note by default, or HPO file when `--note no` |
+| `age_of_onset` | no | Per-sample age for prioritization |
+| `age` | no | Alternate age column used only when `age_of_onset` is absent |
+| `sex` | no | Per-sample sex metadata; override name with `--sex_column` |
 
-## Core parameters
+Age handling:
 
-- `--bam <FILE>`: single BAM/CRAM input (mutually exclusive with `--vcf` in single-file mode)
-- `--vcf <FILE>`: single VCF input
-- `--input_csv <FILE>`: manifest for batch processing
-- `--sex_column <STRING>`: optional CSV sex metadata column name (default: `sex`)
-- `--ref_fa <FILE>`: reference FASTA
-- `--out_prefix <STRING>`: output prefix (single-sample mode)
-- `--output_directory <DIR>`: publish directory (default: launch directory)
-- `--mode <snp|sv>`: restrict to SNP or SV branch
-- `--type <ont|pacbio|short>`: sequencing type for BAM/CRAM flows
-- `--light <yes|no>`: enable lightweight models/callers where supported
-- `--genome <hg38|grch38>`: genome build for default ExpansionHunter catalog selection
-- `--expansionhunter_variant_catalog <FILE>`: optional ExpansionHunter catalog override for short-read BAM/CRAM workflows
-- `--target <yes|no>`: restrict SNP calling to phenotype-derived gene BED
-- `--xtea <yes|no>`: enable xTEA MEI calling in short-read SV/all-NGS BAM/CRAM paths (default: `no`)
-- `--cnvpytor <yes|no>`: enable experimental CNVpytor calling in long-read SV/all-longphase BAM/CRAM paths (default: `no`)
-- `--cnvpytor_baf <yes|no>`: allow CNVpytor to use long-read SNP/BAF support in full long-read mode when SNP calls exist (default: `yes`)
-- `--cnvpytor_bin_sizes <STRING>`: space-separated CNVpytor bin sizes (default: `100000`)
-- `--cnvpytor_primary_bin <INT>`: CNVpytor export bin size for final TSV/VCF (default: `100000`)
-- `--cnvpytor_min_size <INT>`: minimum CNV size retained from CNVpytor output (default: `100000`)
-- `--mito <yes|no>`: enable mitochondrial analysis for BAM/CRAM input; uses Mutect2 for short reads and Clair3 for long reads (default: `no`)
-- `--mito_contig <STRING>`: preferred mitochondrial contig alias (default: `chrM`)
-- `--mito_min_vaf <FLOAT>`: mito prioritization VAF floor (default: `0.01`)
-- `--mito_min_depth <INT>`: mito prioritization depth floor (default: `50`)
-- `--mito_min_alt_reads <INT>`: mito prioritization alternate-read floor (default: `5`)
-- `--phen2gene_filter <INT>`: top-N genes retained for targeted mode (default: 500)
-- `--rankscore <FLOAT>`: RankScore threshold (default: 0.50)
-- `--rankscore_softwares <CSV>`: comma-separated RankScore software names for score aggregation (default: all built-in tools)
-- `--gnomad <FLOAT>`: max AF threshold for SNP prioritization (default: 0.0001)
-- `--inheritance_mode <ml|omim|gnomad>`: inheritance assignment backend for prioritization (default: `ml`)
-- `--include_clinvar_report <yes|no>`: include ClinVar-only calls in final prioritized reports (default: `yes`)
-- `--allow_unphased_comphet <yes|no>`: allow unphased `0/1` or `1/0` AR pairs as compound het in final prioritization (default: `no`)
-- `--gq <INT>`: genotype quality threshold (default: 20)
-- `--ad <INT>`: allele depth threshold (default: 15)
-- `--note <FILE|no>`: phenotype note input, or `no` in CSV mode to interpret `note_path` as HPO file
-- `--hpo <FILE>`: phenotype HPO file
-- `--help`: print help
+- `age_of_onset` is preferred if both age columns are present.
+- Empty age is allowed and treated as not provided.
+- Non-empty age must be `<integer>`, `<integer>d`, `<integer>m`, or `<integer>y`.
+- Integer-only ages are normalized to years, for example `7` becomes `7y`.
 
-## Important behavior updates
+Sex handling:
 
-### Input CSV generator
+- Default sex column name is `sex`; override with `--sex_column <STRING>`.
+- Values are normalized to lowercase and must be `unknown`, `male`, or `female`.
+- Empty or missing values are treated as `unknown`.
 
-Run `scripts/generate_input_csv.sh` to build legacy or unified CSV manifests.
-The generator can add `age_of_onset` and `sex` metadata, with per-sample prompts
-for `unknown`, `male`, or `female` sex values.
-Unified and annotated CSV manifests use the same optional sex metadata rules as
-legacy CSV batch mode.
+Phenotype handling:
 
-### Unified light behavior for SNP/all workflows
+- By default, `note_path` is treated as a clinical note and PhenoTagger runs.
+- With `--note no`, `note_path` is treated as an HPO file and PhenoTagger is skipped.
 
-`--light yes` no longer requires separate SNP/all workflow selection in `main.nf`.
-The workflow now uses unified subworkflows and switches SNP caller internally by mode:
+### Unified CSV
 
-- short-read SNP caller:
-  - default: `deepvariant`
-  - `--light yes`: `haplotypecaller`
-- long-read SNP caller:
-  - default: `clair3`
-  - `--light yes`: `nanocaller`
+Unified CSV mode uses `input_kind` and does not combine `--input_csv` with legacy `--bam true` or `--vcf true` flags.
 
-`--light yes` also enables PhenoSV-light model through config (`ext.args`).
+Required base columns:
 
-### ExpansionHunter catalog selection
+| Column | Required | Values |
+| --- | --- | --- |
+| `sample` | yes | Unique sample identifier |
+| `input_kind` | yes | `annotated_snv`, `vcf_snv`, `vcf_sv`, `bam_ngs`, `cram_ngs` |
+| `phenotype_path` | yes | Clinical note or HPO file path |
+| `phenotype_format` | yes | `clinical_note` or `hpo` |
 
-ExpansionHunter catalogs are staged as Nextflow process inputs for both single and batch short-read modes.
-By default, PipeVar_mito selects a repo-provided catalog from `--genome`:
+Optional/conditional columns:
 
-- `hg38` -> `PipeVar_mito/data/variant_catalog.json`
-- `grch38` -> `PipeVar_mito/data/variant_catalog_grch38.json`
+| Column | Used by | Description |
+| --- | --- | --- |
+| `age_of_onset` | all CSV prioritization flows | Per-sample onset age |
+| `sex` | all CSV prioritization flows | Per-sample sex metadata |
+| `snv_txt_path` | `annotated_snv` | ANNOVAR multianno TXT |
+| `snv_vcf_path` | `annotated_snv` | Matching ANNOVAR multianno VCF |
+| `sv_vcf_path` | annotated all-NGS import | Optional annotated SV VCF when every annotated row has alignment input |
+| `vcf_path` | `vcf_snv`, `vcf_sv` | Existing VCF input |
+| `alignment_path` | `bam_ngs`, `cram_ngs`, annotated hybrid modes | BAM/CRAM input |
+| `alignment_index_path` | alignment-backed modes | Optional explicit BAM/CRAM index path |
 
-Use `--expansionhunter_variant_catalog /path/to/variant_catalog.json` to override the default.
+Current unified manifest constraints:
 
-## Example commands
+- Samples must be unique.
+- Mixed `input_kind` sets are limited to supported homogeneous groups, except mixed `bam_ngs` and `cram_ngs`.
+- Annotated SNV rows either all provide `alignment_path` or none do.
+- Annotated SNV rows with `alignment_path` either all provide `sv_vcf_path` or all leave it blank.
+- Mixed `phenotype_format` values are not supported for non-annotated CSV modes.
 
-### Single-sample long-read full analysis
+Run `scripts/generate_input_csv.sh` to build legacy or unified CSV manifests interactively.
+
+## Feature Options
+
+### Mitochondrial Analysis
+
+Enable with `--mito yes`.
+
+- Supported only for BAM/CRAM input.
+- Supported with `--mode snp` or with `--mode` omitted.
+- Not supported with `--mode sv`.
+- Short reads use Mutect2.
+- Long reads use a mito-specific Clair3 call step followed by VCF postprocessing.
+- Long-read mito is unavailable with `--light yes` because that path selects NanoCaller.
+
+The mito branch emits separate mito outputs and does not modify nuclear `.prio.vcf` outputs. Bundled mito evidence sources include MITOMAP, MitoTip, t-APOGEE, and MitImpact.
+
+### xTEA Mobile-Element Analysis
+
+Enable with `--xtea yes`.
+
+- Supported only for `--type short`.
+- Supported only for BAM/CRAM input.
+- Supported with `--mode sv` or with `--mode` omitted.
+- Not supported with `--mode snp`.
+- Runs per sample in single-sample and CSV batch BAM/CRAM modes.
+
+The xTEA image is expected to contain the `xtea` command, xTEA scripts under `/opt/xTea/xtea`, the repeat library under `/opt/xtea/rep_lib_annotation`, and the GENCODE GFF3 annotation at `/opt/xtea/gencode.gff3`.
+
+### CNVnator And CNVpytor
+
+CNVnator is enabled by default for short-read SV/all-NGS calling with `--cnvnator yes`.
+
+CNVpytor is experimental and disabled by default. Enable with `--cnvpytor yes`.
+
+- Supported only for long-read BAM/CRAM input (`--type ont` or `--type pacbio`).
+- Not supported for VCF-only input, short-read input, targeted CNV interpretation, or mitochondrial CNV interpretation.
+- `--mode sv` runs CNVpytor in read-depth-only mode.
+- Full long-read mode can add SNP/BAF support when SNP calls exist and `--cnvpytor_baf yes`.
+- Calls below the default 100 kb minimum are noisy by default.
+
+### Common-SV Filtering
+
+Common-SV filtering removes common SVs before PhenoSV and final SV prioritization. It is enabled by default in `nextflow.config` with `--common_sv_filter yes`.
+
+Matching thresholds are controlled by `--common_sv_af`, `--common_sv_reciprocal_overlap`, `--common_sv_distance`, `--common_sv_ins_distance`, and `--common_sv_ins_identity`.
+
+### De Novo Filtering
+
+CSV de novo filtering is disabled by default with `--denovo_filter no`.
+
+When enabled, CSV family metadata is used to filter proband SNV/SV ANNOVAR outputs against father/mother calls. Configure role, family, and sample mapping columns with `--denovo_role_column`, `--denovo_family_column`, and `--denovo_vcf_sample_column`.
+
+### Light Mode
+
+`--light yes` switches caller/model choices internally:
+
+| Branch | Default | `--light yes` |
+| --- | --- | --- |
+| short-read SNP | DeepVariant | GATK HaplotypeCaller |
+| long-read SNP | Clair3 | NanoCaller |
+| SV prioritization | PhenoSV default model | PhenoSV-light config |
+
+### Targeted And Gene Filtering
+
+`--target yes` restricts SNP calling to phenotype-derived gene regions where supported.
+
+`--phen2gene_filter <INT>` sets the number of top Phen2Gene genes retained for targeted mode.
+
+`--gene <SYMBOLS|FILE>` restricts final prioritization to comma-separated gene symbols or a one-gene-per-line file.
+
+## Parameters
+
+Defaults below come from `nextflow.config`.
+
+### Input, Output, And Runtime
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `--bam` | `null` | Single BAM/CRAM input |
+| `--vcf` | `null` | Single VCF input |
+| `--input_csv` | `null` | CSV manifest |
+| `--annovar_txt` | `null` | Single-sample ANNOVAR multianno TXT for annotated SNV mode |
+| `--annovar_sv_vcf` | `null` | Single-sample ANNOVAR SV multianno VCF for annotated SV import |
+| `--ref_fa` | `null` | Reference FASTA |
+| `--out_prefix` | `PipeVar` | Single-sample output prefix |
+| `--output_directory` | launch directory | Publish directory |
+| `--mode` | `null` | `snp` or `sv`; omit for all supported branches |
+| `--type` | `ont` | `ont`, `pacbio`, or `short` |
+| `--light` | `null` | Use lightweight callers/models when set to `yes` |
+| `--genome` | `hg38` | Genome build for default ExpansionHunter catalog |
+| `--expansionhunter_variant_catalog` | `null` | Optional ExpansionHunter catalog override |
+| `--sex_column` | `sex` | Optional CSV sex metadata column name |
+| `--annovar_host_path` | `${projectDir}/annovar` | Host ANNOVAR path mounted into containers |
+| `--phenosv_host_path` | `${projectDir}/PhenoSV_model` | Host PhenoSV resource path mounted into containers |
+| `--help` | `false` | Print compact help and exit |
+
+### Phenotype And Prioritization
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `--note` | `null` | Clinical note path, or `no` in CSV mode to treat `note_path` as HPO |
+| `--hpo` | `null` | HPO term file |
+| `--gnomad` | `0.0001` | Maximum gnomAD AF for SNP prioritization |
+| `--inheritance_mode` | `ml` | `ml`, `omim`, or `gnomad`; `gnomad` maps to LOEUF fallback lists |
+| `--include_clinvar_report` | `yes` | Include ClinVar-only calls in final prioritized outputs |
+| `--allow_unphased_comphet` | `no` | Allow unphased `0/1` or `1/0` AR pairs as compound het |
+| `--prioritize_sv_only` | `no` | In combined final prioritization, report only SV/PhenoSV evidence |
+| `--rankscore` | `0.50` | Minimum RankScore cutoff |
+| `--rankscore_softwares` | `null` | Comma-separated RankScore software list; null means all built-in tools |
+| `--rankvar` | `0.05` | Minimum RankVar score |
+| `--phenosv_score` | `0.50` | Minimum PhenoSV score |
+| `--gq` | `20` | Minimum genotype quality |
+| `--ad` | `15` | Minimum allele depth |
+| `--phen2gene_filter` | `500` | Number of top Phen2Gene genes for targeted mode |
+| `--gene` | `null` | Comma-separated genes or one-gene-per-line file |
+| `--target` | `null` | Enable phenotype-derived targeted calling with `yes` |
+
+### Caller And Feature Toggles
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `--annotated_snv` | `no` | Use pre-annotated ANNOVAR TXT + VCF SNV input |
+| `--annotated_sv` | `no` | Use pre-annotated ANNOVAR SV VCF with annotated SNV + short-read BAM/CRAM |
+| `--cnvnator` | `yes` | Add CNVnator to short-read SV/all-NGS calling |
+| `--cnvnator_bin_size` | `100` | CNVnator read-depth bin size |
+| `--cnvpytor` | `no` | Add experimental CNVpytor to long-read SV/all-longphase BAM/CRAM paths |
+| `--cnvpytor_baf` | `yes` | Use SNP/BAF support for CNVpytor when long-read SNP calls exist |
+| `--cnvpytor_bin_sizes` | `100000` | Space-separated CNVpytor bin sizes |
+| `--cnvpytor_primary_bin` | `100000` | CNVpytor export bin size used for final TSV/VCF |
+| `--cnvpytor_min_size` | `100000` | Minimum CNV size retained from CNVpytor output |
+| `--cnvpytor_reference_genome` | `auto` | CNVpytor genome ID passed with `-rg`; auto maps hg38/grch38 to hg38 |
+| `--cnvpytor_reference_conf` | `null` | Optional custom `reference_genomes_conf.py` staged and passed with `-conf` |
+| `--xtea` | `no` | Add xTEA mobile-element calling to short-read SV/all-NGS BAM/CRAM paths |
+| `--mito` | `no` | Add mitochondrial analysis for BAM/CRAM input |
+
+### Filtering And Reporting
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `--common_sv_filter` | `yes` | Remove common SVs before PhenoSV and final SV prioritization |
+| `--common_sv_af` | `0.01` | Minimum AF used to treat baked common SV database records as common |
+| `--common_sv_reciprocal_overlap` | `0.5` | Minimum reciprocal overlap for interval SV matching |
+| `--common_sv_distance` | `1000` | Breakpoint fallback distance for interval SV matching |
+| `--common_sv_ins_distance` | `500` | Insertion position window for common matching |
+| `--common_sv_ins_identity` | `0.5` | Insertion sequence identity threshold when inserted sequence is available |
+| `--denovo_filter` | `no` | Filter proband SNV/SV ANNOVAR outputs against parent calls in CSV mode |
+| `--denovo_role_column` | `role` | CSV role column for proband/father/mother/sibling |
+| `--denovo_family_column` | `family_id` | CSV family grouping column |
+| `--denovo_vcf_sample_column` | `vcf_sample` | Optional CSV column for VCF sample names |
+| `--denovo_sv_min_reciprocal_overlap` | `0.50` | SV parent/proband reciprocal-overlap threshold |
+| `--denovo_exclude_contigs` | `MT,M,chrM,chrMT` | Contigs excluded from de novo filtering |
+| `--mito_contig` | `chrM` | Preferred mitochondrial contig alias |
+| `--mito_min_vaf` | `0.01` | Mito prioritization VAF floor |
+| `--mito_min_depth` | `50` | Mito prioritization depth floor |
+| `--mito_min_alt_reads` | `5` | Mito prioritization alternate-read floor |
+| `--mito_gui_min_af` | `0.5` | Strict mtDNA allele fraction for final report mitochondrial rows |
+| `--mito_gui_min_apogee2` | `0.5` | Strict APOGEE2 score for final report mitochondrial rows |
+| `--mito_gui_min_mitotip` | `12.66` | Strict MitoTip score for final report mitochondrial rows |
+
+## Example Commands
+
+### Single-Sample Long-Read Full Analysis
 
 ```bash
 nextflow run main.nf \
@@ -347,7 +423,7 @@ nextflow run main.nf \
   --type ont
 ```
 
-### Single-sample long-read SV analysis with CNVpytor (RD-only)
+### Single-Sample Long-Read SV Analysis With CNVpytor
 
 ```bash
 nextflow run main.nf \
@@ -361,7 +437,7 @@ nextflow run main.nf \
   --cnvpytor yes
 ```
 
-### Single-sample long-read full analysis with CNVpytor SNP/BAF support
+### Single-Sample Long-Read Full Analysis With CNVpytor SNP/BAF Support
 
 ```bash
 nextflow run main.nf \
@@ -375,7 +451,7 @@ nextflow run main.nf \
   --cnvpytor_baf yes
 ```
 
-### Single-sample short-read full analysis (light)
+### Single-Sample Short-Read Full Analysis With Mito
 
 ```bash
 nextflow run main.nf \
@@ -385,10 +461,10 @@ nextflow run main.nf \
   --hpo /data/p2_hpo.txt \
   --out_prefix p2 \
   --type short \
-  --light yes
+  --mito yes
 ```
 
-### Single-sample short-read SV analysis with xTEA
+### Single-Sample Short-Read SV Analysis With xTEA
 
 ```bash
 nextflow run main.nf \
@@ -402,7 +478,7 @@ nextflow run main.nf \
   --xtea yes
 ```
 
-### Single-sample VCF SNP re-annotation/prioritization
+### Single-Sample VCF SNP Re-Annotation And Prioritization
 
 ```bash
 nextflow run main.nf \
@@ -415,19 +491,7 @@ nextflow run main.nf \
   --out_prefix p3
 ```
 
-### CSV batch BAM mode with HPO file in `note_path`
-
-```bash
-nextflow run main.nf \
-  -profile slurm_singularity \
-  --input_csv /data/samples.csv \
-  --bam true \
-  --note no \
-  --ref_fa /refs/hg38.fa \
-  --type short
-```
-
-### CSV batch short-read SV mode with xTEA
+### CSV Batch Short-Read SV Mode With xTEA
 
 ```bash
 nextflow run main.nf \
@@ -441,7 +505,7 @@ nextflow run main.nf \
   --xtea yes
 ```
 
-### CSV batch VCF mode (SV only)
+### CSV Batch VCF Mode
 
 ```bash
 nextflow run main.nf \
@@ -452,112 +516,114 @@ nextflow run main.nf \
   --ref_fa /refs/hg38.fa
 ```
 
-## Expected outputs (high-level)
+## Outputs
 
-Outputs are published to `--output_directory`.
-Exact files depend on `--mode`, `--type`, and input type.
+Outputs are published to `--output_directory`. Exact files depend on `--mode`, `--type`, input kind, and enabled feature toggles.
 
-### SNP-related outputs
+### SNP-Related Outputs
 
-- caller output (depends on type/light):
-  - `*.deepvariant.vcf.gz` (short default)
-  - `*.recal.vcf.gz` (short light / HaplotypeCaller path)
-  - `*.clair3.vcf.gz` (long default)
-  - `*.nanocaller.vcf.gz` (long light)
-  - `*.mito.vcf.gz` (mito branch for short or long BAM/CRAM runs)
-- annotation/prioritization:
+- Caller outputs:
+  - `*.deepvariant.vcf.gz` for short-read default SNP calling.
+  - `*.recal.vcf.gz` for the short-read HaplotypeCaller/light path.
+  - `*.clair3.vcf.gz` for long-read default SNP calling.
+  - `*.nanocaller.vcf.gz` for the long-read light path.
+  - `*.mito.vcf.gz` for the mito branch.
+- Annotation and prioritization outputs:
   - `*.clinvar.txt`
   - `*.rank_var.tsv`
   - `*.rankscore_filtered.tsv`
-  - ANNOVAR intermediate/final files (`*.hg38_multianno.*`)
+  - ANNOVAR intermediate/final files such as `*.hg38_multianno.*`
   - `*.mito.annotated.tsv`
   - `*.mito.annotated.vcf.gz`
   - `*.mito.prioritized.tsv`
 
-### SV-related outputs
+### SV-Related Outputs
 
-- short-read SV:
+- Short-read SV/MEI:
   - `*_manta.vcf`
   - `*_xtea.vcf` when `--xtea yes`
-  - `*.shortread_sv.merged.vcf` when multiple short-read SV/MEI callers are Truvari-merged and deduplicated
-  - `*.shortread_sv.truvari_collapsed.vcf` audit file for calls collapsed into kept short-read SV representatives
-- long-read SV:
+  - `*.shortread_sv.merged.vcf`
+  - `*.shortread_sv.truvari_collapsed.vcf`
+- Long-read SV/CNV:
   - `*.sniffles.vcf.gz`
   - `*.cnvpytor.vcf`
   - `*.cnvpytor.tsv`
   - `*.pytor`
-  - `*.longread_sv.merged.vcf` when Sniffles and CNVpytor are merged
-- downstream SV prioritization:
+  - `*.longread_sv.merged.vcf`
+- Downstream SV prioritization:
   - `*.exonic.vcf`
-  - `*.phenosv.filtered.tsv` (or corresponding filtered artifacts)
+  - `*.phenosv.filtered.tsv` and related filtered artifacts
 
-### Repeat expansion outputs
+### Repeat Expansion Outputs
 
-- short-read:
-  - `*.json` (ExpansionHunter raw output)
-  - `*.eh.tsv` (filtered disease-threshold loci)
-- long-read:
-  - NanoRepeat result files (`*_nanoRepeat_output.tsv`, related summary files)
+- Short-read ExpansionHunter outputs:
+  - `*.json`
+  - `*.eh.tsv`
+- Long-read NanoRepeat outputs:
+  - `*_nanoRepeat_output.tsv`
+  - related summary files
 
-### Phenotype intermediate outputs
+### Phenotype Outputs
 
 - `*_phenotagger_patient_hpo.txt`
-- Phen2Gene ranking outputs (`*_phen2gene*`)
+- Phen2Gene ranking outputs such as `*_phen2gene*`
 
-## Resource/retry behavior
+## Notes And Pitfalls
 
-Configured in `nextflow.config`:
-
-- global process retry strategy:
-  - `errorStrategy = 'retry'`
-  - `maxRetries = 3`
-- CPU/memory/time vary by process via `withName` blocks.
-
-## Notes and pitfalls
-
-- `--input_csv` requires either `--bam true` or `--vcf true`.
-- In single-file mode, at least one of `--note <FILE>` or `--hpo <FILE>` is required.
-- For single VCF mode, `--mode` must be provided.
-- Reference index (`.fai`) must exist.
-- BAM/CRAM index must exist (`.bai`/`.crai`) for alignment-driven paths.
-- CNVpytor is experimental for long reads and is intended for large CNVs; calls below 100 kb are noisy by default.
-- CNVpytor is used only for whole-genome long-read BAM/CRAM input.
-- `--mode sv` runs CNVpytor in read-depth-only mode; full long-read mode can add SNP/BAF support when SNP calls already exist.
-- CNVpytor is out of scope for mitochondrial CNV interpretation.
+- `--input_csv` legacy mode requires either `--bam true` or `--vcf true`.
+- Unified CSV mode should not be combined with `--bam true` or `--vcf true`.
+- Single-file mode requires `--note <FILE>` or `--hpo <FILE>`.
+- Single VCF mode requires `--mode snp` or `--mode sv`.
+- Reference index `${ref}.fai` must exist when `--ref_fa` is supplied.
+- BAM/CRAM indexes must exist for alignment-driven paths.
+- Short-read mitochondrial analysis also requires a reference dictionary and BWA sidecars: `.dict`, `.amb`, `.ann`, `.bwt`, `.pac`, and `.sa`.
+- The DRAGEN CRAM compatibility path uses `RevertSam --RESTORE_HARDCLIPS false`.
+- xTEA is intended for short-read WGS MEI discovery/genotyping and requires indexed BAM/CRAM input.
+- CNVpytor is experimental for long reads and is intended for large whole-genome CNVs.
 - If using Singularity/Docker profiles, ensure `--annovar_host_path` and `--phenosv_host_path` point to valid host locations.
 
-## Software/components used
+## Additional Documentation
 
-### SNP calling
+- `docs/USAGE.md` for additional usage notes.
+- `docs/WORKFLOW.md` for workflow-level documentation.
+- `docs/PIPEVAR_NUCLEAR_FIGURES.md` for focused nuclear workflow figures.
+- `scripts/generate_input_csv.sh` for generating legacy or unified CSV manifests.
+
+## Software Components
+
+### SNP Calling
 
 - DeepVariant
-- GATK HaplotypeCaller (+ VQSR flow in relevant path)
+- GATK HaplotypeCaller
 - Clair3
 - NanoCaller
 
-### SV calling/prioritization
+### SV/CNV Calling And Prioritization
 
 - Sniffles
 - Manta
+- CNVnator
+- CNVpytor
+- xTEA
 - SURVIVOR
+- Truvari
 - PhenoSV
-- ANNOVAR SV annotation module
+- ANNOVAR SV annotation
 
-### Repeat expansion
+### Repeat Expansion
 
 - ExpansionHunter
 - NanoRepeat
 
-### Annotation/ranking/phenotype
+### Annotation, Ranking, And Phenotype
 
 - ANNOVAR
 - RankVar
-- RankScore filtering path
+- RankScore filtering
 - Phen2Gene
 - PhenoTagger
 - Longphase prioritization helpers
 
 ## Status
 
-PipeVar is under active development. If behavior seems inconsistent with this README,
-`main.nf` help output and `nextflow.config` are the source of truth.
+PipeVar_mito is under active development. `nextflow.config` defines runtime defaults, `README.md` and linked docs describe supported user-facing modes, and `nextflow run main.nf --help` provides a compact command-line quick reference.

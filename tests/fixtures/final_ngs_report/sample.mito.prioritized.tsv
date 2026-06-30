@@ -1,2 +1,0 @@
-variant_key	gene_symbol	caller_af	caller_dp	caller_alt_ad	apogee2_score	mitotip_score	mt_pass_af	mt_pass_apogee2	mt_pass_mitotip	mt_priority_reason	mt_support_score	mt_support_class
-chrM:100A>G	MT-TF	0.72	120	86	0.66	14.2	yes	yes	yes	caller_af>0.5;apogee2_score>0.5;mitotip_score>12.66	5.44	medium

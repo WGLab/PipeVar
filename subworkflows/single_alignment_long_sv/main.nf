@@ -37,7 +37,8 @@ workflow SINGLE_ALIGNMENT_LONG_SV {
 	cnvpytor_mode = params.cnvpytor ? params.cnvpytor.toString().trim().toLowerCase() : "no"
 	if ( cnvpytor_mode == "yes" ) {
 		cnvpytor_dummy_vcf = ref_fa.map { ref_tuple -> ref_tuple[0] }
-		CNVpytor(bam,out_prefix,ref_fa,cnvpytor_dummy_vcf,Channel.value("no"),Channel.value(params.cnvpytor_bin_sizes),Channel.value(params.cnvpytor_primary_bin),Channel.value(params.cnvpytor_min_size))
+		cnvpytor_reference_conf = Channel.value(params.cnvpytor_reference_conf ? file(params.cnvpytor_reference_conf) : [])
+		CNVpytor(bam,out_prefix,ref_fa,Channel.value(params.cnvpytor_reference_genome),cnvpytor_reference_conf,cnvpytor_dummy_vcf,Channel.value("no"),Channel.value(params.cnvpytor_bin_sizes),Channel.value(params.cnvpytor_primary_bin),Channel.value(params.cnvpytor_min_size))
 		sv_merge_inputs = sniffles.out.combine(CNVpytor.out.vcf).map { combined_vcfs ->
 			combined_vcfs.flatten()
 		}

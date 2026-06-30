@@ -1,5 +1,0 @@
-variant_key	gene_symbol	caller_af	caller_dp	caller_alt_ad	apogee2_score	apogee2_pred	mitotip_score	mitotip_quartile	mitomap_reported_pathogenic	clinvar_clnsig
-pass	MT-TF	0.72	120	86	0.66	pathogenic	14.2	Q1	no	.
-low_af	MT-TF	0.50	120	86	0.66	pathogenic	14.2	Q1	no	.
-low_apogee	MT-TF	0.72	120	86	0.50	pathogenic	14.2	Q1	no	.
-low_mitotip	MT-TF	0.72	120	86	0.66	pathogenic	12.66	Q1	no	.

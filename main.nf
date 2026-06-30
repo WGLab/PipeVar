@@ -2,272 +2,51 @@ def pipelineVersion = params.pipeline_version ?: "0.3.0"
 
 def helpMessage = """
 ================================================================================
-  P i p e V a r   P i p e l i n e
+  PipeVar_mito
   Version: ${pipelineVersion}
 ================================================================================
-QUICK USAGE
-  Single sample mode:
-    nextflow run main.nf [--bam sample.bam | --vcf sample.vcf] [options]
-    nextflow run main.nf --annotated_snv yes --annovar_txt sample.hg38_multianno.txt --vcf sample.hg38_multianno.vcf [options]
 
-  CSV batch mode:
-    nextflow run main.nf --input_csv samples.csv --bam true [options]
-    nextflow run main.nf --input_csv samples.csv --vcf true [options]
+Rare-disease variant prioritization for short-read, long-read, and optional
+mitochondrial analysis.
 
---------------------------------------------------------------------------------
-EXECUTION PROFILES (nextflow.config)
---------------------------------------------------------------------------------
-  -profile standard
-      Default. SLURM executor + Singularity backend.
+USAGE
+  Single BAM/CRAM:
+    nextflow run main.nf --bam sample.bam --ref_fa ref.fa (--note note.txt | --hpo hpo.txt) [options]
 
-  -profile slurm_singularity
-      Explicit SLURM + Singularity.
+  Single VCF:
+    nextflow run main.nf --vcf sample.vcf --ref_fa ref.fa --mode <snp|sv> (--note note.txt | --hpo hpo.txt) [options]
 
-  -profile local_singularity
-      Local executor + Singularity.
+  Annotated SNV:
+    nextflow run main.nf --annotated_snv yes --annovar_txt sample.hg38_multianno.txt --vcf sample.hg38_multianno.vcf (--note note.txt | --hpo hpo.txt) [options]
 
-  -profile local_docker
-      Local executor + Docker.
+  Legacy CSV:
+    nextflow run main.nf --input_csv samples.csv --bam true --ref_fa ref.fa [options]
+    nextflow run main.nf --input_csv samples.csv --vcf true --ref_fa ref.fa --mode <snp|sv> [options]
 
-  Container mount paths (used by Singularity/Docker profiles):
-    --annovar_host_path <DIR>   Host path mounted to /annovar
-    --phenosv_host_path <DIR>   Host path mounted to /PhenoSV/train_data
+  Unified CSV:
+    nextflow run main.nf --input_csv samples.csv --ref_fa ref.fa [options]
 
---------------------------------------------------------------------------------
-INPUT MODES
---------------------------------------------------------------------------------
-  1) Single sample BAM/CRAM mode
-     Required:
-       --bam <FILE>
-       --ref_fa <FILE>
-       One phenotype source:
-         --note <FILE>   (clinical note; pipeline runs PhenoTagger)
-         --hpo  <FILE>   (HPO IDs; pipeline skips PhenoTagger)
+PROFILES
+  standard              SLURM + Singularity
+  slurm_singularity     SLURM + Singularity
+  local_singularity     Local executor + Singularity
+  local_docker          Local executor + Docker
 
-  2) Single sample VCF mode
-     Required:
-       --vcf <FILE>
-       --ref_fa <FILE>
-       --mode <snp|sv>
-       One phenotype source:
-         --note <FILE> or --hpo <FILE>
-
-  3) CSV batch BAM mode
-     Required:
-       --input_csv <FILE> --bam true --ref_fa <FILE>
-     CSV columns:
-       sample,file_path,note_path
-       Optional age field for CSV prioritization flows:
-         sample,file_path,note_path,age_of_onset
-         sample,file_path,note_path,age
-       Notes:
-         age_of_onset is preferred if both columns exist
-         age is interpreted per CSV row (per sample), not globally
-         empty age is allowed (treated as not provided)
-         non-empty age must be xd/xm/xy or integer years
-         examples: 10d, 9m, 7y, 7 (normalized to 7y)
-         optional sex metadata is read from --sex_column (default: sex)
-         sex must be unknown, male, or female; empty/missing sex becomes unknown
-     Note handling:
-       default            -> note_path treated as clinical note (PhenoTagger ON)
-       --note no          -> note_path treated as HPO file (PhenoTagger OFF)
-
-  4) CSV batch VCF mode
-     Required:
-       --input_csv <FILE> --vcf true --ref_fa <FILE> --mode <snp|sv>
-     CSV columns:
-       sample,file_path,note_path
-       Optional age field for CSV prioritization flows:
-         sample,file_path,note_path,age_of_onset
-         sample,file_path,note_path,age
-       Notes:
-         age_of_onset is preferred if both columns exist
-         age is interpreted per CSV row (per sample), not globally
-         empty age is allowed (treated as not provided)
-         non-empty age must be xd/xm/xy or integer years
-         examples: 10d, 9m, 7y, 7 (normalized to 7y)
-         optional sex metadata is read from --sex_column (default: sex)
-         sex must be unknown, male, or female; empty/missing sex becomes unknown
-
-  5) Annotated SNV / unified manifest mode
-     Single-sample required:
-       --annotated_snv yes
-       --annovar_txt <ANNOVAR multianno TXT>
-       --vcf <matching ANNOVAR multianno VCF>
-       --note <FILE> or --hpo <FILE>
-     To call SV/STR/optional mito from short-read BAM/CRAM while reusing annotated SNV:
-       --bam <BAM|CRAM> --ref_fa <FILE> --type short
-     To import annotated SV instead of calling SV from BAM/CRAM:
-       --bam <BAM|CRAM> --annotated_sv yes --annovar_sv_vcf <SV multianno VCF>
-       --ref_fa <FILE> --type short
-     CSV unified columns:
-       sample,input_kind,phenotype_path,phenotype_format,age_of_onset,sex,
-       snv_txt_path,snv_vcf_path,sv_vcf_path,vcf_path,alignment_path,alignment_index_path
-
---------------------------------------------------------------------------------
-CORE OPTIONS
---------------------------------------------------------------------------------
-  --mode <snp|sv>          Run only SNP or SV branch. Omit to run both where applicable.
-  --annotated_snv <yes|no> Use pre-annotated ANNOVAR TXT + VCF SNV input. Default: no
-  --annotated_sv <yes|no>  Use pre-annotated ANNOVAR SV VCF with annotated SNV + short-read BAM/CRAM. Default: no
-  --annovar_txt <FILE>     Single-sample ANNOVAR multianno TXT paired with --vcf
-  --annovar_sv_vcf <FILE>  Single-sample ANNOVAR multianno SV VCF paired with --annotated_sv yes
-  --type <ont|pacbio|short>
-                           Sequencing type for BAM/CRAM flows. Default: ont
-  --light <yes|no>         Use lightweight SNP/SV models where supported. Default: no
-  --genome <hg38|grch38>   Genome build for ExpansionHunter catalog. Default: hg38
-  --expansionhunter_variant_catalog <FILE>
-                           Optional ExpansionHunter catalog override. Defaults to
-                           PipeVar_mito/data/variant_catalog.json for hg38 and
-                           PipeVar_mito/data/variant_catalog_grch38.json for grch38.
-
---------------------------------------------------------------------------------
-FILTERING OPTIONS
---------------------------------------------------------------------------------
-  --gnomad <FLOAT>         Max gnomAD AF filter for SNP prioritization. Default: 0.0001
-  --inheritance_mode <ml|omim|gnomad>
-                           Dominant/recessive assignment mode. Default: ml (ML-first, OMIM fallback)
-                           Note: gnomad uses gnomAD constraint (LOEUF) fallback lists.
-  --include_clinvar_report <yes|no>
-                           Include ClinVar-only calls in final prioritized report outputs. Default: yes
-  --allow_unphased_comphet <yes|no>
-                           Treat unphased 0/1 or 1/0 AR het pairs as compound het in final prioritization. Default: no
-  --prioritize_sv_only <yes|no>
-                           In combined final prioritization, report only SV/PhenoSV evidence. Default: no
-  --rankscore <FLOAT>      Minimum RankScore cutoff. Default: 0.50
-  --rankscore_softwares <CSV> Comma-separated RankScore software list. Default: all
-  --rankvar <FLOAT>        Minimum RankVar score cutoff. Default: 0.05
-  --phenosv_score <FLOAT>  Minimum PhenoSV score cutoff. Default: 0.50
-  --common_sv_filter <yes|no>
-                           Remove common SVs before PhenoSV and final SV prioritization. Default: no
-  --common_sv_af <FLOAT>   Minimum AF used to treat baked common SV database records as common. Default: 0.01
-  --common_sv_reciprocal_overlap <FLOAT>
-                           Minimum reciprocal overlap for interval SV common matching. Default: 0.5
-  --common_sv_distance <INT>
-                           Breakpoint fallback distance for interval SV common matching. Default: 1000
-  --common_sv_ins_distance <INT>
-                           Insertion position window for common matching. Default: 500
-  --common_sv_ins_identity <FLOAT>
-                           Insertion sequence identity threshold when inserted sequence is available. Default: 0.8
-  --denovo_filter <yes|no> In CSV mode, filter proband SNV/SV ANNOVAR outputs against father/mother calls. Default: no
-  --denovo_role_column <NAME>
-                           CSV role column for proband/father/mother/sibling. Default: role
-  --denovo_family_column <NAME>
-                           CSV family grouping column. Default: family_id
-  --denovo_vcf_sample_column <NAME>
-                           Optional CSV column for VCF sample names. Default: vcf_sample
-  --denovo_sv_min_reciprocal_overlap <FLOAT>
-                           SV parent/proband reciprocal-overlap threshold. Default: 0.50
-  --gq <INT>               Minimum genotype quality. Default: 20
-  --ad <INT>               Minimum allele depth. Default: 15
-  --phen2gene_filter <INT> Number of top Phen2Gene genes used for targeted mode. Default: 500
-  --gene <SYMBOLS|FILE>    Restrict final prioritization to comma-separated genes or one-gene-per-line file.
-  --target <yes|no>        If yes, run targeted calling in phenotype-derived gene regions.
-  --cnvnator <yes|no>      Add CNVnator to short-read SV/all-NGS calling. Default: yes
-  --cnvnator_bin_size <INT>
-                           CNVnator read-depth bin size. Default: 100
-  --cnvpytor <yes|no>      Add experimental CNVpytor to long-read SV/all-longphase BAM/CRAM paths. Default: no
-  --cnvpytor_baf <yes|no>  Use SNP/BAF support for CNVpytor when long-read SNP calls exist. Default: yes
-  --cnvpytor_bin_sizes <STRING>
-                           Space-separated CNVpytor bin sizes. Default: "100000"
-  --cnvpytor_primary_bin <INT>
-                           CNVpytor export bin size used for final TSV/VCF. Default: 100000
-  --cnvpytor_min_size <INT>
-                           Minimum CNV size retained from CNVpytor output. Default: 100000
-  --xtea <yes|no>          Add xTEA mobile-element calling to short-read SV/all-NGS BAM/CRAM paths. Default: no
-  --mito <yes|no>          Add mitochondrial analysis for BAM/CRAM input. Default: no
-                           Uses Mutect2 for short reads and Clair3 for long reads.
-  --mito_contig <STRING>   Preferred mitochondrial contig alias. Default: chrM
-  --mito_min_vaf <FLOAT>   Minimum heteroplasmy/allele fraction retained in mito prioritization. Default: 0.01
-  --mito_min_depth <INT>   Minimum depth retained in mito prioritization. Default: 50
-  --mito_min_alt_reads <INT>
-                           Minimum alternate read count retained in mito prioritization. Default: 5
-  --mito_gui_min_af <FLOAT>
-                           Minimum strict mtDNA allele fraction for final report mitochondrial rows. Default: 0.5
-  --mito_gui_min_apogee2 <FLOAT>
-                           Minimum strict APOGEE2 score for final report mitochondrial rows. Default: 0.5
-  --mito_gui_min_mitotip <FLOAT>
-                           Minimum strict MitoTip score for final report mitochondrial rows. Default: 12.66
-
---------------------------------------------------------------------------------
-OUTPUT / GENERAL
---------------------------------------------------------------------------------
-  --out_prefix <STRING>    Output prefix. Default: PipeVar
-  --output_directory <DIR> Output directory. Default: launch directory
-  --sex_column <STRING>    Optional CSV sex metadata column. Default: sex
-  --help                   Print this help text and exit
-
---------------------------------------------------------------------------------
-EXAMPLES
---------------------------------------------------------------------------------
-  1) SLURM + Singularity (default), single long-read BAM, full path:
-     nextflow run main.nf \\
-       -profile standard \\
-       --bam /data/sample.bam \\
-       --ref_fa /refs/hg38.fa \\
-       --note /data/note.txt \\
-       --out_prefix patient1 \\
-       --type ont
-
-  2) Local + Docker, single VCF SNP re-annotation:
-     nextflow run main.nf \\
-       -profile local_docker \\
-       --vcf /data/sample.vcf \\
-       --ref_fa /refs/hg38.fa \\
-       --mode snp \\
-       --hpo /data/hpo.txt \\
-       --out_prefix patient_vcf_snp
-
-  3) CSV batch BAM with HPO inputs in note_path (PhenoTagger off):
-     nextflow run main.nf \\
-       -profile slurm_singularity \\
-       --input_csv /data/samples.csv \\
-       --bam true \\
-       --ref_fa /refs/hg38.fa \\
-       --note no
-
-  4) Local + Singularity with custom mount sources:
-     nextflow run main.nf \\
-       -profile local_singularity \\
-       --annovar_host_path /project/annovar \\
-       --phenosv_host_path /project/train_data \\
-       --bam /data/sample.bam \\
-       --ref_fa /refs/hg38.fa \\
-       --note /data/note.txt
-
-  5) Long-read SV with experimental CNVpytor (RD-only):
-     nextflow run main.nf \\
-       -profile standard \\
-       --bam /data/sample.ont.bam \\
-       --ref_fa /refs/hg38.fa \\
-       --hpo /data/sample.hpo.txt \\
-       --type ont \\
-       --mode sv \\
-       --cnvpytor yes \\
-       --out_prefix patient_sv
-
-  6) Long-read full analysis with CNVpytor SNP/BAF support:
-     nextflow run main.nf \\
-       -profile standard \\
-       --bam /data/sample.hifi.bam \\
-       --ref_fa /refs/hg38.fa \\
-       --hpo /data/sample.hpo.txt \\
-       --type pacbio \\
-       --cnvpytor yes \\
-       --cnvpytor_baf yes \\
-       --out_prefix patient_full
+COMMON OPTIONS
+  --type <ont|pacbio|short>     Sequencing type for BAM/CRAM flows
+  --mode <snp|sv>               Restrict to one branch where supported
+  --light <yes|no>              Use lightweight callers/models where supported
+  --mito <yes|no>               Enable mitochondrial analysis for BAM/CRAM input
+  --xtea <yes|no>               Enable short-read mobile-element calling
+  --cnvpytor <yes|no>           Enable experimental long-read CNV calling
+  --out_prefix <STRING>         Single-sample output prefix
+  --output_directory <DIR>      Publish directory
 
 NOTES
-  - BAM mode requires index files (.bai for BAM, .crai for CRAM).
-  - Reference FASTA index (.fai) must exist.
-  - Short-read mito mode also requires the matching `.dict` and BWA sidecars:
-    `.amb`, `.ann`, `.bwt`, `.pac`, `.sa`.
-  - The DRAGEN CRAM compatibility path uses `RevertSam --RESTORE_HARDCLIPS false`.
-  - For VCF single-file mode, provide --mode snp or --mode sv.
-  - For single-file mode, at least one of --note <FILE> or --hpo <FILE> is required.
-  - CNVpytor is experimental for long reads and is intended for large CNVs; calls below 100 kb are noisy by default.
-  - CNVpytor is whole-genome long-read only; do not use it for targeted or mitochondrial CNV interpretation.
-  
+  - BAM/CRAM inputs require index files (.bai or .crai).
+  - Reference FASTA index (.fai) must exist when --ref_fa is supplied.
+  - Single-file mode requires one phenotype source: --note <FILE> or --hpo <FILE>.
+  - Detailed input schemas, parameter defaults, examples, and outputs are in README.md.
 ================================================================================
 """
 
@@ -312,6 +91,11 @@ if (clean_gene_filter) {
 def clean_cnvnator = params.cnvnator ? params.cnvnator.toString().trim().toLowerCase() : 'yes'
 def clean_cnvpytor = params.cnvpytor ? params.cnvpytor.toString().trim().toLowerCase() : 'no'
 def clean_cnvpytor_baf = params.cnvpytor_baf ? params.cnvpytor_baf.toString().trim().toLowerCase() : 'yes'
+def clean_cnvpytor_reference_genome = params.cnvpytor_reference_genome ? params.cnvpytor_reference_genome.toString().trim() : 'auto'
+if (clean_cnvpytor_reference_genome.toLowerCase() == 'auto') {
+    clean_cnvpytor_reference_genome = clean_genome == 'grch38' ? 'hg38' : clean_genome
+}
+def clean_cnvpytor_reference_conf = params.cnvpytor_reference_conf ? params.cnvpytor_reference_conf.toString().trim() : null
 def clean_xtea = params.xtea ? params.xtea.toString().trim().toLowerCase() : 'no'
 def clean_mito = params.mito ? params.mito.toString().trim().toLowerCase() : 'no'
 def clean_annotated_snv = params.annotated_snv ? params.annotated_snv.toString().trim().toLowerCase() : 'no'
@@ -705,6 +489,31 @@ if (clean_cnvpytor == 'yes') {
     if (clean_mode == 'sv' && clean_cnvpytor_baf == 'yes') {
         println "WARNING: --cnvpytor_baf yes was requested with --mode sv; CNVpytor will run in RD-only mode for the SV-only long-read branch."
     }
+
+    if (!clean_cnvpytor_reference_genome) {
+        error """
+        ================================================================
+        ERROR: Invalid CNVpytor Reference Genome
+        ================================================================
+        --cnvpytor_reference_genome must be a non-empty CNVpytor genome ID,
+        for example hg38, hg19, or a custom ID from --cnvpytor_reference_conf.
+        ================================================================
+        """
+    }
+
+    if (clean_cnvpytor_reference_conf && !file(clean_cnvpytor_reference_conf).exists()) {
+        error """
+        ================================================================
+        ERROR: CNVpytor Reference Config Not Found
+        ================================================================
+        You provided: --cnvpytor_reference_conf "${params.cnvpytor_reference_conf}"
+
+        Provide an existing CNVpytor reference_genomes_conf.py file, or omit
+        --cnvpytor_reference_conf when using built-in references such as hg19
+        or hg38.
+        ================================================================
+        """
+    }
 }
 
 // CHECK 2c: Validate CNVnator bin size
@@ -770,6 +579,8 @@ params.cnvnator = clean_cnvnator
 params.cnvpytor = clean_cnvpytor
 params.cnvpytor_baf = clean_cnvpytor_baf
 params.cnvpytor_bin_sizes = clean_cnvpytor_bin_sizes
+params.cnvpytor_reference_genome = clean_cnvpytor_reference_genome
+params.cnvpytor_reference_conf = clean_cnvpytor_reference_conf
 params.xtea = clean_xtea
 params.mito = clean_mito
 params.annotated_snv = clean_annotated_snv

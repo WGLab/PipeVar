@@ -1,8 +1,0 @@
-##fileformat=VCFv4.2
-##contig=<ID=chr1,length=1000000>
-##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Structural variant type">
-##INFO=<ID=END,Number=1,Type=Integer,Description="End coordinate">
-##INFO=<ID=SVLEN,Number=1,Type=Integer,Description="Structural variant length">
-##INFO=<ID=MEINFO,Number=1,Type=String,Description="Mobile element information">
-#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO
-chr1	12000	.	N	<INS:ME:ALU>	30	PASS	SVTYPE=INS;END=12001;SVLEN=300;MEINFO=ALU

@@ -1,8 +1,0 @@
-##fileformat=VCFv4.2
-##INFO=<ID=PRIO_RANK,Number=1,Type=Integer,Description="PipeVar rank">
-##INFO=<ID=PRIO_CAT,Number=1,Type=String,Description="PipeVar category">
-##INFO=<ID=PRIO_MAX_SCORE,Number=1,Type=Float,Description="PipeVar score">
-##INFO=<ID=PRIO_GROUP_SIZE,Number=1,Type=Integer,Description="PipeVar group size">
-#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SAMPLE
-chr1	100	.	A	G	.	PASS	Gene=GENE1;SOURCE=rankvar;MODEL=Dominant;PRIO_RANK=1;PRIO_CAT=RankVar_AD;PRIO_MAX_SCORE=0.91;PRIO_GROUP_SIZE=1	GT:DP	0/1:42
-chr2	200	.	C	T	.	PASS	Gene=GENE2;SOURCE=phenosv;MODEL=Recessive;PRIO_RANK=2;PRIO_CAT=PhenoSV_AR_Hom;PRIO_MAX_SCORE=0.75;PRIO_GROUP_SIZE=1	GT:DP	1/1:38
