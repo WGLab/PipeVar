@@ -1,6 +1,6 @@
 // Batch xTEA wrapper keyed by sample prefix for short-read mobile-element insertion calling.
 process multi_xtea {
-	container = 'beoungl/docker_test:xtea_0.2'
+	container = 'beoungl/docker_test:xtea_0.3'
 
 	input:
 	tuple val(meta), path(bam), path(index)

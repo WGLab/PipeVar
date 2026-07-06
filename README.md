@@ -213,6 +213,7 @@ Sex handling:
 Phenotype handling:
 
 - By default, `note_path` is treated as a clinical note and PhenoTagger runs.
+- With `--phenotype_extractor phenogpt2 --GPU yes`, clinical notes are processed with GPU-backed PhenoGPT2 instead of PhenoTagger.
 - With `--note no`, `note_path` is treated as an HPO file and PhenoTagger is skipped.
 
 ### Unified CSV
@@ -366,6 +367,16 @@ Defaults below come from `nextflow.config`.
 | `--phen2gene_filter` | `500` | Number of top Phen2Gene genes for targeted mode |
 | `--gene` | `null` | Comma-separated genes or one-gene-per-line file |
 | `--target` | `null` | Enable phenotype-derived targeted calling with `yes` |
+| `--phenotype_extractor` | `phenotagger` | Clinical-note extractor: `phenotagger` or GPU-backed `phenogpt2` |
+| `--GPU` | `no` | Shared GPU mode for DeepVariant GPU and PhenoGPT2 |
+| `--gpu_backend` | `singularity` | GPU container backend: `singularity` uses `--nv`, `docker` uses `--gpus 1` |
+| `--gpu_cpus` | `16` | CPU threads assigned to GPU-backed DeepVariant/PhenoGPT2 processes |
+| `--gpu_cluster_options` | `--gres=gpu:1` | Scheduler options applied to GPU-backed processes |
+| `--phenogpt2_batch_size` | `1` | PhenoGPT2 inference batch size |
+| `--phenogpt2_chunk_batch_size` | `1` | PhenoGPT2 chunk batch size |
+| `--phenogpt2_wc` | `0` | PhenoGPT2 word-count chunking; `0` disables chunking |
+| `--phenogpt2_attn_implementation` | `eager` | PhenoGPT2 attention implementation |
+| `--phenogpt2_negation` | `no` | Enable PhenoGPT2 negation filtering; keep `no` unless supporting models are bundled |
 
 ### Caller And Feature Toggles
 
@@ -380,8 +391,7 @@ Defaults below come from `nextflow.config`.
 | `--cnvpytor_bin_sizes` | `100000` | Space-separated CNVpytor bin sizes |
 | `--cnvpytor_primary_bin` | `100000` | CNVpytor export bin size used for final TSV/VCF |
 | `--cnvpytor_min_size` | `100000` | Minimum CNV size retained from CNVpytor output |
-| `--cnvpytor_reference_genome` | `auto` | CNVpytor genome ID passed with `-rg`; auto maps hg38/grch38 to hg38 |
-| `--cnvpytor_reference_conf` | `null` | Optional custom `reference_genomes_conf.py` staged and passed with `-conf` |
+| `--cnvpytor_reference_conf` | `null` | Optional custom `reference_genomes_conf.py` staged and passed with `-conf`; built-in hg19/hg38 references are detected by CNVpytor from alignment headers |
 | `--xtea` | `no` | Add xTEA mobile-element calling to short-read SV/all-NGS BAM/CRAM paths |
 | `--mito` | `no` | Add mitochondrial analysis for BAM/CRAM input |
 
@@ -566,6 +576,7 @@ Outputs are published to `--output_directory`. Exact files depend on `--mode`, `
 ### Phenotype Outputs
 
 - `*_phenotagger_patient_hpo.txt`
+- `*_phenogpt2_patient_hpo.txt` when `--phenotype_extractor phenogpt2`
 - Phen2Gene ranking outputs such as `*_phen2gene*`
 
 ## Notes And Pitfalls

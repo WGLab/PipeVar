@@ -12,6 +12,7 @@ include { ANNOVAR_SV } from '../../modules/annovar_sv/'
 include { common_sv_filter } from '../../modules/common_sv_filter/'
 include { ExpansionHunter } from '../../modules/expansion_hunter/'
 include { phenotagger } from '../../modules/phenotagger/'
+include { phenogpt2 } from '../../modules/phenogpt2/'
 include { eh_filter } from '../../modules/eh_filter/'
 include { sv_prio } from '../../modules/sv_prio/'
 
@@ -33,8 +34,14 @@ workflow SINGLE_ALIGNMENT_NGS_SV {
 
 	hpo=note
 	if ( is_note == "yes" ) {
-		phenotagger(note,out_prefix)
-		hpo=phenotagger.out
+		if ( params.phenotype_extractor.toString().trim().toLowerCase() == "phenogpt2" ) {
+			phenogpt2(note,out_prefix)
+			hpo=phenogpt2.out
+		}
+		else {
+			phenotagger(note,out_prefix)
+			hpo=phenotagger.out
+		}
 	}
 	Phen2gene(hpo,out_prefix)
 	Manta(bam,out_prefix,ref_fa)

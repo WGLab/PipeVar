@@ -9,6 +9,7 @@ include { multi_cnvpytor } from '../../modules/multi_cnvpytor/'
 include { multi_merge_longread_sv_callers } from '../../modules/multi_merge_longread_sv_callers/'
 include { multi_nanorepeat } from '../../modules/multi_nanorepeat/'
 include { multi_phenotagger } from '../../modules/multi_phenotagger/'
+include { multi_phenogpt2 } from '../../modules/multi_phenogpt2/'
 include { multi_sv_prio } from '../../modules/multi_sv_prio/'
 
 
@@ -28,7 +29,17 @@ workflow INPUT_CSV_ALIGNMENT_LONG_SV {
         input_bam_no_bam =  input_bam.map { out_prefix, bam_file, bai_file, note_file -> return tuple ( out_prefix,note_file ) }
         input_bam_with_bam= input_bam.map { out_prefix, bam_file, bai_file, note_file -> return tuple (out_prefix, bam_file, bai_file) }
         if ( is_note == "yes" ) {
-                input_bam_no_bam=multi_phenotagger(input_bam_no_bam)
+                if ( params.phenotype_extractor.toString().trim().toLowerCase() == "phenogpt2" ) {
+
+                        input_bam_no_bam=multi_phenogpt2(input_bam_no_bam)
+
+                }
+
+                else {
+
+                        input_bam_no_bam=multi_phenotagger(input_bam_no_bam)
+
+                }
 	}
 	phen2gene_result=multi_phen2gene(input_bam_no_bam)
 	sniffles_result=multi_sniffles(input_bam_with_bam,ref_fa)
@@ -36,7 +47,7 @@ workflow INPUT_CSV_ALIGNMENT_LONG_SV {
 	if ( cnvpytor_mode == "yes" ) {
 		cnvpytor_input = input_bam_with_bam.map { out_prefix, bam_file, bai_file -> tuple(out_prefix, bam_file, bai_file, bam_file) }
 		cnvpytor_reference_conf = Channel.value(params.cnvpytor_reference_conf ? file(params.cnvpytor_reference_conf) : [])
-		cnvpytor_result=multi_cnvpytor(cnvpytor_input,ref_fa,Channel.value(params.cnvpytor_reference_genome),cnvpytor_reference_conf,Channel.value("no"),Channel.value(params.cnvpytor_bin_sizes),Channel.value(params.cnvpytor_primary_bin),Channel.value(params.cnvpytor_min_size))
+		cnvpytor_result=multi_cnvpytor(cnvpytor_input,ref_fa,cnvpytor_reference_conf,Channel.value("no"),Channel.value(params.cnvpytor_bin_sizes),Channel.value(params.cnvpytor_primary_bin),Channel.value(params.cnvpytor_min_size))
 		merged_sv_input=sniffles_result.join(cnvpytor_result.vcf).map { out_prefix, sniffles_vcf, cnvpytor_vcf ->
 			tuple(out_prefix, [sniffles_vcf, cnvpytor_vcf])
 		}

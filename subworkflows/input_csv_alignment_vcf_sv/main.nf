@@ -5,6 +5,7 @@ include { multi_survivor } from '../../modules/multi_survivor/'
 include { multi_phenosv } from '../../modules/multi_phenosv/'
 include { multi_phen2gene } from '../../modules/multi_phen2gene/'
 include { multi_phenotagger } from '../../modules/multi_phenotagger/'
+include { multi_phenogpt2 } from '../../modules/multi_phenogpt2/'
 include { multi_phen2gene_filter } from '../../modules/multi_reduce_region_phen2gene/'
 include { multi_sv_prio } from '../../modules/multi_sv_prio/'
 
@@ -28,7 +29,17 @@ workflow INPUT_CSV_ALIGNMENT_VCF_SV {
         input_vcf_no_vcf =  input_vcf.map { out_prefix, vcf_file, note_file -> return tuple ( out_prefix,note_file ) }
         input_vcf= input_vcf.map { out_prefix, vcf_file ,note_file -> return tuple (out_prefix, vcf_file) }
         if ( is_note == "yes" ) {
-                input_vcf_no_vcf=multi_phenotagger(input_vcf_no_vcf)
+                if ( params.phenotype_extractor.toString().trim().toLowerCase() == "phenogpt2" ) {
+
+                        input_vcf_no_vcf=multi_phenogpt2(input_vcf_no_vcf)
+
+                }
+
+                else {
+
+                        input_vcf_no_vcf=multi_phenotagger(input_vcf_no_vcf)
+
+                }
         }
         phen2gene_result=multi_phen2gene(input_vcf_no_vcf)
         if ( target == "yes" ) {

@@ -2,6 +2,7 @@ include { multi_phen2gene } from '../../modules/multi_phen2gene/'
 include { multi_rankscore } from '../../modules/multi_rankscore/'
 include { multi_rankvar } from '../../modules/multi_rankvar/'
 include { multi_phenotagger } from '../../modules/multi_phenotagger/'
+include { multi_phenogpt2 } from '../../modules/multi_phenogpt2/'
 include { multi_snp_prio } from '../../modules/multi_snp_prio/'
 include { validate_preannotated_annovar_pair } from '../../modules/validate_preannotated_annovar_pair/'
 
@@ -36,8 +37,13 @@ workflow ANNOTATED_SNV_PRIO_CORE {
 		.filter { out_prefix, annovar_txt, annovar_vcf, phenotype_path, phenotype_format -> phenotype_format == 'hpo' }
 		.map { out_prefix, annovar_txt, annovar_vcf, phenotype_path, phenotype_format -> tuple(out_prefix, phenotype_path) }
 
-	phenotagger_result = multi_phenotagger(clinical_note_input)
-	hpo_paths = phenotagger_result.mix(hpo_input)
+	if ( params.phenotype_extractor.toString().trim().toLowerCase() == "phenogpt2" ) {
+		phenotype_extractor_result = multi_phenogpt2(clinical_note_input)
+	}
+	else {
+		phenotype_extractor_result = multi_phenotagger(clinical_note_input)
+	}
+	hpo_paths = phenotype_extractor_result.mix(hpo_input)
 	phen2gene_result = multi_phen2gene(hpo_paths)
 
 	validated_annovar_txt = validated_annovar.map { out_prefix, annovar_txt, annovar_vcf -> tuple(out_prefix, annovar_txt) }

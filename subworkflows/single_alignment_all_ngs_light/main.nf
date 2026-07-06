@@ -10,6 +10,7 @@ include { haplotypecaller } from '../../modules/haplotypecaller/'
 include { ExpansionHunter } from '../../modules/expansion_hunter/'
 include { Rankscore_analysis } from '../../modules/rankscore_analysis/'
 include { phenotagger } from '../../modules/phenotagger/'
+include { phenogpt2 } from '../../modules/phenogpt2/'
 include { eh_filter } from '../../modules/eh_filter/'
 include { phen2gene_filter } from '../../modules/reduce_region_phen2gene/'
 
@@ -40,8 +41,14 @@ workflow SINGLE_ALIGNMENT_ALL_NGS_LIGHT {
 
 	hpo=note
 	if ( is_note == "yes" ) {
-		phenotagger(note,out_prefix)
-		hpo=phenotagger.out
+		if ( params.phenotype_extractor.toString().trim().toLowerCase() == "phenogpt2" ) {
+			phenogpt2(note,out_prefix)
+			hpo=phenogpt2.out
+		}
+		else {
+			phenotagger(note,out_prefix)
+			hpo=phenotagger.out
+		}
 	}
 	Phen2gene(hpo,out_prefix)
 	if ( target == "yes" ) {

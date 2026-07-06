@@ -12,6 +12,7 @@ include { multi_truvari_shortread_sv_merge } from '../../modules/multi_truvari_s
 include { multi_expansionhunter } from '../../modules/multi_expansionhunter/'
 include { multi_eh_filter } from '../../modules/multi_eh_filter/'
 include { multi_phenotagger } from '../../modules/multi_phenotagger/'
+include { multi_phenogpt2 } from '../../modules/multi_phenogpt2/'
 include { multi_sv_prio } from '../../modules/multi_sv_prio/'
 
 
@@ -33,7 +34,17 @@ workflow INPUT_CSV_ALIGNMENT_NGS_SV {
         input_bam_no_bam =  input_bam.map { out_prefix, bam_file, bai_file, note_file -> return tuple ( out_prefix,note_file ) }
         input_bam_with_bam= input_bam.map { out_prefix, bam_file, bai_file, note_file -> return tuple (out_prefix, bam_file, bai_file) }
         if ( is_note == "yes" ) {
-                input_bam_no_bam=multi_phenotagger(input_bam_no_bam)
+                if ( params.phenotype_extractor.toString().trim().toLowerCase() == "phenogpt2" ) {
+
+                        input_bam_no_bam=multi_phenogpt2(input_bam_no_bam)
+
+                }
+
+                else {
+
+                        input_bam_no_bam=multi_phenotagger(input_bam_no_bam)
+
+                }
         }
         phen2gene_result=multi_phen2gene(input_bam_no_bam)
         multi_eh_result=multi_expansionhunter(input_bam_with_bam,ref_fa,eh_variant_catalog)

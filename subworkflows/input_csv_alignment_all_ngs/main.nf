@@ -18,6 +18,7 @@ include { multi_deepvariant } from '../../modules/multi_deepvariant/'
 include { multi_haplotypecaller } from '../../modules/multi_haplotypecaller/'
 include { multi_prep_gatk } from '../../modules/multi_prep_gatk/'
 include { multi_phenotagger } from '../../modules/multi_phenotagger/'
+include { multi_phenogpt2 } from '../../modules/multi_phenogpt2/'
 include { multi_phen2gene_filter } from '../../modules/multi_reduce_region_phen2gene/'
 include { multi_ngs_prio } from '../../modules/multi_ngs_prio/'
 include { multi_variant_html_report; multi_variant_html_report_with_mito } from '../../modules/variant_html_report/'
@@ -51,7 +52,17 @@ workflow INPUT_CSV_ALIGNMENT_ALL_NGS {
 	input_bam_no_bam =  input_bam.map { out_prefix, bam_file, bai_file, note_file -> return tuple ( out_prefix,note_file ) }
         input_bam_with_bam= input_bam.map { out_prefix, bam_file, bai_file, note_file -> return tuple (out_prefix, bam_file, bai_file) }	
 	if ( is_note == "yes" ) {
-		input_bam_no_bam=multi_phenotagger(input_bam_no_bam)
+		if ( params.phenotype_extractor.toString().trim().toLowerCase() == "phenogpt2" ) {
+
+		        input_bam_no_bam=multi_phenogpt2(input_bam_no_bam)
+
+		}
+
+		else {
+
+		        input_bam_no_bam=multi_phenotagger(input_bam_no_bam)
+
+		}
 	}
 	phen2gene_result=multi_phen2gene(input_bam_no_bam)
         if ( target == "yes" ) {

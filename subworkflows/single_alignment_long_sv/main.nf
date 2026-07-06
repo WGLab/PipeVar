@@ -10,6 +10,7 @@ include { NanoRepeat } from '../../modules/nanorepeat/'
 include { ANNOVAR_SV } from '../../modules/annovar_sv/'
 include { common_sv_filter } from '../../modules/common_sv_filter/'
 include { phenotagger } from '../../modules/phenotagger/'
+include { phenogpt2 } from '../../modules/phenogpt2/'
 include { sv_prio } from '../../modules/sv_prio/'
 
 
@@ -29,8 +30,14 @@ workflow SINGLE_ALIGNMENT_LONG_SV {
 	
 	hpo=note
 	if ( is_note == "yes" ) {
-		phenotagger(note,out_prefix)
-		hpo=phenotagger.out
+		if ( params.phenotype_extractor.toString().trim().toLowerCase() == "phenogpt2" ) {
+			phenogpt2(note,out_prefix)
+			hpo=phenogpt2.out
+		}
+		else {
+			phenotagger(note,out_prefix)
+			hpo=phenotagger.out
+		}
 	}
 	Phen2gene(hpo,out_prefix)
 	sniffles(bam,out_prefix,ref_fa)
@@ -38,7 +45,7 @@ workflow SINGLE_ALIGNMENT_LONG_SV {
 	if ( cnvpytor_mode == "yes" ) {
 		cnvpytor_dummy_vcf = ref_fa.map { ref_tuple -> ref_tuple[0] }
 		cnvpytor_reference_conf = Channel.value(params.cnvpytor_reference_conf ? file(params.cnvpytor_reference_conf) : [])
-		CNVpytor(bam,out_prefix,ref_fa,Channel.value(params.cnvpytor_reference_genome),cnvpytor_reference_conf,cnvpytor_dummy_vcf,Channel.value("no"),Channel.value(params.cnvpytor_bin_sizes),Channel.value(params.cnvpytor_primary_bin),Channel.value(params.cnvpytor_min_size))
+		CNVpytor(bam,out_prefix,ref_fa,cnvpytor_reference_conf,cnvpytor_dummy_vcf,Channel.value("no"),Channel.value(params.cnvpytor_bin_sizes),Channel.value(params.cnvpytor_primary_bin),Channel.value(params.cnvpytor_min_size))
 		sv_merge_inputs = sniffles.out.combine(CNVpytor.out.vcf).map { combined_vcfs ->
 			combined_vcfs.flatten()
 		}

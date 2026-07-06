@@ -4,6 +4,7 @@ include { multi_rankvar } from '../../modules/multi_rankvar/'
 include { multi_expansionhunter } from '../../modules/multi_expansionhunter/'
 include { multi_eh_filter } from '../../modules/multi_eh_filter/'
 include { multi_phenotagger } from '../../modules/multi_phenotagger/'
+include { multi_phenogpt2 } from '../../modules/multi_phenogpt2/'
 include { multi_ngs_prio } from '../../modules/multi_ngs_prio/'
 include { multi_annovar_sv } from '../../modules/multi_annovar_sv/'
 include { multi_common_sv_filter } from '../../modules/multi_common_sv_filter/'
@@ -49,8 +50,13 @@ workflow INPUT_CSV_ANNOTATED_ALL_NGS {
 	hpo_input = input_annotated_ngs
 		.filter { out_prefix, annovar_txt, annovar_vcf, annovar_sv_vcf, bam_file, bai_file, phenotype_path, phenotype_format -> phenotype_format == 'hpo' }
 		.map { out_prefix, annovar_txt, annovar_vcf, annovar_sv_vcf, bam_file, bai_file, phenotype_path, phenotype_format -> tuple(out_prefix, phenotype_path) }
-	phenotagger_result = multi_phenotagger(clinical_note_input)
-	hpo_paths = phenotagger_result.mix(hpo_input)
+	if ( params.phenotype_extractor.toString().trim().toLowerCase() == "phenogpt2" ) {
+		phenotype_extractor_result = multi_phenogpt2(clinical_note_input)
+	}
+	else {
+		phenotype_extractor_result = multi_phenotagger(clinical_note_input)
+	}
+	hpo_paths = phenotype_extractor_result.mix(hpo_input)
 	phen2gene_result = multi_phen2gene(hpo_paths)
 
 	validated_annovar_txt = validated_annovar.map { out_prefix, annovar_txt, annovar_vcf -> tuple(out_prefix, annovar_txt) }

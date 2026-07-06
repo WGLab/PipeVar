@@ -15,6 +15,7 @@ include { ANNOVAR_SV } from '../../modules/annovar_sv/'
 include { common_sv_filter } from '../../modules/common_sv_filter/'
 include { Rankscore_analysis } from '../../modules/rankscore_analysis/'
 include { phenotagger } from '../../modules/phenotagger/'
+include { phenogpt2 } from '../../modules/phenogpt2/'
 include { longphase } from '../../modules/longphase/'
 include { phen2gene_filter } from '../../modules/reduce_region_phen2gene/'
 include { variant_html_report; variant_html_report_with_mito } from '../../modules/variant_html_report/'
@@ -47,8 +48,14 @@ workflow SINGLE_ALIGNMENT_ALL_LONGPHASE {
 	
 	hpo=note
 	if ( is_note == "yes" ) {
-		phenotagger(note,out_prefix)
-		hpo=phenotagger.out
+		if ( params.phenotype_extractor.toString().trim().toLowerCase() == "phenogpt2" ) {
+			phenogpt2(note,out_prefix)
+			hpo=phenogpt2.out
+		}
+		else {
+			phenotagger(note,out_prefix)
+			hpo=phenotagger.out
+		}
 	}
 	Phen2gene(hpo,out_prefix)
 	if ( target == "yes" ) {
@@ -78,7 +85,7 @@ workflow SINGLE_ALIGNMENT_ALL_LONGPHASE {
 	cnvpytor_baf_mode = params.cnvpytor_baf ? params.cnvpytor_baf.toString().trim().toLowerCase() : "yes"
 	if ( cnvpytor_mode == "yes" ) {
 		cnvpytor_reference_conf = Channel.value(params.cnvpytor_reference_conf ? file(params.cnvpytor_reference_conf) : [])
-		CNVpytor(bam,out_prefix,ref_fa,Channel.value(params.cnvpytor_reference_genome),cnvpytor_reference_conf,snp_vcf,Channel.value(cnvpytor_baf_mode),Channel.value(params.cnvpytor_bin_sizes),Channel.value(params.cnvpytor_primary_bin),Channel.value(params.cnvpytor_min_size))
+		CNVpytor(bam,out_prefix,ref_fa,cnvpytor_reference_conf,snp_vcf,Channel.value(cnvpytor_baf_mode),Channel.value(params.cnvpytor_bin_sizes),Channel.value(params.cnvpytor_primary_bin),Channel.value(params.cnvpytor_min_size))
 		sv_merge_inputs = sniffles.out.combine(CNVpytor.out.vcf).map { combined_vcfs ->
 			combined_vcfs.flatten()
 		}

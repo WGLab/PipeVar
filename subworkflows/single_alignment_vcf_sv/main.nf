@@ -6,6 +6,7 @@ include { Phen2gene } from '../../modules/phen2gene/'
 include { ANNOVAR_SV } from '../../modules/annovar_sv/'
 include { common_sv_filter } from '../../modules/common_sv_filter/'
 include { phenotagger } from '../../modules/phenotagger/'
+include { phenogpt2 } from '../../modules/phenogpt2/'
 include { phen2gene_filter } from '../../modules/reduce_region_phen2gene/'
 include { sv_prio } from '../../modules/sv_prio/'
 
@@ -28,9 +29,15 @@ workflow SINGLE_ALIGNMENT_VCF_SV {
 	
 		hpo=note
 		if ( is_note == "yes" ) {
+		if ( params.phenotype_extractor.toString().trim().toLowerCase() == "phenogpt2" ) {
+			phenogpt2(note,out_prefix)
+			hpo=phenogpt2.out
+		}
+		else {
 			phenotagger(note,out_prefix)
 			hpo=phenotagger.out
 		}
+	}
 		Phen2gene(hpo,out_prefix)
 		if ( target == "yes" ) {
 			phen2_gene_bed=phen2gene_filter(Phen2gene.out,ref_fa,out_prefix,phen2gene_top_n)

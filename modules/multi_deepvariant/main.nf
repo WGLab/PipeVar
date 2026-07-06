@@ -1,7 +1,7 @@
 
 // Batch short-read SNP/indel calling with DeepVariant.
 process multi_deepvariant {
-	container "google/deepvariant:${params.deepvariant_version}${params.deepvariant_gpu?.toString()?.trim()?.toLowerCase() == 'yes' ? '-gpu' : ''}"
+	container "google/deepvariant:${params.deepvariant_version}${params.GPU?.toString()?.trim()?.toLowerCase() == 'yes' ? '-gpu' : ''}"
 
         input:
 	tuple val(out_prefix), path(bam), path(index_file)
@@ -27,5 +27,4 @@ process multi_deepvariant {
 
 
 }
-
 

@@ -4,6 +4,7 @@ include { multi_phen2gene } from '../../modules/multi_phen2gene/'
 include { multi_rankscore } from '../../modules/multi_rankscore/'
 include { multi_rankvar } from '../../modules/multi_rankvar/'
 include { multi_phenotagger } from '../../modules/multi_phenotagger/'
+include { multi_phenogpt2 } from '../../modules/multi_phenogpt2/'
 include { multi_phen2gene_filter } from '../../modules/multi_reduce_region_phen2gene/'
 include { multi_snp_prio } from '../../modules/multi_snp_prio/'
 
@@ -33,7 +34,17 @@ workflow INPUT_CSV_ALIGNMENT_VCF_SNP {
         input_vcf_no_vcf =  input_vcf.map { out_prefix, vcf_file, note_file -> return tuple ( out_prefix,note_file ) }
         input_vcf= input_vcf.map { out_prefix, vcf_file ,note_file -> return tuple (out_prefix, vcf_file) }
         if ( is_note == "yes" ) {
-                input_vcf_no_vcf=multi_phenotagger(input_vcf_no_vcf)
+                if ( params.phenotype_extractor.toString().trim().toLowerCase() == "phenogpt2" ) {
+
+                        input_vcf_no_vcf=multi_phenogpt2(input_vcf_no_vcf)
+
+                }
+
+                else {
+
+                        input_vcf_no_vcf=multi_phenotagger(input_vcf_no_vcf)
+
+                }
         }
 	
         phen2gene_result=multi_phen2gene(input_vcf_no_vcf)

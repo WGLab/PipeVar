@@ -15,6 +15,7 @@ include { multi_nanocaller } from '../../modules/multi_nanocaller/'
 include { multi_nanorepeat } from '../../modules/multi_nanorepeat/'
 include { multi_longphase } from '../../modules/multi_longphase/'
 include { multi_phenotagger } from '../../modules/multi_phenotagger/'
+include { multi_phenogpt2 } from '../../modules/multi_phenogpt2/'
 include { multi_phen2gene_filter } from '../../modules/multi_reduce_region_phen2gene/'
 include { multi_variant_html_report; multi_variant_html_report_with_mito } from '../../modules/variant_html_report/'
 
@@ -54,7 +55,17 @@ workflow INPUT_CSV_ALIGNMENT_ALL_LONGPHASE {
 	input_bam_no_bam = split_bams_ch.no_bam
 	input_bam_with_bam = split_bams_ch.with_bam
 	if ( is_note == "yes" ) {
-		input_bam_no_bam=multi_phenotagger(input_bam_no_bam)
+		if ( params.phenotype_extractor.toString().trim().toLowerCase() == "phenogpt2" ) {
+
+		        input_bam_no_bam=multi_phenogpt2(input_bam_no_bam)
+
+		}
+
+		else {
+
+		        input_bam_no_bam=multi_phenotagger(input_bam_no_bam)
+
+		}
 	}
 	phen2gene_result=multi_phen2gene(input_bam_no_bam)
         if ( target == "yes" ) {
@@ -94,7 +105,7 @@ workflow INPUT_CSV_ALIGNMENT_ALL_LONGPHASE {
 			tuple(out_prefix, bam_file, bai_file, snp_vcf)
 		}
 		cnvpytor_reference_conf = Channel.value(params.cnvpytor_reference_conf ? file(params.cnvpytor_reference_conf) : [])
-		cnvpytor_result=multi_cnvpytor(cnvpytor_input,ref_fa,Channel.value(params.cnvpytor_reference_genome),cnvpytor_reference_conf,Channel.value(cnvpytor_baf_mode),Channel.value(params.cnvpytor_bin_sizes),Channel.value(params.cnvpytor_primary_bin),Channel.value(params.cnvpytor_min_size))
+		cnvpytor_result=multi_cnvpytor(cnvpytor_input,ref_fa,cnvpytor_reference_conf,Channel.value(cnvpytor_baf_mode),Channel.value(params.cnvpytor_bin_sizes),Channel.value(params.cnvpytor_primary_bin),Channel.value(params.cnvpytor_min_size))
 		merged_sv_input=sniffles_result.join(cnvpytor_result.vcf).map { out_prefix, sniffles_vcf, cnvpytor_vcf ->
 			tuple(out_prefix, [sniffles_vcf, cnvpytor_vcf])
 		}

@@ -7,6 +7,7 @@ include { Phen2gene } from '../../modules/phen2gene/'
 include { RankVar } from '../../modules/rankvar/'
 include { Rankscore_analysis } from '../../modules/rankscore_analysis/'
 include { phenotagger } from '../../modules/phenotagger/'
+include { phenogpt2 } from '../../modules/phenogpt2/'
 include { phen2gene_filter } from '../../modules/reduce_region_phen2gene/'
 include { snp_prio } from '../../modules/snp_prio/'
 
@@ -37,8 +38,14 @@ workflow SINGLE_ALIGNMENT_LONG_SNP {
 	
 	hpo=note
 	if ( is_note == "yes" ) {
-		phenotagger(note,out_prefix)
-		hpo=phenotagger.out
+		if ( params.phenotype_extractor.toString().trim().toLowerCase() == "phenogpt2" ) {
+			phenogpt2(note,out_prefix)
+			hpo=phenogpt2.out
+		}
+		else {
+			phenotagger(note,out_prefix)
+			hpo=phenotagger.out
+		}
 	}
 	Phen2gene(hpo,out_prefix)
 	if ( target == "yes" ) {

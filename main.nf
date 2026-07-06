@@ -39,12 +39,16 @@ COMMON OPTIONS
   --mito <yes|no>               Enable mitochondrial analysis for BAM/CRAM input
   --xtea <yes|no>               Enable short-read mobile-element calling
   --cnvpytor <yes|no>           Enable experimental long-read CNV calling
+  --GPU <yes|no>                Enable shared GPU mode for DeepVariant GPU and PhenoGPT2
+  --phenotype_extractor <STR>   phenotagger or phenogpt2 for clinical notes
   --out_prefix <STRING>         Single-sample output prefix
   --output_directory <DIR>      Publish directory
 
 NOTES
   - BAM/CRAM inputs require index files (.bai or .crai).
   - Reference FASTA index (.fai) must exist when --ref_fa is supplied.
+  - CNVpytor custom references can use --cnvpytor_reference_conf <reference_genomes_conf.py>;
+    built-in hg19/hg38 references are detected by CNVpytor from alignment headers.
   - Single-file mode requires one phenotype source: --note <FILE> or --hpo <FILE>.
   - Detailed input schemas, parameter defaults, examples, and outputs are in README.md.
 ================================================================================
@@ -77,6 +81,8 @@ def clean_allow_unphased_comphet = params.allow_unphased_comphet ? params.allow_
 def clean_prioritize_sv_only = params.prioritize_sv_only ? params.prioritize_sv_only.toString().trim().toLowerCase() : 'no'
 def clean_common_sv_filter = params.common_sv_filter ? params.common_sv_filter.toString().trim().toLowerCase() : 'no'
 def clean_rankscore_softwares = params.rankscore_softwares ? params.rankscore_softwares.toString().trim() : ""
+def clean_GPU = params.GPU ? params.GPU.toString().trim().toLowerCase() : 'no'
+def clean_phenotype_extractor = params.phenotype_extractor ? params.phenotype_extractor.toString().trim().toLowerCase() : 'phenotagger'
 def clean_gene_filter = params.gene ? params.gene.toString().trim() : ""
 if (clean_gene_filter) {
     def gene_filter_file = file(clean_gene_filter)
@@ -91,10 +97,6 @@ if (clean_gene_filter) {
 def clean_cnvnator = params.cnvnator ? params.cnvnator.toString().trim().toLowerCase() : 'yes'
 def clean_cnvpytor = params.cnvpytor ? params.cnvpytor.toString().trim().toLowerCase() : 'no'
 def clean_cnvpytor_baf = params.cnvpytor_baf ? params.cnvpytor_baf.toString().trim().toLowerCase() : 'yes'
-def clean_cnvpytor_reference_genome = params.cnvpytor_reference_genome ? params.cnvpytor_reference_genome.toString().trim() : 'auto'
-if (clean_cnvpytor_reference_genome.toLowerCase() == 'auto') {
-    clean_cnvpytor_reference_genome = clean_genome == 'grch38' ? 'hg38' : clean_genome
-}
 def clean_cnvpytor_reference_conf = params.cnvpytor_reference_conf ? params.cnvpytor_reference_conf.toString().trim() : null
 def clean_xtea = params.xtea ? params.xtea.toString().trim().toLowerCase() : 'no'
 def clean_mito = params.mito ? params.mito.toString().trim().toLowerCase() : 'no'
@@ -113,6 +115,7 @@ def valid_inheritance_modes = ['ml', 'omim', 'gnomad']
 def valid_yes_no = ['yes', 'no']
 def valid_input_kinds = ['annotated_snv', 'vcf_snv', 'vcf_sv', 'bam_ngs', 'cram_ngs']
 def valid_phenotype_formats = ['clinical_note', 'hpo']
+def valid_phenotype_extractors = ['phenotagger', 'phenogpt2']
 
 def manifestHeaderColumns = []
 def manifestRowsForValidation = []
@@ -286,6 +289,47 @@ if (!valid_types.contains(clean_type)) {
       --type ont
       --type pacbio
       --type short
+    ================================================================
+    """
+}
+
+if (!valid_yes_no.contains(clean_GPU)) {
+    error """
+    ================================================================
+    ERROR: Invalid GPU Toggle
+    ================================================================
+    You provided: --GPU "${params.GPU}"
+
+    Valid options are:
+      --GPU yes
+      --GPU no
+    ================================================================
+    """
+}
+
+if (!valid_phenotype_extractors.contains(clean_phenotype_extractor)) {
+    error """
+    ================================================================
+    ERROR: Invalid Phenotype Extractor
+    ================================================================
+    You provided: --phenotype_extractor "${params.phenotype_extractor}"
+
+    Valid options are:
+      --phenotype_extractor phenotagger
+      --phenotype_extractor phenogpt2
+    ================================================================
+    """
+}
+
+if (clean_phenotype_extractor == 'phenogpt2' && clean_GPU != 'yes') {
+    error """
+    ================================================================
+    ERROR: PhenoGPT2 Requires GPU
+    ================================================================
+    PhenoGPT2 is GPU-backed in PipeVar_mito.
+
+    Use:
+      --phenotype_extractor phenogpt2 --GPU yes
     ================================================================
     """
 }
@@ -490,17 +534,6 @@ if (clean_cnvpytor == 'yes') {
         println "WARNING: --cnvpytor_baf yes was requested with --mode sv; CNVpytor will run in RD-only mode for the SV-only long-read branch."
     }
 
-    if (!clean_cnvpytor_reference_genome) {
-        error """
-        ================================================================
-        ERROR: Invalid CNVpytor Reference Genome
-        ================================================================
-        --cnvpytor_reference_genome must be a non-empty CNVpytor genome ID,
-        for example hg38, hg19, or a custom ID from --cnvpytor_reference_conf.
-        ================================================================
-        """
-    }
-
     if (clean_cnvpytor_reference_conf && !file(clean_cnvpytor_reference_conf).exists()) {
         error """
         ================================================================
@@ -579,7 +612,6 @@ params.cnvnator = clean_cnvnator
 params.cnvpytor = clean_cnvpytor
 params.cnvpytor_baf = clean_cnvpytor_baf
 params.cnvpytor_bin_sizes = clean_cnvpytor_bin_sizes
-params.cnvpytor_reference_genome = clean_cnvpytor_reference_genome
 params.cnvpytor_reference_conf = clean_cnvpytor_reference_conf
 params.xtea = clean_xtea
 params.mito = clean_mito

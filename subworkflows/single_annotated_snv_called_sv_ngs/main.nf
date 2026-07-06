@@ -12,6 +12,7 @@ include { common_sv_filter } from '../../modules/common_sv_filter/'
 include { ExpansionHunter } from '../../modules/expansion_hunter/'
 include { Rankscore_analysis } from '../../modules/rankscore_analysis/'
 include { phenotagger } from '../../modules/phenotagger/'
+include { phenogpt2 } from '../../modules/phenogpt2/'
 include { eh_filter } from '../../modules/eh_filter/'
 include { ngs_prio } from '../../modules/ngs_prio/'
 include { validate_preannotated_annovar_pair } from '../../modules/validate_preannotated_annovar_pair/'
@@ -57,8 +58,14 @@ workflow SINGLE_ANNOTATED_SNV_CALLED_SV_NGS {
 
 	hpo = phenotype
 	if ( phenotype_format == 'clinical_note' || phenotype_format == 'yes' ) {
-		phenotagger(phenotype, out_prefix)
-		hpo = phenotagger.out
+		if ( params.phenotype_extractor.toString().trim().toLowerCase() == "phenogpt2" ) {
+			phenogpt2(phenotype, out_prefix)
+			hpo = phenogpt2.out
+		}
+		else {
+			phenotagger(phenotype, out_prefix)
+			hpo = phenotagger.out
+		}
 	}
 	Phen2gene(hpo, out_prefix)
 	RankVar(validated_annovar_txt, Phen2gene.out, hpo, out_prefix, gnomad, gq, ad, rankvar_filter)

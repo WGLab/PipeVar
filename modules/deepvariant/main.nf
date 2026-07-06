@@ -1,7 +1,7 @@
 
 // Call SNP/indel variants from short-read alignments using DeepVariant.
 process deepvariant {
-	container "google/deepvariant:${params.deepvariant_version}${params.deepvariant_gpu?.toString()?.trim()?.toLowerCase() == 'yes' ? '-gpu' : ''}"
+	container "google/deepvariant:${params.deepvariant_version}${params.GPU?.toString()?.trim()?.toLowerCase() == 'yes' ? '-gpu' : ''}"
 
         input:
 	tuple path(bam), path(index)
@@ -28,5 +28,4 @@ process deepvariant {
 
 
 }
-
 
