@@ -1,6 +1,6 @@
 // Batch merge and deduplicate short-read SV/MEI caller VCFs with Truvari collapse.
 process multi_truvari_shortread_sv_merge {
-	container = 'beoungl/docker_test:truvari_0.4'
+	container = 'beoungl/docker_test:truvari_0.5'
 
 	input:
 	tuple val(out_prefix), path(sv_vcfs)
@@ -28,8 +28,37 @@ process multi_truvari_shortread_sv_merge {
 	    --out-prefix ${out_prefix} \\
 	    --reference "$ref_fa" \\
 	    --work-dir truvari_inputs \\
-	    --truvari-args "$args" \\
+	    --prepare-only \\
 	    "\${vcf_files[@]}"
+
+	prepared_vcfs=()
+	for normalized_vcf in truvari_inputs/*.normalized.vcf; do
+	    if [[ ! -s "\$normalized_vcf" ]]; then
+	        echo "Prepared normalized VCF is missing or empty: \$normalized_vcf" >&2
+	        exit 1
+	    fi
+	    prepared_vcf="\${normalized_vcf%.normalized.vcf}.prepared.vcf.gz"
+	    bcftools sort -Oz -o "\$prepared_vcf" "\$normalized_vcf"
+	    tabix -f -p vcf "\$prepared_vcf"
+	    prepared_vcfs+=( "\$prepared_vcf" )
+	done
+
+	if [[ \${#prepared_vcfs[@]} -eq 0 ]]; then
+	    echo "No normalized short-read SV VCFs were prepared for Truvari merge" >&2
+	    exit 1
+	fi
+
+	bcftools merge -m id "\${prepared_vcfs[@]}" -Oz -o ${out_prefix}.shortread_sv.bcftools_merged.vcf.gz
+	tabix -f -p vcf ${out_prefix}.shortread_sv.bcftools_merged.vcf.gz
+
+	truvari collapse \\
+	    -i ${out_prefix}.shortread_sv.bcftools_merged.vcf.gz \\
+	    -o ${out_prefix}.shortread_sv.truvari_merged.vcf \\
+	    -c ${out_prefix}.shortread_sv.truvari_collapsed.vcf \\
+	    -f "$ref_fa" \\
+	    --intra $args
+
+	cp ${out_prefix}.shortread_sv.truvari_merged.vcf ${out_prefix}.shortread_sv.merged.vcf
 
 	cat <<-END_VERSIONS > versions.yml
 	"${task.process}":

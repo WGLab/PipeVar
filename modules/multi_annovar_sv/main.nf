@@ -1,7 +1,7 @@
 
 // Batch SV annotation and phenotype-gene filtering with ANNOVAR.
 process multi_annovar_sv {
-	container ='beoungl/docker_test:truvari_0.4'
+	container ='beoungl/docker_test:truvari_0.5'
 
 
         input:
