@@ -1,6 +1,6 @@
 // Batch de novo filtering for keyed ANNOVAR small-variant TXT/VCF outputs.
 process multi_denovo_snv_filter {
-	container = 'beoungl/docker_test:denovo_snv_sv_filter_0.1'
+	container = 'beoungl/docker_test:denovo_snv_sv_filter_0.3'
 	tag 'snv'
 
 	input:
@@ -15,6 +15,7 @@ process multi_denovo_snv_filter {
 	path "*.denovo.snv.hg38_multianno.txt", emit: txt
 	path "*.denovo.snv.hg38_multianno.vcf", emit: vcf
 	path "denovo.snv.summary.tsv", emit: summary
+	path "denovo.snv.bindings.tsv", emit: bindings
 
 	script:
 	def prefixes = out_prefixes instanceof List ? out_prefixes : [out_prefixes]

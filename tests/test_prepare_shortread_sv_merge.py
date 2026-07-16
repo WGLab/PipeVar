@@ -142,7 +142,18 @@ class PrepareShortreadSvMergeTest(unittest.TestCase):
             self.assertIn("prepare_shortread_sv_merge.py", module_source)
             self.assertIn("bcftools sort", module_source)
             self.assertIn("bcftools merge -m id", module_source)
+            self.assertIn("INFO/SVTYPE=\"BND\"", module_source)
+            self.assertIn("shortread_sv.collapse_input.vcf.gz", module_source)
+            self.assertIn("shortread_sv.bnd_passthrough.vcf.gz", module_source)
             self.assertIn("truvari collapse", module_source)
+            self.assertIn("recombine_bnd_with_target_schema", module_source)
+            self.assertIn("bcftools query -l", module_source)
+            self.assertIn("bcftools view -s", module_source)
+            self.assertIn("bcftools view -G", module_source)
+            self.assertIn("bcftools concat -a", module_source)
+            self.assertIn("validate_vcf_width", module_source)
+            self.assertNotIn(">> ${out_prefix}.shortread_sv.merged.vcf", module_source)
+            self.assertNotIn(">> ${out_prefix}.shortread_sv.truvari_collapsed.vcf", module_source)
 
 
 if __name__ == "__main__":

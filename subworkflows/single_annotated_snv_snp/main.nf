@@ -43,7 +43,14 @@ workflow SINGLE_ANNOTATED_SNV_SNP {
 		rankvar_filter,
 		inheritance_mode,
 		include_clinvar_report,
-		allow_unphased_comphet
+		allow_unphased_comphet,
+		"no",
+		"null",
+		"role",
+		"family_id",
+		"vcf_sample",
+		"MT,M,chrM,chrMT",
+		"0.50"
 	)
 
 	emit:

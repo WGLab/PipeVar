@@ -15,6 +15,13 @@ workflow INPUT_CSV_ANNOTATED_SNV_SNP {
 	inheritance_mode
 	include_clinvar_report
 	allow_unphased_comphet
+	denovo_filter
+	denovo_pedigree
+	denovo_role_column
+	denovo_family_column
+	denovo_vcf_sample_column
+	denovo_exclude_contigs
+	denovo_sv_min_reciprocal_overlap
 
 	main:
 	ANNOTATED_SNV_PRIO_CORE(
@@ -29,7 +36,14 @@ workflow INPUT_CSV_ANNOTATED_SNV_SNP {
 		rankvar_filter,
 		inheritance_mode,
 		include_clinvar_report,
-		allow_unphased_comphet
+		allow_unphased_comphet,
+		denovo_filter,
+		denovo_pedigree,
+		denovo_role_column,
+		denovo_family_column,
+		denovo_vcf_sample_column,
+		denovo_exclude_contigs,
+		denovo_sv_min_reciprocal_overlap
 	)
 
 	emit:

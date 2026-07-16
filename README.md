@@ -192,7 +192,7 @@ Shared legacy CSV columns:
 | --- | --- | --- |
 | `sample` | yes | Output/sample identifier |
 | `file_path` | yes | BAM/CRAM or VCF path |
-| `note_path` | yes | Clinical note by default, or HPO file when `--note no` |
+| `note_path` | proband only with de novo; otherwise yes | Clinical note by default, or HPO file when `--note no` |
 | `age_of_onset` | no | Per-sample age for prioritization |
 | `age` | no | Alternate age column used only when `age_of_onset` is absent |
 | `sex` | no | Per-sample sex metadata; override name with `--sex_column` |
@@ -301,7 +301,20 @@ Matching thresholds are controlled by `--common_sv_af`, `--common_sv_reciprocal_
 
 CSV de novo filtering is disabled by default with `--denovo_filter no`.
 
-When enabled, CSV family metadata is used to filter proband SNV/SV ANNOVAR outputs against father/mother calls. Configure role, family, and sample mapping columns with `--denovo_role_column`, `--denovo_family_column`, and `--denovo_vcf_sample_column`.
+When enabled, CSV family metadata is used to compare cohort VCF calls before any sample-specific Phen2Gene or target-region restriction. Called SNV and SV records are filtered before ANNOVAR; imported ANNOVAR SNV TXT/VCF pairs are filtered together. Every CSV row must have a `proband`, `father`, `mother`, or `sibling` role; each family must contain one proband and at least one parent. Sample identifiers must be globally unique and use only letters, numbers, `.`, `_`, and `-`.
+
+Parents are variant controls only: their phenotype, age, and sex cells may be blank, and only probands continue through phenotype extraction, sex-aware prioritization, repeat/mitochondrial analysis, and final reporting. With both de novo and sex metadata enabled, inherited maternal chrX and paternal chrY calls are removed first; retained male chrX/XLR and chrY/AR calls can then receive hemizygous prioritization. Female and `unknown` probands retain the existing non-hemizygous behavior.
+
+Example combined columns:
+
+```csv
+sample,file_path,note_path,family_id,role,vcf_sample,sex
+child,child.bam,child.hpo.txt,F1,proband,CHILD,male
+mother,mother.bam,,F1,mother,MOTHER,
+father,father.bam,,F1,father,FATHER,
+```
+
+Configure role, family, and sample mapping columns with `--denovo_role_column`, `--denovo_family_column`, and `--denovo_vcf_sample_column`. Published binding manifests preserve sample-to-file identity, while `denovo.snv.summary.tsv` and `denovo.sv.summary.tsv` report the parents used, parental variants loaded, proband variants examined, and kept/removed counts. A zero-match family produces a warning rather than failing because it can be biologically valid.
 
 ### Light Mode
 
@@ -405,7 +418,7 @@ Defaults below come from `nextflow.config`.
 | `--common_sv_distance` | `1000` | Breakpoint fallback distance for interval SV matching |
 | `--common_sv_ins_distance` | `500` | Insertion position window for common matching |
 | `--common_sv_ins_identity` | `0.5` | Insertion sequence identity threshold when inserted sequence is available |
-| `--denovo_filter` | `no` | Filter proband SNV/SV ANNOVAR outputs against parent calls in CSV mode |
+| `--denovo_filter` | `no` | Filter proband SNV/SV calls against parents before phenotype-specific restriction |
 | `--denovo_role_column` | `role` | CSV role column for proband/father/mother/sibling |
 | `--denovo_family_column` | `family_id` | CSV family grouping column |
 | `--denovo_vcf_sample_column` | `vcf_sample` | Optional CSV column for VCF sample names |

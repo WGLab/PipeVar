@@ -51,14 +51,92 @@ process multi_truvari_shortread_sv_merge {
 	bcftools merge -m id "\${prepared_vcfs[@]}" -Oz -o ${out_prefix}.shortread_sv.bcftools_merged.vcf.gz
 	tabix -f -p vcf ${out_prefix}.shortread_sv.bcftools_merged.vcf.gz
 
-	truvari collapse \\
-	    -i ${out_prefix}.shortread_sv.bcftools_merged.vcf.gz \\
-	    -o ${out_prefix}.shortread_sv.truvari_merged.vcf \\
-	    -c ${out_prefix}.shortread_sv.truvari_collapsed.vcf \\
-	    -f "$ref_fa" \\
-	    --intra $args
+	bcftools view -e 'INFO/SVTYPE="BND"' ${out_prefix}.shortread_sv.bcftools_merged.vcf.gz -Oz -o ${out_prefix}.shortread_sv.collapse_input.vcf.gz
+	tabix -f -p vcf ${out_prefix}.shortread_sv.collapse_input.vcf.gz
+	bcftools view -i 'INFO/SVTYPE="BND"' ${out_prefix}.shortread_sv.bcftools_merged.vcf.gz -Oz -o ${out_prefix}.shortread_sv.bnd_passthrough.vcf.gz
+	tabix -f -p vcf ${out_prefix}.shortread_sv.bnd_passthrough.vcf.gz
 
-	cp ${out_prefix}.shortread_sv.truvari_merged.vcf ${out_prefix}.shortread_sv.merged.vcf
+	if bcftools view -H ${out_prefix}.shortread_sv.collapse_input.vcf.gz | grep -q .; then
+	    truvari collapse \\
+	        -i ${out_prefix}.shortread_sv.collapse_input.vcf.gz \\
+	        -o ${out_prefix}.shortread_sv.truvari_merged.vcf \\
+	        -c ${out_prefix}.shortread_sv.truvari_collapsed.vcf \\
+	        -f "$ref_fa" \\
+	        --intra $args
+	else
+	    bcftools view ${out_prefix}.shortread_sv.collapse_input.vcf.gz > ${out_prefix}.shortread_sv.truvari_merged.vcf
+	    cp ${out_prefix}.shortread_sv.truvari_merged.vcf ${out_prefix}.shortread_sv.truvari_collapsed.vcf
+	fi
+
+	validate_vcf_width() {
+	    local vcf="\$1"
+	    awk -F '\\t' '
+	        /^#CHROM/ {
+	            expected = NF
+	            next
+	        }
+	        /^#/ { next }
+	        {
+	            if (!expected) {
+	                printf "VCF width validation failed: missing #CHROM header\\n" > "/dev/stderr"
+	                exit 1
+	            }
+	            if (NF != expected) {
+	                printf "VCF width validation failed at line %d: expected %d fields, observed %d\\n", NR, expected, NF > "/dev/stderr"
+	                exit 1
+	            }
+	        }
+	        END {
+	            if (!expected) {
+	                exit 1
+	            }
+	        }
+	    ' "\$vcf"
+	}
+
+	recombine_bnd_with_target_schema() {
+	    local target_vcf="\$1"
+	    local output_vcf="\$2"
+	    local label="\$3"
+	    local sample_file="\${label}.samples.txt"
+	    local target_bgz="\${label}.target.vcf.gz"
+	    local projected_bnd="\${label}.bnd.projected.vcf.gz"
+	    local combined_unsorted="\${label}.combined.unsorted.vcf"
+
+	    bcftools query -l "\$target_vcf" > "\$sample_file"
+	    if [[ -s "\$sample_file" ]]; then
+	        local sample_csv
+	        sample_csv=\$(paste -sd, "\$sample_file")
+	        bcftools view -s "\$sample_csv" -Oz -o "\$projected_bnd" ${out_prefix}.shortread_sv.bnd_passthrough.vcf.gz
+	    else
+	        bcftools view -G -Oz -o "\$projected_bnd" ${out_prefix}.shortread_sv.bnd_passthrough.vcf.gz
+	    fi
+	    tabix -f -p vcf "\$projected_bnd"
+
+	    bcftools view -Oz -o "\$target_bgz" "\$target_vcf"
+	    tabix -f -p vcf "\$target_bgz"
+	    bcftools concat -a -Ov "\$target_bgz" "\$projected_bnd" > "\$combined_unsorted"
+	    bcftools sort -Ov -o "\$output_vcf" "\$combined_unsorted"
+	    validate_vcf_width "\$output_vcf"
+	}
+
+	if bcftools view -H ${out_prefix}.shortread_sv.bnd_passthrough.vcf.gz | grep -q .; then
+	    echo "Passing BND records through without Truvari collapse using each target VCF sample schema" >&2
+	    recombine_bnd_with_target_schema \\
+	        ${out_prefix}.shortread_sv.truvari_merged.vcf \\
+	        ${out_prefix}.shortread_sv.merged.vcf \\
+	        retained
+	    recombine_bnd_with_target_schema \\
+	        ${out_prefix}.shortread_sv.truvari_collapsed.vcf \\
+	        ${out_prefix}.shortread_sv.truvari_collapsed.with_bnd.vcf \\
+	        collapsed
+	    mv ${out_prefix}.shortread_sv.truvari_collapsed.with_bnd.vcf ${out_prefix}.shortread_sv.truvari_collapsed.vcf
+	else
+	    cp ${out_prefix}.shortread_sv.truvari_merged.vcf ${out_prefix}.shortread_sv.merged.vcf
+	fi
+
+	validate_vcf_width ${out_prefix}.shortread_sv.merged.vcf
+	validate_vcf_width ${out_prefix}.shortread_sv.truvari_collapsed.vcf
 
 	cat <<-END_VERSIONS > versions.yml
 	"${task.process}":

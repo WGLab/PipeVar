@@ -18,6 +18,8 @@ include { multi_phenotagger } from '../../modules/multi_phenotagger/'
 include { multi_phenogpt2 } from '../../modules/multi_phenogpt2/'
 include { multi_phen2gene_filter } from '../../modules/multi_reduce_region_phen2gene/'
 include { multi_variant_html_report; multi_variant_html_report_with_mito } from '../../modules/variant_html_report/'
+include { DENOVO_SNV_VCF_FILTER_CORE } from '../denovo_snv_vcf_filter_core'
+include { DENOVO_SV_FILTER_CORE } from '../denovo_sv_filter_core'
 
 
 
@@ -43,6 +45,13 @@ workflow INPUT_CSV_ALIGNMENT_ALL_LONGPHASE {
 	allow_unphased_comphet
 	mito_tsv
 	mito_mode
+	denovo_filter
+	denovo_pedigree
+	denovo_role_column
+	denovo_family_column
+	denovo_vcf_sample_column
+	denovo_exclude_contigs
+	denovo_sv_min_reciprocal_overlap
 
 	main:
 	
@@ -54,45 +63,66 @@ workflow INPUT_CSV_ALIGNMENT_ALL_LONGPHASE {
 	// 3. Access your newly structured channels
 	input_bam_no_bam = split_bams_ch.no_bam
 	input_bam_with_bam = split_bams_ch.with_bam
-	if ( is_note == "yes" ) {
-		if ( params.phenotype_extractor.toString().trim().toLowerCase() == "phenogpt2" ) {
-
-		        input_bam_no_bam=multi_phenogpt2(input_bam_no_bam)
-
-		}
-
-		else {
-
-		        input_bam_no_bam=multi_phenotagger(input_bam_no_bam)
-
-		}
-	}
-	phen2gene_result=multi_phen2gene(input_bam_no_bam)
-        if ( target == "yes" ) {
-                phen2_gene_bed=multi_phen2gene_filter(phen2gene_result,ref_fa,phen2gene_top_n)
+        bam_for_proband_tasks=input_bam_with_bam
+        if ( denovo_filter == "yes" ) {
                 if ( caller_mode == "nanocaller" ) {
-                        snp_result=multi_nanocaller(input_bam_with_bam,ref_fa,phen2_gene_bed)
+                        snp_result=multi_nanocaller(input_bam_with_bam,ref_fa,"null")
                 }
                 else {
-                        snp_result=multi_clair3(input_bam_with_bam,ref_fa,phen2_gene_bed)
+                        snp_result=multi_clair3(input_bam_with_bam,ref_fa,"null")
                 }
+                denovo_snv_result=DENOVO_SNV_VCF_FILTER_CORE(snp_result,denovo_pedigree,denovo_role_column,denovo_family_column,denovo_vcf_sample_column,denovo_exclude_contigs)
+                snp_for_annotation=denovo_snv_result.records
+                proband_keys=denovo_snv_result.records.map { out_prefix, vcf_file -> tuple(out_prefix, true) }
+                input_bam_no_bam=input_bam_no_bam.join(proband_keys, failOnDuplicate: true).map { out_prefix, note_file, marker -> tuple(out_prefix, note_file) }
+                bam_for_proband_tasks=input_bam_with_bam.join(proband_keys, failOnDuplicate: true).map { out_prefix, bam_file, bai_file, marker -> tuple(out_prefix, bam_file, bai_file) }
         }
         else {
+                if ( is_note == "yes" ) {
+                        if ( params.phenotype_extractor.toString().trim().toLowerCase() == "phenogpt2" ) {
+                                input_bam_no_bam=multi_phenogpt2(input_bam_no_bam)
+                        }
+                        else {
+                                input_bam_no_bam=multi_phenotagger(input_bam_no_bam)
+                        }
+                }
+                phen2gene_result=multi_phen2gene(input_bam_no_bam)
+                def caller_regions=target
+                if ( target == "yes" ) {
+                        phen2_gene_bed=multi_phen2gene_filter(phen2gene_result,ref_fa,phen2gene_top_n)
+                        caller_regions=phen2_gene_bed
+                }
                 if ( caller_mode == "nanocaller" ) {
-                        snp_result=multi_nanocaller(input_bam_with_bam,ref_fa,target)
+                        snp_result=multi_nanocaller(input_bam_with_bam,ref_fa,caller_regions)
                 }
                 else {
-                        snp_result=multi_clair3(input_bam_with_bam,ref_fa,target)
+                        snp_result=multi_clair3(input_bam_with_bam,ref_fa,caller_regions)
+                }
+                snp_for_annotation=snp_result
+        }
+        if ( denovo_filter == "yes" ) {
+                if ( is_note == "yes" ) {
+                        if ( params.phenotype_extractor.toString().trim().toLowerCase() == "phenogpt2" ) {
+                                input_bam_no_bam=multi_phenogpt2(input_bam_no_bam)
+                        }
+                        else {
+                                input_bam_no_bam=multi_phenotagger(input_bam_no_bam)
+                        }
+                }
+                phen2gene_result=multi_phen2gene(input_bam_no_bam)
+                if ( target == "yes" ) {
+                        phen2_gene_bed=multi_phen2gene_filter(phen2gene_result,ref_fa,phen2gene_top_n)
                 }
         }
         if ( target == "yes" ) {
-                annovar_input=snp_result.join(phen2_gene_bed).map { out_prefix, vcf_file, bed_file -> tuple(out_prefix, vcf_file, bed_file) }
+                annovar_input=snp_for_annotation.join(phen2_gene_bed, failOnMismatch: true, failOnDuplicate: true).map { out_prefix, vcf_file, bed_file -> tuple(out_prefix, vcf_file, bed_file) }
         }
         else {
-                annovar_input=snp_result.map { out_prefix, vcf_file -> tuple(out_prefix, vcf_file, target) }
+                annovar_input=snp_for_annotation.map { out_prefix, vcf_file -> tuple(out_prefix, vcf_file, target) }
         }
 	annovar_result=multi_annovar(annovar_input)
-	annovar_result_txt=annovar_result.map { item -> tuple(item[0], item[1]) }
+	annovar_for_downstream=annovar_result
+	annovar_result_txt=annovar_for_downstream.map { item -> tuple(item[0], item[1]) }
 	join_annovar_phen2gene=annovar_result_txt.join(phen2gene_result)
 	join_annovar_hpo=join_annovar_phen2gene.join(input_bam_no_bam)
 	rankscore_result=multi_rankscore(join_annovar_phen2gene,gnomad,rankscore_filter,rankscore_softwares,gq,phen2gene_top_n)
@@ -114,30 +144,35 @@ workflow INPUT_CSV_ALIGNMENT_ALL_LONGPHASE {
 	else {
 		sv_result=sniffles_result
 	}
+	sv_for_annotation=sv_result
+	if ( denovo_filter == "yes" ) {
+		denovo_sv_result=DENOVO_SV_FILTER_CORE(sv_result,denovo_pedigree,denovo_role_column,denovo_family_column,denovo_vcf_sample_column,denovo_exclude_contigs,denovo_sv_min_reciprocal_overlap)
+		sv_for_annotation=denovo_sv_result.records
+	}
         if ( target == "yes" ) {
-	        sniffles_result_annovar=sv_result.join(phen2gene_result).join(phen2_gene_bed).map { out_prefix, vcf_file, phen2gene_file, bed_file -> tuple(out_prefix, vcf_file, phen2gene_file, bed_file, "called") }
+	        sniffles_result_annovar=sv_for_annotation.join(phen2gene_result, failOnMismatch: true, failOnDuplicate: true).join(phen2_gene_bed, failOnMismatch: true, failOnDuplicate: true).map { out_prefix, vcf_file, phen2gene_file, bed_file -> tuple(out_prefix, vcf_file, phen2gene_file, bed_file, "called") }
         }
         else {
-	        sniffles_result_annovar=sv_result.join(phen2gene_result).map { out_prefix, vcf_file, phen2gene_file -> tuple(out_prefix, vcf_file, phen2gene_file, target, "called") }
+	        sniffles_result_annovar=sv_for_annotation.join(phen2gene_result, failOnMismatch: true, failOnDuplicate: true).map { out_prefix, vcf_file, phen2gene_file -> tuple(out_prefix, vcf_file, phen2gene_file, target, "called") }
         }
 	annovar_sv_result=multi_annovar_sv(sniffles_result_annovar)
 	annovar_sv_for_downstream = annovar_sv_result
 	if ( params.common_sv_filter.toString().trim().toLowerCase() == "yes" ) {
-		multi_common_sv_filter(annovar_sv_result)
+		multi_common_sv_filter(annovar_sv_for_downstream)
 		annovar_sv_for_downstream = multi_common_sv_filter.out.filtered_vcf
 	}
 	survivor_result=multi_survivor(annovar_sv_for_downstream)
 	phenosv_input=survivor_result.join(input_bam_no_bam)
 	phenosv_result=multi_phenosv(phenosv_input)
-	multi_nanorepeat(input_bam_with_bam,ref_fa)
-	annovar_join=annovar_result.map { item -> tuple(item[0], item[2]) }
+	multi_nanorepeat(bam_for_proband_tasks,ref_fa)
+	annovar_join=annovar_for_downstream.map { item -> tuple(item[0], item[2]) }
 	annovar_sv_join=annovar_sv_for_downstream.map { item -> tuple(item[0], item[1]) }
-	join_vcf_bam=annovar_join.join(input_bam_with_bam)
+	join_vcf_bam=annovar_join.join(bam_for_proband_tasks, failOnMismatch: true, failOnDuplicate: true)
 	join_vcf_bam_sv=annovar_sv_join.join(join_vcf_bam)
 	join_vcf_bam_phenosv=phenosv_result.join(join_vcf_bam_sv)
 	join_vcf_bam_rankscore=rankscore_result.join(join_vcf_bam_phenosv)
 	join_vcf_bam_rankvar=rankvar_result.join(join_vcf_bam_rankscore)
-	input_bam_hpo_age=input_bam_no_bam.join(input_meta).map { out_prefix, hpo_path, age_of_onset, sex -> tuple(out_prefix, hpo_path, age_of_onset, sex) }
+	input_bam_hpo_age=input_bam_no_bam.join(input_meta, failOnMismatch: true, failOnDuplicate: true).map { out_prefix, hpo_path, age_of_onset, sex -> tuple(out_prefix, hpo_path, age_of_onset, sex) }
 	join_vcf_bam_rankvar_hpo=join_vcf_bam_rankvar.join(input_bam_hpo_age)
 	multi_longphase(join_vcf_bam_rankvar_hpo,ref_fa,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
 

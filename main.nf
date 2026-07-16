@@ -80,6 +80,11 @@ def clean_include_clinvar_report = params.include_clinvar_report ? params.includ
 def clean_allow_unphased_comphet = params.allow_unphased_comphet ? params.allow_unphased_comphet.trim().toLowerCase() : 'no'
 def clean_prioritize_sv_only = params.prioritize_sv_only ? params.prioritize_sv_only.toString().trim().toLowerCase() : 'no'
 def clean_common_sv_filter = params.common_sv_filter ? params.common_sv_filter.toString().trim().toLowerCase() : 'no'
+def clean_denovo_filter = params.denovo_filter ? params.denovo_filter.toString().trim().toLowerCase() : 'no'
+def clean_denovo_role_column = params.denovo_role_column ? params.denovo_role_column.toString().trim() : 'role'
+def clean_denovo_family_column = params.denovo_family_column ? params.denovo_family_column.toString().trim() : 'family_id'
+def clean_denovo_vcf_sample_column = params.denovo_vcf_sample_column ? params.denovo_vcf_sample_column.toString().trim() : 'vcf_sample'
+def clean_denovo_exclude_contigs = params.denovo_exclude_contigs ? params.denovo_exclude_contigs.toString().trim() : 'MT,M,chrM,chrMT'
 def clean_rankscore_softwares = params.rankscore_softwares ? params.rankscore_softwares.toString().trim() : ""
 def clean_GPU = params.GPU ? params.GPU.toString().trim().toLowerCase() : 'no'
 def clean_phenotype_extractor = params.phenotype_extractor ? params.phenotype_extractor.toString().trim().toLowerCase() : 'phenotagger'
@@ -117,6 +122,38 @@ def valid_input_kinds = ['annotated_snv', 'vcf_snv', 'vcf_sv', 'bam_ngs', 'cram_
 def valid_phenotype_formats = ['clinical_note', 'hpo']
 def valid_phenotype_extractors = ['phenotagger', 'phenogpt2']
 
+// Quote-aware parsing for manifest validation; Nextflow splitCsv performs the
+// corresponding runtime parsing for channel construction.
+def parseCsvRecord = { String line ->
+    def values = []
+    def current = new StringBuilder()
+    def quoted = false
+    for (int idx = 0; idx < line.size(); idx++) {
+        def ch = line.charAt(idx)
+        if (ch == ('"' as char)) {
+            if (quoted && idx + 1 < line.size() && line.charAt(idx + 1) == ('"' as char)) {
+                current.append('"')
+                idx++
+            }
+            else {
+                quoted = !quoted
+            }
+        }
+        else if (ch == (',' as char) && !quoted) {
+            values << current.toString().trim()
+            current.setLength(0)
+        }
+        else {
+            current.append(ch)
+        }
+    }
+    if (quoted) {
+        error "ERROR: unterminated quoted CSV field: ${line}"
+    }
+    values << current.toString().trim()
+    values
+}
+
 def manifestHeaderColumns = []
 def manifestRowsForValidation = []
 def manifestUsesUnifiedSchema = false
@@ -138,7 +175,7 @@ if (params.input_csv) {
         error "ERROR: input CSV is empty: ${params.input_csv}"
     }
 
-    manifestHeaderColumns = manifestLines[0].split(/\s*,\s*/, -1).collect { it.trim() }
+    manifestHeaderColumns = parseCsvRecord(manifestLines[0])
     manifestUsesUnifiedSchema = manifestHeaderColumns.contains('input_kind')
 
     if (manifestUsesUnifiedSchema) {
@@ -150,7 +187,7 @@ if (params.input_csv) {
 
         def seenSamples = [] as Set
         manifestLines.drop(1).findAll { it.trim() }.eachWithIndex { line, rowIdx ->
-            def values = line.split(/,/, -1).collect { it.trim() }
+            def values = parseCsvRecord(line)
             if (values.size() != manifestHeaderColumns.size()) {
                 error "ERROR: Unified input CSV row ${rowIdx + 2} has ${values.size()} column(s); expected ${manifestHeaderColumns.size()}."
             }
@@ -165,15 +202,23 @@ if (params.input_csv) {
                 error "ERROR: Unified input CSV contains duplicate sample '${sample}'. Samples must be unique in v1."
             }
             seenSamples << sample
+			if (clean_denovo_filter == 'yes' && !(sample ==~ /[A-Za-z0-9][A-Za-z0-9._-]*/)) {
+				error "ERROR: sample '${sample}' is not filename-safe; use only letters, numbers, '.', '_' and '-'."
+			}
 
             def inputKind = row.input_kind?.toLowerCase()
             def phenotypeFormat = row.phenotype_format?.toLowerCase()
+			def role = clean_denovo_filter == 'yes' ? (row[clean_denovo_role_column] ?: '').toString().trim().toLowerCase() : 'proband'
+			def isControl = clean_denovo_filter == 'yes' && role in ['father', 'mother', 'sibling']
             if (!valid_input_kinds.contains(inputKind)) {
                 error "ERROR: Unified input CSV sample '${sample}' has invalid input_kind '${row.input_kind}'."
             }
-            if (!valid_phenotype_formats.contains(phenotypeFormat)) {
+            if (!isControl && !valid_phenotype_formats.contains(phenotypeFormat)) {
                 error "ERROR: Unified input CSV sample '${sample}' has invalid phenotype_format '${row.phenotype_format}'."
             }
+			if (!isControl && !(row.phenotype_path ?: '').toString().trim()) {
+				error "ERROR: Unified input CSV proband '${sample}' requires phenotype_path."
+			}
 
             def snvTxtPath = row.containsKey('snv_txt_path') ? row.snv_txt_path : ''
             def snvVcfPath = row.containsKey('snv_vcf_path') ? row.snv_vcf_path : ''
@@ -233,7 +278,9 @@ if (params.input_csv) {
 
             manifestRowsForValidation << row
             manifestInputKinds << inputKind
-            manifestPhenotypeFormats << phenotypeFormat
+			if (!isControl) {
+				manifestPhenotypeFormats << phenotypeFormat
+			}
         }
 
         if (manifestRowsForValidation.isEmpty()) {
@@ -709,6 +756,20 @@ if (!valid_yes_no.contains(clean_common_sv_filter)) {
     """
 }
 
+if (!valid_yes_no.contains(clean_denovo_filter)) {
+    error "ERROR: Invalid --denovo_filter '${params.denovo_filter}'. Use 'yes' or 'no'."
+}
+
+[clean_denovo_role_column, clean_denovo_family_column, clean_denovo_vcf_sample_column].each { columnName ->
+    if (!(columnName ==~ /[A-Za-z_][A-Za-z0-9_.-]*/)) {
+        error "ERROR: invalid de novo CSV column name '${columnName}'."
+    }
+}
+
+if (!(params.denovo_sv_min_reciprocal_overlap.toString() ==~ /0\.[0-9]*[1-9][0-9]*|1(\.0+)?/)) {
+    error "ERROR: Invalid --denovo_sv_min_reciprocal_overlap '${params.denovo_sv_min_reciprocal_overlap}'. Provide a value greater than 0 and at most 1."
+}
+
 if (!(params.phenosv_score.toString() ==~ /([0-9]+([.][0-9]+)?|[.][0-9]+)/)) {
     error """
     ================================================================
@@ -786,6 +847,73 @@ if (params.input_csv && manifestUsesUnifiedSchema && (params.bam || params.vcf))
     ERROR: Unified input CSV should not be combined with --bam true or --vcf true.
     The manifest row input_kind already selects the input path.
     """
+}
+
+if (clean_denovo_filter == 'yes' && !params.input_csv) {
+    error "ERROR: --denovo_filter yes is supported only with --input_csv."
+}
+
+if (clean_denovo_filter == 'yes') {
+    def pedigreeFile = file(params.input_csv)
+    def pedigreeLines = pedigreeFile.readLines().findAll { it.trim() }
+    if (pedigreeLines.isEmpty()) {
+        error "ERROR: de novo pedigree CSV is empty: ${params.input_csv}"
+    }
+    def pedigreeHeader = parseCsvRecord(pedigreeLines[0])
+    def sampleIndex = pedigreeHeader.indexOf('sample')
+    def roleIndex = pedigreeHeader.indexOf(clean_denovo_role_column)
+    def familyIndex = pedigreeHeader.indexOf(clean_denovo_family_column)
+    if (sampleIndex < 0 || roleIndex < 0) {
+        error "ERROR: --denovo_filter yes requires CSV columns 'sample' and '${clean_denovo_role_column}'."
+    }
+
+    def allowedRoles = ['proband', 'father', 'mother', 'sibling'] as Set
+    def pedigreeFamilies = [:]
+	def pedigreeSamples = [] as Set
+    pedigreeLines.drop(1).eachWithIndex { line, rowIndex ->
+        def values = parseCsvRecord(line)
+        if (values.size() != pedigreeHeader.size()) {
+            error "ERROR: de novo CSV row ${rowIndex + 2} has ${values.size()} column(s); expected ${pedigreeHeader.size()}."
+        }
+        def sample = values[sampleIndex]
+        def role = values[roleIndex].toLowerCase()
+        if (!sample || !allowedRoles.contains(role)) {
+            error "ERROR: invalid de novo pedigree row ${rowIndex + 2}; sample must be non-empty and role must be father, mother, proband, or sibling."
+        }
+		if (!(sample ==~ /[A-Za-z0-9][A-Za-z0-9._-]*/)) {
+			error "ERROR: sample '${sample}' is not filename-safe; use only letters, numbers, '.', '_' and '-'."
+		}
+		if (pedigreeSamples.contains(sample)) {
+			error "ERROR: duplicate sample '${sample}' in de novo CSV. Sample keys must be globally unique."
+		}
+		pedigreeSamples << sample
+        if (role != 'sibling') {
+            def familyId = familyIndex >= 0 && values[familyIndex] ? values[familyIndex] : 'family_1'
+            if (!pedigreeFamilies.containsKey(familyId)) {
+                pedigreeFamilies[familyId] = [:]
+            }
+            def family = pedigreeFamilies[familyId]
+            if (family.containsKey(role)) {
+                error "ERROR: family '${familyId}' has duplicate role '${role}' (${family[role]}, ${sample})."
+            }
+            family[role] = sample
+        }
+    }
+    if (pedigreeFamilies.isEmpty()) {
+        error "ERROR: --denovo_filter yes requires at least one proband and one parent."
+    }
+    pedigreeFamilies.each { familyId, family ->
+        if (!family.containsKey('proband')) {
+            error "ERROR: family '${familyId}' is missing a proband."
+        }
+        if (!family.containsKey('father') && !family.containsKey('mother')) {
+            error "ERROR: family '${familyId}' must include father and/or mother."
+        }
+    }
+	def requestedSexColumn = params.sex_column ? params.sex_column.toString().trim() : 'sex'
+	if (requestedSexColumn != 'sex' && !pedigreeHeader.contains(requestedSexColumn)) {
+		error "ERROR: requested --sex_column '${requestedSexColumn}' is absent from the input CSV."
+	}
 }
 
 if (clean_annotated_snv == 'yes') {
@@ -958,10 +1086,31 @@ workflow {
 	def input_annotated_called_ngs = null
 	def csv_manifest_mode = null
 	def csv_manifest_is_note = null
+	def denovo_pedigree = Channel.value("null")
+	def phenotypeFileForRow = { row, columnName ->
+		def role = clean_denovo_filter == 'yes' ? (row[clean_denovo_role_column] ?: '').toString().trim().toLowerCase() : 'proband'
+		if (clean_denovo_filter == 'yes' && role != 'proband') {
+			return 'null'
+		}
+		def rawPath = (row[columnName] ?: '').toString().trim()
+		if (!rawPath) {
+			error "ERROR: proband '${row.sample}' requires a non-empty ${columnName}."
+		}
+		file(rawPath, checkIfExists: true)
+	}
 	if ( params.input_csv ) {
+		if ( clean_denovo_filter == 'yes' ) {
+			denovo_pedigree = Channel.fromPath(params.input_csv).first()
+		}
 		input_meta = Channel
     .fromPath( params.input_csv )
     .splitCsv( header:true )
+	.filter { row ->
+		if (clean_denovo_filter != 'yes') {
+			return true
+		}
+		return (row[clean_denovo_role_column] ?: '').toString().trim().toLowerCase() == 'proband'
+	}
     .map { row ->
         def out_prefix = row.sample
         def has_age_of_onset = row.containsKey('age_of_onset')
@@ -1035,8 +1184,8 @@ workflow {
             file(row.sv_vcf_path, checkIfExists: true),
             bam_file,
             bai,
-            file(row.phenotype_path, checkIfExists: true),
-            row.phenotype_format.toString().trim().toLowerCase()
+            phenotypeFileForRow(row, 'phenotype_path'),
+            (row.phenotype_format ?: '').toString().trim().toLowerCase()
         )
     }
     input_annotated_snv = null
@@ -1071,8 +1220,8 @@ workflow {
             file(row.snv_vcf_path, checkIfExists: true),
             bam_file,
             bai,
-            file(row.phenotype_path, checkIfExists: true),
-            row.phenotype_format.toString().trim().toLowerCase()
+            phenotypeFileForRow(row, 'phenotype_path'),
+            (row.phenotype_format ?: '').toString().trim().toLowerCase()
         )
     }
     input_annotated_snv = null
@@ -1090,8 +1239,8 @@ workflow {
             row.sample,
             file(row.snv_txt_path, checkIfExists: true),
             file(row.snv_vcf_path, checkIfExists: true),
-            file(row.phenotype_path, checkIfExists: true),
-            row.phenotype_format.toString().trim().toLowerCase()
+            phenotypeFileForRow(row, 'phenotype_path'),
+            (row.phenotype_format ?: '').toString().trim().toLowerCase()
         )
     }
     input_annotated_ngs = null
@@ -1109,7 +1258,7 @@ workflow {
         return tuple(
             row.sample,
             file(row.vcf_path, checkIfExists: true),
-            file(row.phenotype_path, checkIfExists: true),
+            phenotypeFileForRow(row, 'phenotype_path'),
         )
     }
     input_bam = null
@@ -1145,7 +1294,7 @@ input_bam = Channel
             row.sample,
             bam_file,
             bai,
-            file(row.phenotype_path, checkIfExists: true),
+            phenotypeFileForRow(row, 'phenotype_path'),
         )
     }
     input_vcf = null
@@ -1164,7 +1313,7 @@ input_bam = Channel
     .splitCsv( header:true )
     .map { row ->
         def vcf_file = file(row.file_path, checkIfExists: true)
-        def note_file = file(row.note_path, checkIfExists: true)
+        def note_file = phenotypeFileForRow(row, 'note_path')
 	def out_prefix = row.sample
 
         // Return a List/tuple in a specific order
@@ -1208,10 +1357,8 @@ input_bam = Channel
             error "Index file not found for ${bam_file}. Looked for BAM index paths (${bai_path}, ${bam_file}.bai) or CRAM index paths (${bam_file}.crai, ${bam_file.toString().replaceFirst(/\.cram$/, '.crai')})"
         }
 
-        def note_file = file(row.note_path, checkIfExists: true)
+        def note_file = phenotypeFileForRow(row, 'note_path')
 	def out_prefix = row.sample
-	def bam_file_parent = bam_file.parent
-	def note_file_parent = note_file.parent
 
         // Return the tuple
         return tuple(
@@ -1353,56 +1500,63 @@ eh_variant_catalog = Channel
 	if ( clean_target == 'yes' ) {
 		target = "yes"
 	}
+	def mito_input_bam = input_bam
+	if (clean_denovo_filter == 'yes' && input_bam != null) {
+		def proband_meta_keys = input_meta.map { sample, age_of_onset, sex -> tuple(sample, true) }
+		mito_input_bam = input_bam.join(proband_meta_keys, failOnDuplicate: true).map { sample, bam_file, bai_file, phenotype_file, marker ->
+			tuple(sample, bam_file, bai_file, phenotype_file)
+		}
+	}
 	if ( params.input_csv ) {
         if ( input_annotated_ngs != null ) {
-            INPUT_CSV_ANNOTATED_ALL_NGS(input_annotated_ngs, input_meta, ref_fa, ref_fa, eh_variant_catalog, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_ref_fa, mito_contig)
+            INPUT_CSV_ANNOTATED_ALL_NGS(input_annotated_ngs, input_meta, ref_fa, ref_fa, eh_variant_catalog, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_ref_fa, mito_contig, clean_denovo_filter, denovo_pedigree, clean_denovo_role_column, clean_denovo_family_column, clean_denovo_vcf_sample_column, clean_denovo_exclude_contigs, params.denovo_sv_min_reciprocal_overlap)
         }
         else if ( input_annotated_called_ngs != null ) {
-            INPUT_CSV_ANNOTATED_SNV_CALLED_SV_NGS(input_annotated_called_ngs, input_meta, ref_fa, ref_fa, eh_variant_catalog, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_ref_fa, mito_contig)
+            INPUT_CSV_ANNOTATED_SNV_CALLED_SV_NGS(input_annotated_called_ngs, input_meta, ref_fa, ref_fa, eh_variant_catalog, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_ref_fa, mito_contig, clean_denovo_filter, denovo_pedigree, clean_denovo_role_column, clean_denovo_family_column, clean_denovo_vcf_sample_column, clean_denovo_exclude_contigs, params.denovo_sv_min_reciprocal_overlap)
         }
         else if ( input_annotated_snv != null ) {
-            INPUT_CSV_ANNOTATED_SNV_SNP(input_annotated_snv, input_meta, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
+            INPUT_CSV_ANNOTATED_SNV_SNP(input_annotated_snv, input_meta, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, inheritance_mode, include_clinvar_report, allow_unphased_comphet, clean_denovo_filter, denovo_pedigree, clean_denovo_role_column, clean_denovo_family_column, clean_denovo_vcf_sample_column, clean_denovo_exclude_contigs, params.denovo_sv_min_reciprocal_overlap)
         }
         else if ( input_vcf != null ) {
             def effective_csv_mode = clean_mode ?: csv_manifest_mode
             if ( effective_csv_mode == 'sv' ) {
-                INPUT_CSV_ALIGNMENT_VCF_SV(input_vcf, input_meta, ref_fa, phen2gene_top_n, is_note, target, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
+                INPUT_CSV_ALIGNMENT_VCF_SV(input_vcf, input_meta, ref_fa, phen2gene_top_n, is_note, target, inheritance_mode, include_clinvar_report, allow_unphased_comphet, clean_denovo_filter, denovo_pedigree, clean_denovo_role_column, clean_denovo_family_column, clean_denovo_vcf_sample_column, clean_denovo_exclude_contigs, params.denovo_sv_min_reciprocal_overlap)
             }
             else if ( effective_csv_mode == 'snp' ) {
-                INPUT_CSV_ALIGNMENT_VCF_SNP(input_vcf, input_meta, ref_fa, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
+                INPUT_CSV_ALIGNMENT_VCF_SNP(input_vcf, input_meta, ref_fa, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, inheritance_mode, include_clinvar_report, allow_unphased_comphet, clean_denovo_filter, denovo_pedigree, clean_denovo_role_column, clean_denovo_family_column, clean_denovo_vcf_sample_column, clean_denovo_exclude_contigs, params.denovo_sv_min_reciprocal_overlap)
             }
         }
 	        else if ( input_bam != null ) {
 		            if ( clean_type == 'short' ) {
 		                    mito_report_tsv = Channel.empty()
 		                    if ( clean_mito == 'yes' ) {
-		                        INPUT_CSV_ALIGNMENT_NGS_MITO(input_bam, mito_ref_fa, mito_contig)
+		                        INPUT_CSV_ALIGNMENT_NGS_MITO(mito_input_bam, mito_ref_fa, mito_contig)
 		                        mito_report_tsv = INPUT_CSV_ALIGNMENT_NGS_MITO.out.prioritized_tsv
 		                    }
 		                    if ( clean_mode == 'sv' ) {
-		                        INPUT_CSV_ALIGNMENT_NGS_SV(input_bam, input_meta, ref_fa, eh_variant_catalog, is_note, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
+		                        INPUT_CSV_ALIGNMENT_NGS_SV(input_bam, input_meta, ref_fa, eh_variant_catalog, is_note, inheritance_mode, include_clinvar_report, allow_unphased_comphet, clean_denovo_filter, denovo_pedigree, clean_denovo_role_column, clean_denovo_family_column, clean_denovo_vcf_sample_column, clean_denovo_exclude_contigs, params.denovo_sv_min_reciprocal_overlap)
 		                    }
 	                    else if ( clean_mode == 'snp' ) {
-                        INPUT_CSV_NGS_SNP(input_bam, input_meta, ref_fa, eh_variant_catalog, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
+                        INPUT_CSV_NGS_SNP(input_bam, input_meta, ref_fa, eh_variant_catalog, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet, clean_denovo_filter, denovo_pedigree, clean_denovo_role_column, clean_denovo_family_column, clean_denovo_vcf_sample_column, clean_denovo_exclude_contigs, params.denovo_sv_min_reciprocal_overlap)
 				}
 				else {
-                                INPUT_CSV_ALIGNMENT_ALL_NGS(input_bam, input_meta, ref_fa, eh_variant_catalog, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_report_tsv, clean_mito)
+                                INPUT_CSV_ALIGNMENT_ALL_NGS(input_bam, input_meta, ref_fa, eh_variant_catalog, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_report_tsv, clean_mito, clean_denovo_filter, denovo_pedigree, clean_denovo_role_column, clean_denovo_family_column, clean_denovo_vcf_sample_column, clean_denovo_exclude_contigs, params.denovo_sv_min_reciprocal_overlap)
 	                        }
 	            }
 	            else { // Long reads
 	                    mito_report_tsv = Channel.empty()
 	                    if ( clean_mito == 'yes' ) {
-	                        INPUT_CSV_ALIGNMENT_LONG_MITO(input_bam, ref_fa, mito_contig)
+	                        INPUT_CSV_ALIGNMENT_LONG_MITO(mito_input_bam, ref_fa, mito_contig)
 	                        mito_report_tsv = INPUT_CSV_ALIGNMENT_LONG_MITO.out.prioritized_tsv
 	                    }
 	                    if ( clean_mode == 'sv' ) {
-	                        INPUT_CSV_ALIGNMENT_LONG_SV(input_bam, input_meta, ref_fa,  is_note, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
+	                        INPUT_CSV_ALIGNMENT_LONG_SV(input_bam, input_meta, ref_fa,  is_note, inheritance_mode, include_clinvar_report, allow_unphased_comphet, clean_denovo_filter, denovo_pedigree, clean_denovo_role_column, clean_denovo_family_column, clean_denovo_vcf_sample_column, clean_denovo_exclude_contigs, params.denovo_sv_min_reciprocal_overlap)
 	                    }
 	                    else if ( clean_mode == 'snp' ) {
-                        INPUT_CSV_ALIGNMENT_LONG_SNP(input_bam, input_meta, ref_fa,  rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
+                        INPUT_CSV_ALIGNMENT_LONG_SNP(input_bam, input_meta, ref_fa,  rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet, clean_denovo_filter, denovo_pedigree, clean_denovo_role_column, clean_denovo_family_column, clean_denovo_vcf_sample_column, clean_denovo_exclude_contigs, params.denovo_sv_min_reciprocal_overlap)
 	                    }
 	                    else {
-                        INPUT_CSV_ALIGNMENT_ALL_LONGPHASE(input_bam, input_meta, ref_fa,  rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_report_tsv, clean_mito)
+                        INPUT_CSV_ALIGNMENT_ALL_LONGPHASE(input_bam, input_meta, ref_fa,  rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, long_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_report_tsv, clean_mito, clean_denovo_filter, denovo_pedigree, clean_denovo_role_column, clean_denovo_family_column, clean_denovo_vcf_sample_column, clean_denovo_exclude_contigs, params.denovo_sv_min_reciprocal_overlap)
 	                    }
 	            }
 	        }
