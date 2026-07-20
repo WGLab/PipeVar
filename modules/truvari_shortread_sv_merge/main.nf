@@ -101,6 +101,7 @@ process truvari_shortread_sv_merge {
 	    local label="\$3"
 	    local sample_file="\${label}.samples.txt"
 	    local target_bgz="\${label}.target.vcf.gz"
+	    local projected_bnd_unsorted="\${label}.bnd.projected.unsorted.vcf.gz"
 	    local projected_bnd="\${label}.bnd.projected.vcf.gz"
 	    local combined_unsorted="\${label}.combined.unsorted.vcf"
 
@@ -108,17 +109,27 @@ process truvari_shortread_sv_merge {
 	    if [[ -s "\$sample_file" ]]; then
 	        local sample_csv
 	        sample_csv=\$(paste -sd, "\$sample_file")
-	        bcftools view -s "\$sample_csv" -Oz -o "\$projected_bnd" ${out_prefix}.shortread_sv.bnd_passthrough.vcf.gz
+	        bcftools view -s "\$sample_csv" -Oz -o "\$projected_bnd_unsorted" ${out_prefix}.shortread_sv.bnd_passthrough.vcf.gz
 	    else
-	        bcftools view -G -Oz -o "\$projected_bnd" ${out_prefix}.shortread_sv.bnd_passthrough.vcf.gz
+	        bcftools view -G -Oz -o "\$projected_bnd_unsorted" ${out_prefix}.shortread_sv.bnd_passthrough.vcf.gz
 	    fi
+	    bcftools sort -Oz -o "\$projected_bnd" "\$projected_bnd_unsorted"
 	    tabix -f -p vcf "\$projected_bnd"
 
-	    bcftools view -Oz -o "\$target_bgz" "\$target_vcf"
+	    bcftools sort -Oz -o "\$target_bgz" "\$target_vcf"
 	    tabix -f -p vcf "\$target_bgz"
 	    bcftools concat -a -Ov "\$target_bgz" "\$projected_bnd" > "\$combined_unsorted"
 	    bcftools sort -Ov -o "\$output_vcf" "\$combined_unsorted"
 	    validate_vcf_width "\$output_vcf"
+	}
+
+	sort_plain_vcf() {
+	    local input_vcf="\$1"
+	    local output_vcf="\$2"
+	    local sorted_vcf="\${output_vcf%.vcf}.sorted.tmp.vcf"
+
+	    bcftools sort -Ov -o "\$sorted_vcf" "\$input_vcf"
+	    mv "\$sorted_vcf" "\$output_vcf"
 	}
 
 	if bcftools view -H ${out_prefix}.shortread_sv.bnd_passthrough.vcf.gz | grep -q .; then
@@ -133,7 +144,12 @@ process truvari_shortread_sv_merge {
 	        collapsed
 	    mv ${out_prefix}.shortread_sv.truvari_collapsed.with_bnd.vcf ${out_prefix}.shortread_sv.truvari_collapsed.vcf
 	else
-	    cp ${out_prefix}.shortread_sv.truvari_merged.vcf ${out_prefix}.shortread_sv.merged.vcf
+	    sort_plain_vcf \\\\
+	        ${out_prefix}.shortread_sv.truvari_merged.vcf \\\\
+	        ${out_prefix}.shortread_sv.merged.vcf
+	    sort_plain_vcf \\\\
+	        ${out_prefix}.shortread_sv.truvari_collapsed.vcf \\\\
+	        ${out_prefix}.shortread_sv.truvari_collapsed.vcf
 	fi
 
 	validate_vcf_width ${out_prefix}.shortread_sv.merged.vcf

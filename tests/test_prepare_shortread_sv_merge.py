@@ -8,6 +8,7 @@ from pathlib import Path
 
 SCRIPT = Path("/home/beoungle/docker_work/truvari/prepare_shortread_sv_merge.py")
 PIPEVAR_MITO = Path("/home/beoungle/PipeVar_mito")
+FIXTURES = PIPEVAR_MITO / "tests/fixtures/truari_shortread_sv_merge"
 
 
 class PrepareShortreadSvMergeTest(unittest.TestCase):
@@ -127,6 +128,22 @@ class PrepareShortreadSvMergeTest(unittest.TestCase):
             self.assertFalse((root / "sample.shortread_sv.merged.vcf").exists())
             self.assertFalse((root / "sample.shortread_sv.truvari_collapsed.vcf").exists())
 
+    def test_ordering_regression_fixture_revisits_a_contig_and_has_manta_bnds(self):
+        retained_rows = [
+            line.split("\t")
+            for line in (FIXTURES / "multicontig_truvari_retained.vcf").read_text().splitlines()
+            if line and not line.startswith("#")
+        ]
+        bnd_rows = [
+            line.split("\t")
+            for line in (FIXTURES / "manta_bnd_passthrough.vcf").read_text().splitlines()
+            if line and not line.startswith("#")
+        ]
+
+        self.assertEqual([row[0] for row in retained_rows], ["chr1", "chr2", "chr1"])
+        self.assertTrue(all("SVTYPE=BND" in row[7] for row in bnd_rows))
+        self.assertEqual({len(row) for row in retained_rows + bnd_rows}, {10})
+
     def test_modules_run_merge_and_collapse_directly(self):
         module_paths = [
             PIPEVAR_MITO / "modules/truvari_shortread_sv_merge/main.nf",
@@ -152,6 +169,19 @@ class PrepareShortreadSvMergeTest(unittest.TestCase):
             self.assertIn("bcftools view -G", module_source)
             self.assertIn("bcftools concat -a", module_source)
             self.assertIn("validate_vcf_width", module_source)
+            self.assertIn(
+                'bcftools sort -Oz -o "\\$target_bgz" "\\$target_vcf"',
+                module_source,
+            )
+            self.assertNotIn(
+                'bcftools view -Oz -o "\\$target_bgz" "\\$target_vcf"',
+                module_source,
+            )
+            self.assertIn(
+                'bcftools sort -Oz -o "\\$projected_bnd" "\\$projected_bnd_unsorted"',
+                module_source,
+            )
+            self.assertGreaterEqual(module_source.count("sort_plain_vcf"), 3)
             self.assertNotIn(">> ${out_prefix}.shortread_sv.merged.vcf", module_source)
             self.assertNotIn(">> ${out_prefix}.shortread_sv.truvari_collapsed.vcf", module_source)
 

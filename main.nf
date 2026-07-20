@@ -1500,9 +1500,9 @@ eh_variant_catalog = Channel
 	if ( clean_target == 'yes' ) {
 		target = "yes"
 	}
-	def mito_input_bam = input_bam
+	mito_input_bam = input_bam
 	if (clean_denovo_filter == 'yes' && input_bam != null) {
-		def proband_meta_keys = input_meta.map { sample, age_of_onset, sex -> tuple(sample, true) }
+		proband_meta_keys = input_meta.map { sample, age_of_onset, sex -> tuple(sample, true) }
 		mito_input_bam = input_bam.join(proband_meta_keys, failOnDuplicate: true).map { sample, bam_file, bai_file, phenotype_file, marker ->
 			tuple(sample, bam_file, bai_file, phenotype_file)
 		}

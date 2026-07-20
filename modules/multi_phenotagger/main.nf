@@ -19,7 +19,20 @@ process multi_phenotagger {
 
 	temp_dir="\${curr_dir}/${out_prefix}_phenotagger"
 
-	mv $phenotagger_input ${out_prefix}_phenotagger_input.txt	
+	normalized_input=${out_prefix}_phenotagger_input.normalized.tmp
+	awk '{
+		gsub(/\r/, " ", \$0)
+		for (i = 1; i <= NF; i++) {
+			printf "%s%s", separator, \$i
+			separator = " "
+		}
+	}
+	END {
+		if (separator != "") {
+			print ""
+		}
+	}' $phenotagger_input > \${normalized_input}
+	mv \${normalized_input} ${out_prefix}_phenotagger_input.txt
 
 	python3 /PhenoTagger_py/generate_input.py \
         -i ${out_prefix}_phenotagger_input.txt \
@@ -44,6 +57,5 @@ process multi_phenotagger {
 
 
 }
-
 
 
