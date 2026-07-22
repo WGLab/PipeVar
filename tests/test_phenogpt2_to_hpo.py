@@ -15,6 +15,14 @@ spec.loader.exec_module(phenogpt2_to_hpo)
 
 
 class PhenoGPT2ToHpoTests(unittest.TestCase):
+    def make_model(self, root, shard="model-00001-of-00001.safetensors"):
+        for name in phenogpt2_to_hpo.REQUIRED_MODEL_FILES[:-1]:
+            (root / name).write_text("metadata")
+        (root / shard).write_bytes(b"weights")
+        (root / "model.safetensors.index.json").write_text(
+            json.dumps({"weight_map": {"model.weight": shard}})
+        )
+
     def test_make_input_uses_json_null_image(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp = Path(tmpdir)
@@ -100,6 +108,75 @@ class PhenoGPT2ToHpoTests(unittest.TestCase):
             phenogpt2_to_hpo.convert(result_path, out_hpo, prefer_filtered=False)
 
             self.assertEqual(out_hpo.read_text(), "HP:0001250\nHP:0004322\n")
+
+    def test_validate_model_accepts_complete_checkpoint(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            model = Path(tmpdir) / "model-v1"
+            model.mkdir()
+            self.make_model(model)
+
+            fingerprint = phenogpt2_to_hpo.validate_model(model)
+
+            self.assertRegex(fingerprint, r"^[0-9a-f]{64}$")
+
+    def test_validate_model_rejects_missing_shard(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            model = Path(tmpdir) / "model-v1"
+            model.mkdir()
+            self.make_model(model)
+            (model / "model-00001-of-00001.safetensors").unlink()
+
+            with self.assertRaisesRegex(ValueError, "required model file is missing"):
+                phenogpt2_to_hpo.validate_model(model)
+
+    def test_validate_model_rejects_malformed_index(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            model = Path(tmpdir) / "model-v1"
+            model.mkdir()
+            self.make_model(model)
+            (model / "model.safetensors.index.json").write_text("not-json")
+
+            with self.assertRaisesRegex(ValueError, "invalid model index"):
+                phenogpt2_to_hpo.validate_model(model)
+
+    def test_validate_model_fingerprint_changes_with_shard(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            model = Path(tmpdir) / "model-v1"
+            model.mkdir()
+            self.make_model(model)
+            before = phenogpt2_to_hpo.validate_model(model)
+            (model / "model-00001-of-00001.safetensors").write_bytes(b"new-weights")
+
+            after = phenogpt2_to_hpo.validate_model(model)
+
+            self.assertNotEqual(before, after)
+
+    def test_validate_model_rejects_traversal_in_index(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            model = Path(tmpdir) / "model-v1"
+            model.mkdir()
+            self.make_model(model)
+            (model / "model.safetensors.index.json").write_text(
+                json.dumps({"weight_map": {"model.weight": "../weights.safetensors"}})
+            )
+
+            with self.assertRaisesRegex(ValueError, "unsafe model path"):
+                phenogpt2_to_hpo.validate_model(model)
+
+    def test_validate_model_rejects_escaping_symlink(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            model = tmp / "model-v1"
+            model.mkdir()
+            self.make_model(model)
+            outside = tmp / "outside.safetensors"
+            outside.write_bytes(b"weights")
+            shard = model / "model-00001-of-00001.safetensors"
+            shard.unlink()
+            shard.symlink_to(outside)
+
+            with self.assertRaisesRegex(ValueError, "resolves outside checkpoint root"):
+                phenogpt2_to_hpo.validate_model(model)
 
 
 if __name__ == "__main__":

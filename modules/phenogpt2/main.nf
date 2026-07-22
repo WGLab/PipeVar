@@ -1,6 +1,6 @@
 // Extract HPO terms from clinical notes with GPU-backed PhenoGPT2.
 process phenogpt2 {
-	container 'beoungl/docker_test:phenogpt2_0.1'
+	container 'beoungl/docker_test:phenogpt2_0.2'
 
 	input:
 	path clinical_note
@@ -15,7 +15,10 @@ process phenogpt2 {
 	export PHENOGPT2_WC="${params.phenogpt2_wc}"
 	export PHENOGPT2_ATTN_IMPLEMENTATION="${params.phenogpt2_attn_implementation}"
 	export PHENOGPT2_NEGATION="${params.phenogpt2_negation}"
+	export PHENOGPT2_MODEL_DIR="/opt/phenogpt2/models/phenogpt2"
+	export PHENOGPT2_CACHE_DIR="${params.phenogpt2_cache_host_path ? '/opt/phenogpt2/cache' : '.phenogpt2_cache'}"
+	export PHENOGPT2_MODEL_FINGERPRINT="${params.phenogpt2_model_fingerprint}"
 
-	run_phenogpt2_to_hpo $clinical_note ${out_prefix}
+	run_phenogpt2_to_hpo "${clinical_note}" "${out_prefix}"
 	"""
 }

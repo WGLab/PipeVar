@@ -73,6 +73,23 @@ All Singularity/Docker profiles mount these host paths:
 
 Mitochondrial annotation databases are baked into the mito annotation image and do not require extra runtime bind mounts.
 
+PhenoGPT2 weights are deliberately not included in its image. When a clinical
+note is routed to PhenoGPT2, provide a complete, immutable, versioned checkpoint
+directory with `--phenogpt2_model_host_path`. That directory is mounted
+read-only only for the PhenoGPT2 task. The default generated-model cache is
+task-local; an optional pre-created `--phenogpt2_cache_host_path` is mounted
+read-write only for that task. DeepVariant never receives either mount.
+
+```bash
+# The persistent cache is optional, but must already exist when supplied.
+mkdir -p /data/phenogpt2-cache/image-0.2_model-v1_a100
+nextflow run main.nf -profile local_docker \
+  --bam sample.bam --ref_fa /refs/hg38.fa --note note.txt \
+  --phenotype_extractor phenogpt2 --GPU yes \
+  --phenogpt2_model_host_path /data/models/phenogpt2-v1/new_model \
+  --phenogpt2_cache_host_path /data/phenogpt2-cache/image-0.2_model-v1_a100
+```
+
 ### Setup Script
 
 ANNOVAR must be downloaded through the ANNOVAR registration process:
@@ -214,6 +231,7 @@ Phenotype handling:
 
 - By default, `note_path` is treated as a clinical note and PhenoTagger runs.
 - With `--phenotype_extractor phenogpt2 --GPU yes`, clinical notes are processed with GPU-backed PhenoGPT2 instead of PhenoTagger.
+- PhenoGPT2 additionally requires `--phenogpt2_model_host_path /absolute/versioned/new_model`.
 - With `--note no`, `note_path` is treated as an HPO file and PhenoTagger is skipped.
 
 ### Unified CSV
@@ -390,6 +408,9 @@ Defaults below come from `nextflow.config`.
 | `--phenogpt2_wc` | `0` | PhenoGPT2 word-count chunking; `0` disables chunking |
 | `--phenogpt2_attn_implementation` | `eager` | PhenoGPT2 attention implementation |
 | `--phenogpt2_negation` | `no` | Enable PhenoGPT2 negation filtering; keep `no` unless supporting models are bundled |
+| `--phenogpt2_model_host_path` | `null` | Required absolute canonical path to a complete `new_model` checkpoint when PhenoGPT2 processes clinical notes; mounted read-only |
+| `--phenogpt2_cache_host_path` | `null` | Optional absolute canonical path to a pre-created writable persistent cache; otherwise each task uses its own work-directory cache |
+| `--phenogpt2_max_forks` | `1` | Maximum concurrent PhenoGPT2 tasks |
 
 ### Caller And Feature Toggles
 
@@ -605,6 +626,10 @@ Outputs are published to `--output_directory`. Exact files depend on `--mode`, `
 - xTEA is intended for short-read WGS MEI discovery/genotyping and requires indexed BAM/CRAM input.
 - CNVpytor is experimental for long reads and is intended for large whole-genome CNVs.
 - If using Singularity/Docker profiles, ensure `--annovar_host_path` and `--phenosv_host_path` point to valid host locations.
+- Initial external-model PhenoGPT2 support is text-only with `--phenogpt2_negation no` and `--phenogpt2_wc 0`. The auxiliary Qwen and BERT models are not provisioned.
+- Keep a mounted PhenoGPT2 checkpoint immutable and use a new versioned directory for every checkpoint change. PipeVar fingerprints the checkpoint metadata, index, and shard sizes/timestamps so a changed version invalidates `-resume` reuse.
+- On HPC, model and persistent-cache paths must exist at the identical absolute path on the submit node and every GPU compute node. Persistent caches must be trusted, writable, and namespaced by PhenoGPT2 image, model version, and GPU class.
+- PhenoGPT2 validation targets a GPU with at least 40 GB memory; 80 GB is preferred. External mounting reduces image transfer size, not checkpoint distribution size or GPU-memory demand.
 
 ## Additional Documentation
 

@@ -1,3 +1,6 @@
+import groovy.json.JsonSlurper
+import java.security.MessageDigest
+
 def pipelineVersion = params.pipeline_version ?: "0.3.0"
 
 def helpMessage = """
@@ -41,6 +44,8 @@ COMMON OPTIONS
   --cnvpytor <yes|no>           Enable experimental long-read CNV calling
   --GPU <yes|no>                Enable shared GPU mode for DeepVariant GPU and PhenoGPT2
   --phenotype_extractor <STR>   phenotagger or phenogpt2 for clinical notes
+  --phenogpt2_model_host_path   Complete versioned new_model directory (PhenoGPT2 notes)
+  --phenogpt2_cache_host_path   Optional pre-created persistent cache directory
   --out_prefix <STRING>         Single-sample output prefix
   --output_directory <DIR>      Publish directory
 
@@ -50,6 +55,8 @@ NOTES
   - CNVpytor custom references can use --cnvpytor_reference_conf <reference_genomes_conf.py>;
     built-in hg19/hg38 references are detected by CNVpytor from alignment headers.
   - Single-file mode requires one phenotype source: --note <FILE> or --hpo <FILE>.
+  - PhenoGPT2 clinical-note runs require an external read-only model mount;
+    HPO-only inputs do not require a PhenoGPT2 model, cache, or GPU.
   - Detailed input schemas, parameter defaults, examples, and outputs are in README.md.
 ================================================================================
 """
@@ -88,6 +95,7 @@ def clean_denovo_exclude_contigs = params.denovo_exclude_contigs ? params.denovo
 def clean_rankscore_softwares = params.rankscore_softwares ? params.rankscore_softwares.toString().trim() : ""
 def clean_GPU = params.GPU ? params.GPU.toString().trim().toLowerCase() : 'no'
 def clean_phenotype_extractor = params.phenotype_extractor ? params.phenotype_extractor.toString().trim().toLowerCase() : 'phenotagger'
+def clean_phenogpt2_negation = params.phenogpt2_negation ? params.phenogpt2_negation.toString().trim().toLowerCase() : 'no'
 def clean_gene_filter = params.gene ? params.gene.toString().trim() : ""
 if (clean_gene_filter) {
     def gene_filter_file = file(clean_gene_filter)
@@ -307,6 +315,135 @@ if (params.input_csv) {
     }
 }
 
+// PhenoGPT2 resources are required only when a clinical note will actually be
+// processed. HPO-only inputs continue to work without a GPU or model mount.
+def singleClinicalNote = !params.input_csv && params.note != null && !(clean_note in ['yes', 'no'])
+def unifiedClinicalNote = params.input_csv && manifestUsesUnifiedSchema && manifestPhenotypeFormats.contains('clinical_note')
+def legacyClinicalNote = params.input_csv && !manifestUsesUnifiedSchema && !(params.note != null && clean_note == 'no')
+def phenogpt2WillRun = clean_phenotype_extractor == 'phenogpt2' && (singleClinicalNote || unifiedClinicalNote || legacyClinicalNote)
+
+def parsePositiveInteger = { value, String option ->
+    try {
+        def parsed = value as int
+        if (parsed <= 0) {
+            error "ERROR: --${option} must be a positive integer; received '${value}'."
+        }
+        parsed
+    }
+    catch (Exception ignored) {
+        error "ERROR: --${option} must be a positive integer; received '${value}'."
+    }
+}
+
+if (phenogpt2WillRun) {
+    if (clean_GPU != 'yes') {
+        error "ERROR: PhenoGPT2 will process clinical notes and requires --GPU yes."
+    }
+    if (clean_phenogpt2_negation != 'no') {
+        error "ERROR: --phenogpt2_negation yes is not supported by the externally mounted PhenoGPT2 image."
+    }
+
+    parsePositiveInteger(params.phenogpt2_batch_size, 'phenogpt2_batch_size')
+    parsePositiveInteger(params.phenogpt2_chunk_batch_size, 'phenogpt2_chunk_batch_size')
+    parsePositiveInteger(params.phenogpt2_max_forks, 'phenogpt2_max_forks')
+    int phenogpt2Wc
+    try {
+        phenogpt2Wc = params.phenogpt2_wc as int
+    }
+    catch (Exception ignored) {
+        error "ERROR: --phenogpt2_wc must be a nonnegative integer; received '${params.phenogpt2_wc}'."
+    }
+    if (phenogpt2Wc < 0) {
+        error "ERROR: --phenogpt2_wc must be a nonnegative integer; received '${params.phenogpt2_wc}'."
+    }
+    if (phenogpt2Wc > 0) {
+        error "ERROR: --phenogpt2_wc > 0 is not supported until the BERT filtering model is provisioned."
+    }
+
+    def validateHostDirectory = { rawValue, String option, boolean writable ->
+        if (rawValue == null || !rawValue.toString().trim()) {
+            error "ERROR: --${option} is required when PhenoGPT2 processes clinical notes."
+        }
+        def rawPath = rawValue.toString()
+        if (java.util.regex.Pattern.compile('[\\s,:\\x00-\\x1F\\x7F]').matcher(rawPath).find()) {
+            error "ERROR: --${option} contains whitespace, a bind delimiter, or a control character: '${rawPath}'."
+        }
+        def directory = new File(rawPath)
+        if (!directory.isAbsolute()) {
+            error "ERROR: --${option} must be an absolute path: '${rawPath}'."
+        }
+        if (!directory.exists() || !directory.isDirectory()) {
+            error "ERROR: --${option} must be a pre-existing directory: '${rawPath}'."
+        }
+        def canonical = directory.canonicalFile
+        if (canonical.absolutePath != directory.absolutePath) {
+            error "ERROR: --${option} must already be canonical; use '${canonical.absolutePath}'."
+        }
+        if (!canonical.canRead()) {
+            error "ERROR: --${option} is not readable: '${canonical}'."
+        }
+        if (writable && !canonical.canWrite()) {
+            error "ERROR: --${option} is not writable: '${canonical}'."
+        }
+        canonical
+    }
+
+    def modelRoot = validateHostDirectory(params.phenogpt2_model_host_path, 'phenogpt2_model_host_path', false)
+    def cacheRoot = params.phenogpt2_cache_host_path ? validateHostDirectory(params.phenogpt2_cache_host_path, 'phenogpt2_cache_host_path', true) : null
+    def requiredMetadata = ['config.json', 'tokenizer_config.json', 'tokenizer.json', 'chat_template.jinja', 'model.safetensors.index.json']
+    def resolveModelFile = { String relativePath ->
+        def relativeFile = new File(relativePath)
+        if (relativeFile.isAbsolute() || relativePath.tokenize('/\\').contains('..')) {
+            error "ERROR: Unsafe path in PhenoGPT2 checkpoint: '${relativePath}'."
+        }
+        def candidate = new File(modelRoot, relativePath)
+        if (!candidate.exists()) {
+            error "ERROR: Missing PhenoGPT2 checkpoint file: '${relativePath}'."
+        }
+        def resolved = candidate.canonicalFile
+        def rootPrefix = modelRoot.absolutePath + File.separator
+        if (!(resolved.absolutePath == modelRoot.absolutePath || resolved.absolutePath.startsWith(rootPrefix))) {
+            error "ERROR: PhenoGPT2 checkpoint symlink escapes the model root: '${relativePath}'."
+        }
+        if (!resolved.isFile() || !resolved.canRead() || resolved.length() == 0L) {
+            error "ERROR: PhenoGPT2 checkpoint file is empty, unreadable, or not regular: '${relativePath}'."
+        }
+        resolved
+    }
+
+    def metadataFiles = requiredMetadata.collect { resolveModelFile(it) }
+    def checkpointIndex
+    try {
+        checkpointIndex = new JsonSlurper().parse(metadataFiles[-1])
+    }
+    catch (Exception exc) {
+        error "ERROR: Invalid PhenoGPT2 checkpoint index: ${exc.message}"
+    }
+    if (!(checkpointIndex.weight_map instanceof Map) || checkpointIndex.weight_map.isEmpty()) {
+        error "ERROR: PhenoGPT2 checkpoint index has no nonempty weight_map."
+    }
+    if (checkpointIndex.weight_map.values().any { !(it instanceof String) || !it }) {
+        error "ERROR: PhenoGPT2 checkpoint index contains an invalid shard path."
+    }
+    def shardNames = checkpointIndex.weight_map.values().unique().sort()
+    def shardFiles = shardNames.collect { resolveModelFile(it) }
+
+    def digest = MessageDigest.getInstance('SHA-256')
+    metadataFiles.each { metadata ->
+        digest.update(metadata.name.getBytes('UTF-8'))
+        digest.update(metadata.bytes)
+    }
+    shardNames.eachWithIndex { shardName, idx ->
+        def shard = shardFiles[idx]
+        digest.update(shardName.getBytes('UTF-8'))
+        digest.update(shard.length().toString().getBytes('UTF-8'))
+        digest.update(shard.lastModified().toString().getBytes('UTF-8'))
+    }
+    params.phenogpt2_model_host_path = modelRoot.absolutePath
+    params.phenogpt2_cache_host_path = cacheRoot?.absolutePath
+    params.phenogpt2_model_fingerprint = digest.digest().collect { String.format('%02x', it & 0xff) }.join()
+}
+
 // CHECK 1: Validate Mode
 if (clean_mode && !valid_modes.contains(clean_mode)) {
     error """
@@ -364,19 +501,6 @@ if (!valid_phenotype_extractors.contains(clean_phenotype_extractor)) {
     Valid options are:
       --phenotype_extractor phenotagger
       --phenotype_extractor phenogpt2
-    ================================================================
-    """
-}
-
-if (clean_phenotype_extractor == 'phenogpt2' && clean_GPU != 'yes') {
-    error """
-    ================================================================
-    ERROR: PhenoGPT2 Requires GPU
-    ================================================================
-    PhenoGPT2 is GPU-backed in PipeVar_mito.
-
-    Use:
-      --phenotype_extractor phenogpt2 --GPU yes
     ================================================================
     """
 }
@@ -1456,7 +1580,7 @@ eh_variant_catalog = Channel
 	def is_note = "no"
 	if ( params.input_csv ) {
 		// CSV mode default: note_path is treated as clinical notes unless user explicitly sets --note no.
-		is_note = csv_manifest_is_note != null ? csv_manifest_is_note : ((clean_note == 'no') ? "no" : "yes")
+		is_note = csv_manifest_is_note != null ? csv_manifest_is_note : ((params.note != null && clean_note == 'no') ? "no" : "yes")
 	}
 	else {
 		// Single-file mode: `note` must be a file path; `hpo` is used directly as HPO input.

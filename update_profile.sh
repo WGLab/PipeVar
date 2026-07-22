@@ -38,18 +38,21 @@ update_standard_profile() {
             inner = indent "    "
             print indent "standard {"
             if (profile == "standard" || profile == "slurm_singularity") {
+                print inner "params.gpu_backend = \047singularity\047"
                 print inner "process.executor = \047slurm\047"
                 print inner "singularity.enabled = true"
                 print inner "singularity.autoMounts = true"
                 print inner "singularity.runOptions = \"--bind ${params.annovar_host_path}:/annovar,${params.phenosv_host_path}:/PhenoSV/train_data\""
                 print inner "docker.enabled = false"
             } else if (profile == "local_singularity") {
+                print inner "params.gpu_backend = \047singularity\047"
                 print inner "process.executor = \047local\047"
                 print inner "singularity.enabled = true"
                 print inner "singularity.autoMounts = true"
                 print inner "singularity.runOptions = \"--bind ${params.annovar_host_path}:/annovar,${params.phenosv_host_path}:/PhenoSV/train_data\""
                 print inner "docker.enabled = false"
             } else if (profile == "local_docker") {
+                print inner "params.gpu_backend = \047docker\047"
                 print inner "process.executor = \047local\047"
                 print inner "docker.enabled = true"
                 print inner "docker.runOptions = \"-v ${params.annovar_host_path}:/annovar -v ${params.phenosv_host_path}:/PhenoSV/train_data\""
