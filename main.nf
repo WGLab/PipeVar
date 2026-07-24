@@ -1,6 +1,3 @@
-import groovy.json.JsonSlurper
-import java.security.MessageDigest
-
 def pipelineVersion = params.pipeline_version ?: "0.3.0"
 
 def helpMessage = """
@@ -396,163 +393,40 @@ if (phenogpt2WillRun) {
         canonical
     }
 
-    def requiredFilesByKind = [
-        main: ['config.json', 'tokenizer_config.json', 'tokenizer.json', 'chat_template.jinja', 'model.safetensors.index.json'],
-        negation: ['config.json', 'tokenizer_config.json', 'tokenizer.json', 'model.safetensors.index.json'],
-        embedding: ['config.json', 'tokenizer_config.json', 'tokenizer.json', 'modules.json', 'model.safetensors'],
-    ]
-    def hashFile = { File input ->
-        def digest = MessageDigest.getInstance('SHA-256')
-        input.withInputStream { stream ->
-            byte[] buffer = new byte[8 * 1024 * 1024]
-            int count
-            while ((count = stream.read(buffer)) > 0) {
-                digest.update(buffer, 0, count)
-            }
+    def requireModelDirectory = { rawValue, String option ->
+        if (rawValue == null || !rawValue.toString().trim()) {
+            error "ERROR: --${option} is required when PhenoGPT2 processes clinical notes."
         }
-        digest.digest().collect { String.format('%02x', it & 0xff) }.join()
-    }
-    def validateCheckpoint = { rawValue, String option, String kind ->
-        def root = validateHostDirectory(rawValue, option, false)
-        def resolveModelFile = { String relativePath ->
-            def relativeFile = new File(relativePath)
-            if (relativeFile.isAbsolute() || relativePath.tokenize('/\\').contains('..')) {
-                error "ERROR: Unsafe path in --${option}: '${relativePath}'."
-            }
-            def candidate = new File(root, relativePath)
-            if (!candidate.exists()) {
-                error "ERROR: Missing ${kind} checkpoint file: '${relativePath}'."
-            }
-            if (java.nio.file.Files.isSymbolicLink(candidate.toPath())) {
-                error "ERROR: ${kind} checkpoint files must be materialized, not symlinks: '${relativePath}'."
-            }
-            def resolved = candidate.canonicalFile
-            def rootPrefix = root.absolutePath + File.separator
-            if (!(resolved.absolutePath == root.absolutePath || resolved.absolutePath.startsWith(rootPrefix))) {
-                error "ERROR: ${kind} checkpoint file escapes its model root: '${relativePath}'."
-            }
-            if (!resolved.isFile() || !resolved.canRead() || resolved.length() == 0L) {
-                error "ERROR: ${kind} checkpoint file is empty, unreadable, or not regular: '${relativePath}'."
-            }
-            resolved
+        def directory = new File(rawValue.toString())
+        if (!directory.exists() || !directory.isDirectory()) {
+            error "ERROR: --${option} must be a pre-existing directory: '${rawValue}'."
         }
-
-        def manifest = resolveModelFile('SHA256SUMS')
-        def manifestEntries = [:]
-        manifest.readLines().eachWithIndex { line, index ->
-            def matcher = line =~ /^([0-9a-fA-F]{64})[ \t]+\*?(.+)$/
-            if (!matcher.matches()) {
-                error "ERROR: Invalid ${kind} SHA256SUMS line ${index + 1}: '${line}'."
-            }
-            def relativePath = matcher.group(2)
-            if (manifestEntries.containsKey(relativePath)) {
-                error "ERROR: Duplicate ${kind} SHA256SUMS path: '${relativePath}'."
-            }
-            manifestEntries[relativePath] = matcher.group(1).toLowerCase()
-        }
-        if (manifestEntries.isEmpty()) {
-            error "ERROR: ${kind} SHA256SUMS is empty."
-        }
-
-        def actualPaths = [] as Set
-        def modelWalk = java.nio.file.Files.walk(root.toPath())
-        try {
-            modelWalk.forEach { path ->
-                if (path != root.toPath()) {
-                    def relativePath = root.toPath().relativize(path).toString().replace(File.separator, '/')
-                    if (java.nio.file.Files.isSymbolicLink(path)) {
-                        error "ERROR: ${kind} checkpoint files must be materialized, not symlinks: '${relativePath}'."
-                    }
-                    if (java.nio.file.Files.isRegularFile(path) && relativePath != 'SHA256SUMS') {
-                        actualPaths << relativePath
-                    }
-                }
-            }
-        }
-        finally {
-            modelWalk.close()
-        }
-        def manifestPaths = manifestEntries.keySet() as Set
-        if (actualPaths != manifestPaths) {
-            def missing = (manifestPaths - actualPaths).sort()
-            def unmanifested = (actualPaths - manifestPaths).sort()
-            error "ERROR: ${kind} SHA256SUMS does not match checkpoint files; missing=${missing}, unmanifested=${unmanifested}."
-        }
-
-        requiredFilesByKind[kind].each { required ->
-            if (!manifestEntries.containsKey(required)) {
-                error "ERROR: ${kind} SHA256SUMS is missing required file '${required}'."
-            }
-            resolveModelFile(required)
-        }
-        if (kind in ['main', 'negation']) {
-            def checkpointIndex
-            try {
-                checkpointIndex = new JsonSlurper().parse(resolveModelFile('model.safetensors.index.json'))
-            }
-            catch (Exception exc) {
-                error "ERROR: Invalid ${kind} checkpoint index: ${exc.message}"
-            }
-            if (!(checkpointIndex.weight_map instanceof Map) || checkpointIndex.weight_map.isEmpty()) {
-                error "ERROR: ${kind} checkpoint index has no nonempty weight_map."
-            }
-            checkpointIndex.weight_map.values().unique().each { shard ->
-                if (!(shard instanceof String) || !shard || !manifestEntries.containsKey(shard)) {
-                    error "ERROR: ${kind} checkpoint index references an invalid or unmanifested shard: '${shard}'."
-                }
-                resolveModelFile(shard)
-            }
-        }
-
-        manifestEntries.each { relativePath, expected ->
-            def observed = hashFile(resolveModelFile(relativePath))
-            if (observed != expected) {
-                error "ERROR: ${kind} checkpoint checksum mismatch: '${relativePath}'."
-            }
-        }
-        [root: root, fingerprint: hashFile(manifest)]
+        directory.absoluteFile
     }
 
-    def mainCheckpoint = validateCheckpoint(
-        params.phenogpt2_model_host_path, 'phenogpt2_model_host_path', 'main'
+    def mainCheckpointRoot = requireModelDirectory(
+        params.phenogpt2_model_host_path, 'phenogpt2_model_host_path'
     )
-    def negationCheckpoint = null
-    def embeddingCheckpoint = null
+    def negationCheckpointRoot = null
+    def embeddingCheckpointRoot = null
     if (clean_phenogpt2_negation == 'yes') {
-        negationCheckpoint = validateCheckpoint(
+        negationCheckpointRoot = requireModelDirectory(
             params.phenogpt2_negation_model_host_path,
-            'phenogpt2_negation_model_host_path',
-            'negation'
+            'phenogpt2_negation_model_host_path'
         )
-        embeddingCheckpoint = validateCheckpoint(
+        embeddingCheckpointRoot = requireModelDirectory(
             params.phenogpt2_embedding_model_host_path,
-            'phenogpt2_embedding_model_host_path',
-            'embedding'
+            'phenogpt2_embedding_model_host_path'
         )
     }
     def cacheRoot = params.phenogpt2_cache_host_path ?
         validateHostDirectory(params.phenogpt2_cache_host_path, 'phenogpt2_cache_host_path', true) :
         null
-    def fingerprints = [
-        mainCheckpoint.fingerprint,
-        negationCheckpoint?.fingerprint ?: '',
-        embeddingCheckpoint?.fingerprint ?: '',
-    ]
-    def combinedDigest = MessageDigest.getInstance('SHA-256')
-    fingerprints.each { fingerprint ->
-        combinedDigest.update(fingerprint.getBytes('UTF-8'))
-        combinedDigest.update('\n'.getBytes('UTF-8'))
-    }
 
-    params.phenogpt2_model_host_path = mainCheckpoint.root.absolutePath
-    params.phenogpt2_negation_model_host_path = negationCheckpoint?.root?.absolutePath
-    params.phenogpt2_embedding_model_host_path = embeddingCheckpoint?.root?.absolutePath
+    params.phenogpt2_model_host_path = mainCheckpointRoot.absolutePath
+    params.phenogpt2_negation_model_host_path = negationCheckpointRoot?.absolutePath
+    params.phenogpt2_embedding_model_host_path = embeddingCheckpointRoot?.absolutePath
     params.phenogpt2_cache_host_path = cacheRoot?.absolutePath
-    params.phenogpt2_model_fingerprint = mainCheckpoint.fingerprint
-    params.phenogpt2_negation_model_fingerprint = negationCheckpoint?.fingerprint ?: ''
-    params.phenogpt2_embedding_model_fingerprint = embeddingCheckpoint?.fingerprint ?: ''
-    params.phenogpt2_combined_model_fingerprint =
-        combinedDigest.digest().collect { String.format('%02x', it & 0xff) }.join()
 }
 
 // CHECK 1: Validate Mode

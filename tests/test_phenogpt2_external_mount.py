@@ -69,8 +69,8 @@ class PhenoGPT2ExternalMountTests(unittest.TestCase):
             self.assertIn("/opt/phenogpt2/models/phenogpt2", module)
             self.assertIn("/opt/phenogpt2/models/negation", module)
             self.assertIn("/opt/phenogpt2/models/embedding", module)
-            self.assertIn("PHENOGPT2_MODEL_FINGERPRINT", module)
-            self.assertIn("PHENOGPT2_COMBINED_MODEL_FINGERPRINT", module)
+            self.assertNotIn("PHENOGPT2_MODEL_FINGERPRINT", module)
+            self.assertNotIn("PHENOGPT2_COMBINED_MODEL_FINGERPRINT", module)
         self.assertNotIn("params.phenogpt2_container", (PIPEVAR / "nextflow.config").read_text())
 
     def test_mounts_are_phenogpt2_process_specific(self):
@@ -94,7 +94,12 @@ class PhenoGPT2ExternalMountTests(unittest.TestCase):
         self.assertNotIn("negation yes is not supported", main)
         self.assertIn("phenogpt2_negation_model_host_path", main)
         self.assertIn("phenogpt2_embedding_model_host_path", main)
-        self.assertIn("SHA256SUMS", main)
+        self.assertNotIn("SHA256SUMS", main)
+        self.assertNotIn("MessageDigest", main)
+        self.assertIn("def requireModelDirectory", main)
+        self.assertIn("mainCheckpointRoot = requireModelDirectory", main)
+        self.assertNotIn("mainCheckpointRoot = validateHostDirectory", main)
+        self.assertIn("must be a pre-existing directory", main)
 
     def test_legacy_csv_defaults_to_clinical_notes(self):
         main = (PIPEVAR / "main.nf").read_text()
