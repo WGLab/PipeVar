@@ -49,13 +49,13 @@ workflow INPUT_CSV_ALIGNMENT_LONG_SNP_LIGHT {
                 }
         }
 	phen2gene_result=multi_phen2gene(input_bam_no_bam)
+        caller_regions=input_bam_with_bam.map { out_prefix, bam_file, bai_file -> tuple(out_prefix, []) }
         if ( target == "yes" ) {
                 phen2_gene_bed=multi_phen2gene_filter(phen2gene_result,ref_fa,phen2gene_top_n)
-                nanocaller_result=multi_nanocaller(input_bam_with_bam,ref_fa,phen2_gene_bed)
+                caller_regions=phen2_gene_bed
         }
-        else {
-                nanocaller_result=multi_nanocaller(input_bam_with_bam,ref_fa,target)
-        }
+        caller_input=input_bam_with_bam.join(caller_regions, failOnMismatch: true, failOnDuplicate: true)
+        nanocaller_result=multi_nanocaller(caller_input,ref_fa)
         if ( target == "yes" ) {
                 annovar_input=nanocaller_result.join(phen2_gene_bed).map { out_prefix, vcf_file, bed_file -> tuple(out_prefix, vcf_file, bed_file) }
         }

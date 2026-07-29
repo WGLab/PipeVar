@@ -20,6 +20,7 @@ workflow SINGLE_ALIGNMENT_NGS_SNP {
 	bam
 	out_prefix
 	ref_fa
+	gatk_ref_fa
 	eh_variant_catalog
 	note
 	rankscore_filter
@@ -54,7 +55,7 @@ workflow SINGLE_ALIGNMENT_NGS_SNP {
 	if ( target == "yes" ) {
 		phen2_gene_bed=phen2gene_filter(Phen2gene.out,ref_fa,out_prefix,phen2gene_top_n)
 		if ( caller_mode == "haplotypecaller" ) {
-			haplotypecaller(bam,out_prefix,ref_fa,phen2_gene_bed)
+			haplotypecaller(bam,out_prefix,gatk_ref_fa,phen2_gene_bed)
 		}
 		else {
 			deepvariant(bam,out_prefix,ref_fa,phen2_gene_bed)
@@ -62,7 +63,7 @@ workflow SINGLE_ALIGNMENT_NGS_SNP {
 	}
 	else {
 		if ( caller_mode == "haplotypecaller" ) {
-			haplotypecaller(bam,out_prefix,ref_fa,target)
+			haplotypecaller(bam,out_prefix,gatk_ref_fa,target)
 		}
 		else {
 			deepvariant(bam,out_prefix,ref_fa,target)

@@ -4,6 +4,7 @@ import pickle
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 SCRIPT = Path("/home/beoungle/docker_work/phenogpt2/phenogpt2_to_hpo.py")
@@ -15,20 +16,27 @@ spec.loader.exec_module(phenogpt2_to_hpo)
 
 
 class PhenoGPT2ToHpoTests(unittest.TestCase):
-    def make_model(self, root, shard="model-00001-of-00001.safetensors"):
-        for name in phenogpt2_to_hpo.REQUIRED_MODEL_FILES[:-1]:
-            (root / name).write_text("metadata")
-        (root / shard).write_bytes(b"weights")
-        (root / "model.safetensors.index.json").write_text(
-            json.dumps({"weight_map": {"model.weight": shard}})
-        )
+    def setUp(self):
+        patcher = mock.patch.object(phenogpt2_to_hpo, "_probe_model_loader")
+        self.loader_probe = patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def make_model(self, root, weight_name="weights.custom"):
+        (root / "runtime-metadata.custom").write_text("metadata")
+        (root / weight_name).write_bytes(b"weights")
 
     def make_embedding_model(self, root):
-        for name in phenogpt2_to_hpo.MODEL_REQUIRED_FILES["embedding"]:
-            if name == "model.safetensors":
-                (root / name).write_bytes(b"weights")
-            else:
-                (root / name).write_text("metadata")
+        self.make_model(root, weight_name="embedding-weights.custom")
+
+    def make_upstream_source(self, root, repo_id="vendor/embedding-model"):
+        root.mkdir()
+        (root / "helpers.py").write_text(
+            "from sentence_transformers import SentenceTransformer\n"
+            f"MODEL_ID = {repo_id!r}\n"
+            "def load_embedding():\n"
+            "    return SentenceTransformer(MODEL_ID)\n"
+        )
+        return root
 
     def test_make_input_uses_json_null_image(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -213,7 +221,6 @@ class PhenoGPT2ToHpoTests(unittest.TestCase):
             model = Path(tmpdir) / "model-v1"
             model.mkdir()
             self.make_model(model)
-            phenogpt2_to_hpo.write_manifest(model)
 
             fingerprint = phenogpt2_to_hpo.validate_model(model)
 
@@ -224,7 +231,6 @@ class PhenoGPT2ToHpoTests(unittest.TestCase):
             model = Path(tmpdir) / "negation"
             model.mkdir()
             self.make_model(model)
-            phenogpt2_to_hpo.write_manifest(model)
 
             fingerprint = phenogpt2_to_hpo.validate_model(model, kind="negation")
 
@@ -235,7 +241,6 @@ class PhenoGPT2ToHpoTests(unittest.TestCase):
             model = Path(tmpdir) / "embedding"
             model.mkdir()
             self.make_embedding_model(model)
-            phenogpt2_to_hpo.write_manifest(model)
 
             fingerprint = phenogpt2_to_hpo.validate_model(model, kind="embedding")
 
@@ -249,11 +254,11 @@ class PhenoGPT2ToHpoTests(unittest.TestCase):
             model.mkdir()
             cache.mkdir()
             self.make_embedding_model(model)
-            phenogpt2_to_hpo.write_manifest(model)
+            source = self.make_upstream_source(tmp / "app")
             fingerprint = phenogpt2_to_hpo.validate_model(model, kind="embedding")
 
             snapshot = phenogpt2_to_hpo.prepare_embedding_cache(
-                model, cache, fingerprint
+                model, cache, fingerprint, source
             )
 
             self.assertTrue(snapshot.is_symlink())
@@ -261,7 +266,7 @@ class PhenoGPT2ToHpoTests(unittest.TestCase):
             self.assertEqual(
                 (
                     cache
-                    / phenogpt2_to_hpo.EMBEDDING_CACHE_REPO
+                    / "models--vendor--embedding-model"
                     / "refs"
                     / "main"
                 ).read_text(),
@@ -276,11 +281,11 @@ class PhenoGPT2ToHpoTests(unittest.TestCase):
             model.mkdir()
             cache.mkdir()
             self.make_embedding_model(model)
-            phenogpt2_to_hpo.write_manifest(model)
+            source = self.make_upstream_source(tmp / "app")
             fingerprint = phenogpt2_to_hpo.validate_model(model, kind="embedding")
             snapshot = (
                 cache
-                / phenogpt2_to_hpo.EMBEDDING_CACHE_REPO
+                / "models--vendor--embedding-model"
                 / "snapshots"
                 / fingerprint[:40]
             )
@@ -288,7 +293,7 @@ class PhenoGPT2ToHpoTests(unittest.TestCase):
 
             with self.assertRaisesRegex(ValueError, "conflicts"):
                 phenogpt2_to_hpo.prepare_embedding_cache(
-                    model, cache, fingerprint
+                    model, cache, fingerprint, source
                 )
 
     def test_prepare_embedding_cache_rejects_conflicting_ref(self):
@@ -299,98 +304,109 @@ class PhenoGPT2ToHpoTests(unittest.TestCase):
             model.mkdir()
             cache.mkdir()
             self.make_embedding_model(model)
-            phenogpt2_to_hpo.write_manifest(model)
+            source = self.make_upstream_source(tmp / "app")
             fingerprint = phenogpt2_to_hpo.validate_model(model, kind="embedding")
-            refs = cache / phenogpt2_to_hpo.EMBEDDING_CACHE_REPO / "refs"
+            refs = cache / "models--vendor--embedding-model" / "refs"
             refs.mkdir(parents=True)
             (refs / "main").write_text("0" * 40 + "\n")
 
             with self.assertRaisesRegex(ValueError, "different model revision"):
                 phenogpt2_to_hpo.prepare_embedding_cache(
-                    model, cache, fingerprint
+                    model, cache, fingerprint, source
                 )
 
-    def test_validate_model_rejects_missing_shard(self):
+    def test_validate_model_accepts_checkpoint_with_incidental_empty_file(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             model = Path(tmpdir) / "model-v1"
             model.mkdir()
             self.make_model(model)
-            (model / "model-00001-of-00001.safetensors").unlink()
-            phenogpt2_to_hpo.write_manifest(model)
+            (model / "download.lock").touch()
 
-            with self.assertRaisesRegex(ValueError, "required model file is missing"):
+            fingerprint = phenogpt2_to_hpo.validate_model(model)
+
+            self.assertRegex(fingerprint, r"^[0-9a-f]{64}$")
+            self.loader_probe.assert_called_once_with(model.resolve(), "main")
+
+    def test_discovers_embedding_repository_from_upstream_source(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = self.make_upstream_source(Path(tmpdir) / "app", "org/model-v2")
+
+            repo_id = phenogpt2_to_hpo.discover_embedding_repo_id(source)
+
+            self.assertEqual(repo_id, "org/model-v2")
+
+    def test_rejects_ambiguous_embedding_repositories(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = Path(tmpdir) / "app"
+            self.make_upstream_source(source, "org/model-a")
+            (source / "other.py").write_text(
+                "from sentence_transformers import SentenceTransformer\n"
+                "SentenceTransformer('org/model-b')\n"
+            )
+
+            with self.assertRaisesRegex(ValueError, "multiple"):
+                phenogpt2_to_hpo.discover_embedding_repo_id(source)
+
+    def test_validate_model_rejects_empty_directory(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            model = Path(tmpdir) / "model-v1"
+            model.mkdir()
+
+            with self.assertRaisesRegex(ValueError, "has no files"):
                 phenogpt2_to_hpo.validate_model(model)
 
-    def test_validate_model_rejects_malformed_index(self):
+    def test_validate_model_defers_layout_to_loader(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             model = Path(tmpdir) / "model-v1"
             model.mkdir()
-            self.make_model(model)
-            (model / "model.safetensors.index.json").write_text("not-json")
-            phenogpt2_to_hpo.write_manifest(model)
+            self.make_model(model, weight_name="unexpected-layout.weights")
+            self.loader_probe.side_effect = ValueError("loader rejected checkpoint")
 
-            with self.assertRaisesRegex(ValueError, "invalid model index"):
+            with self.assertRaisesRegex(ValueError, "loader rejected checkpoint"):
                 phenogpt2_to_hpo.validate_model(model)
 
-    def test_validate_model_fingerprint_changes_with_shard(self):
+    def test_validate_model_fingerprint_changes_with_content(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             model = Path(tmpdir) / "model-v1"
             model.mkdir()
             self.make_model(model)
-            phenogpt2_to_hpo.write_manifest(model)
             before = phenogpt2_to_hpo.validate_model(model)
-            (model / "model-00001-of-00001.safetensors").write_bytes(b"new-weights")
-            phenogpt2_to_hpo.write_manifest(model)
+            (model / "weights.custom").write_bytes(b"new-weights")
 
             after = phenogpt2_to_hpo.validate_model(model)
 
             self.assertNotEqual(before, after)
 
-    def test_validate_model_rejects_stale_manifest(self):
+    def test_resolve_model_directory_supports_huggingface_cache(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            model = Path(tmpdir) / "model-v1"
-            model.mkdir()
-            self.make_model(model)
-            phenogpt2_to_hpo.write_manifest(model)
-            (model / "model-00001-of-00001.safetensors").write_bytes(b"changed")
+            cache = Path(tmpdir) / "models--vendor--model"
+            revision = "a" * 40
+            snapshot = cache / "snapshots" / revision
+            blob = cache / "blobs" / "content"
+            snapshot.mkdir(parents=True)
+            blob.parent.mkdir()
+            blob.write_bytes(b"weights")
+            (cache / "refs").mkdir()
+            (cache / "refs" / "main").write_text(f"{revision}\n")
+            (snapshot / "weights-any-name").symlink_to("../../blobs/content")
 
-            with self.assertRaisesRegex(ValueError, "checksum mismatch"):
-                phenogpt2_to_hpo.validate_model(model)
+            resolved = phenogpt2_to_hpo.resolve_model_directory(cache)
+            fingerprint = phenogpt2_to_hpo.validate_model(cache)
 
-    def test_validate_model_rejects_unmanifested_file(self):
+            self.assertEqual(resolved, snapshot.resolve())
+            self.assertRegex(fingerprint, r"^[0-9a-f]{64}$")
+            self.loader_probe.assert_called_once_with(snapshot.resolve(), "main")
+
+    def test_validate_model_rejects_incomplete_huggingface_cache(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            model = Path(tmpdir) / "model-v1"
-            model.mkdir()
-            self.make_model(model)
-            phenogpt2_to_hpo.write_manifest(model)
-            (model / "generation_config.json").write_text("{}")
+            cache = Path(tmpdir) / "models--vendor--model"
+            revision = "b" * 40
+            (cache / "snapshots" / revision).mkdir(parents=True)
+            (cache / "refs").mkdir()
+            (cache / "refs" / "main").write_text(f"{revision}\n")
 
-            with self.assertRaisesRegex(ValueError, "unmanifested"):
-                phenogpt2_to_hpo.validate_model(model)
-
-    def test_write_manifest_is_atomic_and_leaves_no_temporary_file(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            model = Path(tmpdir) / "model-v1"
-            model.mkdir()
-            self.make_model(model)
-
-            manifest = phenogpt2_to_hpo.write_manifest(model)
-
-            self.assertTrue(manifest.is_file())
-            self.assertEqual(list(model.glob(f".{phenogpt2_to_hpo.MANIFEST_NAME}.*")), [])
-
-    def test_validate_model_rejects_traversal_in_index(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            model = Path(tmpdir) / "model-v1"
-            model.mkdir()
-            self.make_model(model)
-            (model / "model.safetensors.index.json").write_text(
-                json.dumps({"weight_map": {"model.weight": "../weights.safetensors"}})
-            )
-            phenogpt2_to_hpo.write_manifest(model)
-
-            with self.assertRaisesRegex(ValueError, "unsafe model path"):
-                phenogpt2_to_hpo.validate_model(model)
+            with self.assertRaisesRegex(ValueError, "has no files"):
+                phenogpt2_to_hpo.validate_model(cache)
 
     def test_validate_model_rejects_escaping_symlink(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -400,12 +416,12 @@ class PhenoGPT2ToHpoTests(unittest.TestCase):
             self.make_model(model)
             outside = tmp / "outside.safetensors"
             outside.write_bytes(b"weights")
-            shard = model / "model-00001-of-00001.safetensors"
-            shard.unlink()
-            shard.symlink_to(outside)
+            weight = model / "weights.custom"
+            weight.unlink()
+            weight.symlink_to(outside)
 
-            with self.assertRaisesRegex(ValueError, "materialized files"):
-                phenogpt2_to_hpo.write_manifest(model)
+            with self.assertRaisesRegex(ValueError, "outside its mount"):
+                phenogpt2_to_hpo.validate_model(model)
 
 
 if __name__ == "__main__":

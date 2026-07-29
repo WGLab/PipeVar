@@ -42,8 +42,8 @@ COMMON OPTIONS
   --GPU <yes|no>                Enable shared GPU mode for DeepVariant GPU and PhenoGPT2
   --phenotype_extractor <STR>   phenotagger or phenogpt2 for clinical notes
   --phenogpt2_model_host_path   Complete versioned new_model directory (PhenoGPT2 notes)
-  --phenogpt2_negation_model_host_path   Complete Qwen negation model directory
-  --phenogpt2_embedding_model_host_path  Complete Qwen embedding model directory
+  --phenogpt2_negation_model_host_path   Complete negation model directory
+  --phenogpt2_embedding_model_host_path  Complete embedding model directory
   --phenogpt2_cache_host_path   Optional pre-created persistent cache directory
   --out_prefix <STRING>         Single-sample output prefix
   --output_directory <DIR>      Publish directory
@@ -76,7 +76,7 @@ if (params.help) {
 
 def clean_mode   = params.mode   ? params.mode.trim().toLowerCase()   : null
 def clean_type   = params.type   ? params.type.trim().toLowerCase()   : 'ont' // Default from params
-def clean_light  = params.light  ? params.light.trim().toLowerCase()  : 'no'
+def clean_light  = params.light == null ? 'no' : params.light.toString().trim().toLowerCase()
 def clean_genome = params.genome ? params.genome.trim().toLowerCase() : 'hg38'
 def raw_target_param = params.target ?: params.targeted
 def clean_target = raw_target_param ? raw_target_param.trim().toLowerCase() : 'no'
@@ -458,6 +458,20 @@ if (!valid_types.contains(clean_type)) {
       --type ont
       --type pacbio
       --type short
+    ================================================================
+    """
+}
+
+if (!valid_yes_no.contains(clean_light)) {
+    error """
+    ================================================================
+    ERROR: Invalid Light Mode Toggle
+    ================================================================
+    You provided: --light "${params.light}"
+
+    Valid options are:
+      --light yes
+      --light no
     ================================================================
     """
 }
@@ -1186,7 +1200,9 @@ include { INPUT_CSV_ANNOTATED_SNV_CALLED_SV_NGS } from './subworkflows/input_csv
 
 workflow {
 	def input_meta = null
+	def input_bam = null
 	def mito_ref_fa = null
+	def gatk_ref_fa = null
 	def eh_variant_catalog = null
 	def annovar_txt = null
 	def annovar_sv_vcf = null
@@ -1521,9 +1537,17 @@ Channel
 			annovar_sv_vcf = Channel.value(params.annovar_sv_vcf)
 		}
 	}
-	//Need to add dict file in case there is we are running haplotypecaller!!!!
-	if (params.ref_fa != null && clean_light == 'yes' && clean_type == 'short' ) {
+	if (params.ref_fa != null) {
 ref_fa = Channel
+    .fromPath(params.ref_fa)
+    .map { fa_file ->
+        def fai_file = file("${fa_file}.fai")
+        return [ fa_file, fai_file ]
+    }
+    .first()
+	}
+	if (params.ref_fa != null && clean_type == 'short') {
+gatk_ref_fa = Channel
     .fromPath(params.ref_fa)
     .map { fa_file ->
         def fai_file = file("${fa_file}.fai")
@@ -1532,15 +1556,6 @@ ref_fa = Channel
     }
     .first()
 	}
-        else if ( params.ref_fa != null ) {
-ref_fa = Channel
-    .fromPath(params.ref_fa)
-    .map { fa_file ->
-        def fai_file = file("${fa_file}.fai")
-        return [ fa_file, fai_file ]
-    }
-    .first()
-        }
 	if (params.ref_fa != null && clean_mito == 'yes' && clean_type == 'short') {
 mito_ref_fa = Channel
     .fromPath(params.ref_fa)
@@ -1603,8 +1618,8 @@ eh_variant_catalog = Channel
 	phen2gene_top_n=Channel.value(params.phen2gene_filter)
 	gq=Channel.value(params.gq)
 	ad=Channel.value(params.ad)
-	short_snp_caller = Channel.value(clean_light == 'yes' ? 'haplotypecaller' : 'deepvariant')
-	long_snp_caller = Channel.value(clean_light == 'yes' ? 'nanocaller' : 'clair3')
+	def short_snp_caller = clean_light == 'yes' ? 'haplotypecaller' : 'deepvariant'
+	def long_snp_caller = clean_light == 'yes' ? 'nanocaller' : 'clair3'
 	def target="null"
 	if ( clean_target == 'yes' ) {
 		target = "yes"
@@ -1646,10 +1661,10 @@ eh_variant_catalog = Channel
 		                        INPUT_CSV_ALIGNMENT_NGS_SV(input_bam, input_meta, ref_fa, eh_variant_catalog, is_note, inheritance_mode, include_clinvar_report, allow_unphased_comphet, clean_denovo_filter, denovo_pedigree, clean_denovo_role_column, clean_denovo_family_column, clean_denovo_vcf_sample_column, clean_denovo_exclude_contigs, params.denovo_sv_min_reciprocal_overlap)
 		                    }
 	                    else if ( clean_mode == 'snp' ) {
-                        INPUT_CSV_NGS_SNP(input_bam, input_meta, ref_fa, eh_variant_catalog, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet, clean_denovo_filter, denovo_pedigree, clean_denovo_role_column, clean_denovo_family_column, clean_denovo_vcf_sample_column, clean_denovo_exclude_contigs, params.denovo_sv_min_reciprocal_overlap)
+                        INPUT_CSV_NGS_SNP(input_bam, input_meta, ref_fa, gatk_ref_fa, eh_variant_catalog, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet, clean_denovo_filter, denovo_pedigree, clean_denovo_role_column, clean_denovo_family_column, clean_denovo_vcf_sample_column, clean_denovo_exclude_contigs, params.denovo_sv_min_reciprocal_overlap)
 				}
 				else {
-                                INPUT_CSV_ALIGNMENT_ALL_NGS(input_bam, input_meta, ref_fa, eh_variant_catalog, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_report_tsv, clean_mito, clean_denovo_filter, denovo_pedigree, clean_denovo_role_column, clean_denovo_family_column, clean_denovo_vcf_sample_column, clean_denovo_exclude_contigs, params.denovo_sv_min_reciprocal_overlap)
+                                INPUT_CSV_ALIGNMENT_ALL_NGS(input_bam, input_meta, ref_fa, gatk_ref_fa, eh_variant_catalog, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_report_tsv, clean_mito, clean_denovo_filter, denovo_pedigree, clean_denovo_role_column, clean_denovo_family_column, clean_denovo_vcf_sample_column, clean_denovo_exclude_contigs, params.denovo_sv_min_reciprocal_overlap)
 	                        }
 	            }
 	            else { // Long reads
@@ -1701,10 +1716,10 @@ eh_variant_catalog = Channel
 	                        SINGLE_ALIGNMENT_NGS_SV(bam, out_prefix, ref_fa, eh_variant_catalog, note, is_note, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 	                    }
 	                    else if ( clean_mode == 'snp' ) {
-                        SINGLE_ALIGNMENT_NGS_SNP(bam, out_prefix, ref_fa, eh_variant_catalog, note, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
+                        SINGLE_ALIGNMENT_NGS_SNP(bam, out_prefix, ref_fa, gatk_ref_fa, eh_variant_catalog, note, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 	                    }
 			    else {
-			                SINGLE_ALIGNMENT_ALL_NGS(bam, out_prefix, ref_fa, eh_variant_catalog, note, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_report_tsv, clean_mito)
+			                SINGLE_ALIGNMENT_ALL_NGS(bam, out_prefix, ref_fa, gatk_ref_fa, eh_variant_catalog, note, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, short_snp_caller, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_report_tsv, clean_mito)
 			    }
 	            }
 	            else { // Long reads

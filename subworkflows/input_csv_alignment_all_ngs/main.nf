@@ -32,6 +32,7 @@ workflow INPUT_CSV_ALIGNMENT_ALL_NGS {
 	input_bam
 	input_meta
 	ref_fa
+	gatk_ref_fa
 	eh_variant_catalog
 	rankscore_filter
 	rankscore_softwares
@@ -62,12 +63,15 @@ workflow INPUT_CSV_ALIGNMENT_ALL_NGS {
         input_bam_with_bam= input_bam.map { out_prefix, bam_file, bai_file, note_file -> return tuple (out_prefix, bam_file, bai_file) }	
         bam_for_proband_tasks=input_bam_with_bam
         if ( denovo_filter == "yes" ) {
+                caller_regions=input_bam_with_bam.map { out_prefix, bam_file, bai_file -> tuple(out_prefix, []) }
                 if ( caller_mode == "haplotypecaller" ) {
                         multi_prep_gatk_result=multi_prep_gatk(input_bam_with_bam)
-                        snp_result=multi_haplotypecaller(multi_prep_gatk_result,ref_fa,"null")
+                        haplotypecaller_input=multi_prep_gatk_result.join(caller_regions, failOnMismatch: true, failOnDuplicate: true)
+                        snp_result=multi_haplotypecaller(haplotypecaller_input,gatk_ref_fa)
                 }
                 else {
-                        snp_result=multi_deepvariant(input_bam_with_bam,ref_fa,"null")
+                        deepvariant_input=input_bam_with_bam.join(caller_regions, failOnMismatch: true, failOnDuplicate: true)
+                        snp_result=multi_deepvariant(deepvariant_input,ref_fa)
                 }
                 denovo_snv_result=DENOVO_SNV_VCF_FILTER_CORE(snp_result,denovo_pedigree,denovo_role_column,denovo_family_column,denovo_vcf_sample_column,denovo_exclude_contigs)
                 snp_for_annotation=denovo_snv_result.records
@@ -85,17 +89,19 @@ workflow INPUT_CSV_ALIGNMENT_ALL_NGS {
                         }
                 }
                 phen2gene_result=multi_phen2gene(input_bam_no_bam)
-                def caller_regions=target
+                caller_regions=input_bam_with_bam.map { out_prefix, bam_file, bai_file -> tuple(out_prefix, []) }
                 if ( target == "yes" ) {
                         phen2_gene_bed=multi_phen2gene_filter(phen2gene_result,ref_fa,phen2gene_top_n)
                         caller_regions=phen2_gene_bed
                 }
                 if ( caller_mode == "haplotypecaller" ) {
                         multi_prep_gatk_result=multi_prep_gatk(input_bam_with_bam)
-                        snp_result=multi_haplotypecaller(multi_prep_gatk_result,ref_fa,caller_regions)
+                        haplotypecaller_input=multi_prep_gatk_result.join(caller_regions, failOnMismatch: true, failOnDuplicate: true)
+                        snp_result=multi_haplotypecaller(haplotypecaller_input,gatk_ref_fa)
                 }
                 else {
-                        snp_result=multi_deepvariant(input_bam_with_bam,ref_fa,caller_regions)
+                        deepvariant_input=input_bam_with_bam.join(caller_regions, failOnMismatch: true, failOnDuplicate: true)
+                        snp_result=multi_deepvariant(deepvariant_input,ref_fa)
                 }
                 snp_for_annotation=snp_result
         }

@@ -62,14 +62,16 @@ workflow INPUT_CSV_ALIGNMENT_ALL_LONGPHASE {
 }.set { split_bams_ch } // 2. Assign the multiMap object to a new variable
 	// 3. Access your newly structured channels
 	input_bam_no_bam = split_bams_ch.no_bam
-	input_bam_with_bam = split_bams_ch.with_bam
+        input_bam_with_bam = split_bams_ch.with_bam
         bam_for_proband_tasks=input_bam_with_bam
         if ( denovo_filter == "yes" ) {
+                caller_regions=input_bam_with_bam.map { out_prefix, bam_file, bai_file -> tuple(out_prefix, []) }
+                caller_input=input_bam_with_bam.join(caller_regions, failOnMismatch: true, failOnDuplicate: true)
                 if ( caller_mode == "nanocaller" ) {
-                        snp_result=multi_nanocaller(input_bam_with_bam,ref_fa,"null")
+                        snp_result=multi_nanocaller(caller_input,ref_fa)
                 }
                 else {
-                        snp_result=multi_clair3(input_bam_with_bam,ref_fa,"null")
+                        snp_result=multi_clair3(caller_input,ref_fa)
                 }
                 denovo_snv_result=DENOVO_SNV_VCF_FILTER_CORE(snp_result,denovo_pedigree,denovo_role_column,denovo_family_column,denovo_vcf_sample_column,denovo_exclude_contigs)
                 snp_for_annotation=denovo_snv_result.records
@@ -87,16 +89,17 @@ workflow INPUT_CSV_ALIGNMENT_ALL_LONGPHASE {
                         }
                 }
                 phen2gene_result=multi_phen2gene(input_bam_no_bam)
-                def caller_regions=target
+                caller_regions=input_bam_with_bam.map { out_prefix, bam_file, bai_file -> tuple(out_prefix, []) }
                 if ( target == "yes" ) {
                         phen2_gene_bed=multi_phen2gene_filter(phen2gene_result,ref_fa,phen2gene_top_n)
                         caller_regions=phen2_gene_bed
                 }
+                caller_input=input_bam_with_bam.join(caller_regions, failOnMismatch: true, failOnDuplicate: true)
                 if ( caller_mode == "nanocaller" ) {
-                        snp_result=multi_nanocaller(input_bam_with_bam,ref_fa,caller_regions)
+                        snp_result=multi_nanocaller(caller_input,ref_fa)
                 }
                 else {
-                        snp_result=multi_clair3(input_bam_with_bam,ref_fa,caller_regions)
+                        snp_result=multi_clair3(caller_input,ref_fa)
                 }
                 snp_for_annotation=snp_result
         }

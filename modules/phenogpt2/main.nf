@@ -1,6 +1,6 @@
 // Extract HPO terms from clinical notes with GPU-backed PhenoGPT2.
 process phenogpt2 {
-	container 'beoungl/docker_test:phenogpt2_0.2'
+	container 'beoungl/docker_test:phenogpt2_0.4'
 
 	input:
 	path clinical_note

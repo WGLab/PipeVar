@@ -26,6 +26,30 @@ class PhenoGPT2ExternalMountTests(unittest.TestCase):
         self.assertIn("MINICONDA_SHA256=a098a5b1581d8fd078c430b82e27106602223e335efef708a124e723814d120c", dockerfile)
         self.assertIn("PHENOGPT2_REF=68922bc131abecc3e3becd0e5ae927d015e4b0e4", dockerfile)
 
+    def test_runtime_slim_retains_jit_build_requirements(self):
+        dockerfile = (DOCKER_CONTEXT / "Dockerfile").read_text()
+        runtime = dockerfile.split(
+            "FROM ${CUDA_RUNTIME_IMAGE} AS runtime-slim", 1
+        )[1]
+        self.assertIn("build-essential", runtime)
+        self.assertIn("CC=/usr/bin/gcc", runtime)
+        self.assertIn("CXX=/usr/bin/g++", runtime)
+        self.assertIn("test -x /usr/bin/gcc", runtime)
+        self.assertIn("test -x /usr/bin/g++", runtime)
+        self.assertIn("Python.h", runtime)
+        self.assertIn("triton/backends/nvidia/include/cuda.h", runtime)
+        self.assertIn("triton/backends/nvidia/bin/ptxas", runtime)
+
+    def test_wrapper_routes_jit_caches_to_runtime_cache(self):
+        wrapper = (DOCKER_CONTEXT / "run_phenogpt2_to_hpo").read_text()
+        self.assertIn('CUDA_CACHE_PATH="$cache_dir/cuda"', wrapper)
+        self.assertIn(
+            'TORCHINDUCTOR_CACHE_DIR="$cache_dir/torchinductor"', wrapper
+        )
+        self.assertIn('TRITON_HOME="$cache_dir/triton"', wrapper)
+        self.assertIn('TRITON_CACHE_DIR="$cache_dir/triton/cache"', wrapper)
+        self.assertIn('VLLM_CACHE_ROOT="$cache_dir/vllm"', wrapper)
+
     def test_runtime_requirements_keep_negation_and_drop_training_packages(self):
         requirements = (DOCKER_CONTEXT / "requirements-runtime.txt").read_text().lower()
         lock = (DOCKER_CONTEXT / "requirements-runtime.lock").read_text().lower()
@@ -65,7 +89,7 @@ class PhenoGPT2ExternalMountTests(unittest.TestCase):
             (PIPEVAR / "modules/multi_phenogpt2/main.nf").read_text(),
         ]
         for module in modules:
-            self.assertIn("beoungl/docker_test:phenogpt2_0.2", module)
+            self.assertIn("beoungl/docker_test:phenogpt2_0.4", module)
             self.assertIn("/opt/phenogpt2/models/phenogpt2", module)
             self.assertIn("/opt/phenogpt2/models/negation", module)
             self.assertIn("/opt/phenogpt2/models/embedding", module)
@@ -88,13 +112,22 @@ class PhenoGPT2ExternalMountTests(unittest.TestCase):
         main = (PIPEVAR / "main.nf").read_text()
         self.assertIn("-negation_model \"$negation_model_dir\"", wrapper)
         self.assertNotIn("-embedding_model", wrapper)
+        self.assertIn("resolve-model-dir", wrapper)
         self.assertIn("prepare-embedding-cache", wrapper)
-        self.assertIn("models--Qwen--Qwen3-Embedding-0.6B", helper)
+        self.assertIn("discover_embedding_repo_id", helper)
+        self.assertNotIn("EMBEDDING_CACHE_REPO", helper)
+        self.assertNotIn("MANIFEST_NAME", helper)
+        self.assertNotIn("_validate_manifest", helper)
+        self.assertNotIn("write_manifest", helper)
+        self.assertNotIn("MODEL_REQUIRED_FILES", helper)
+        self.assertNotIn("model.safetensors.index.json", helper)
+        self.assertNotIn("chat_template.jinja", helper)
+        self.assertIn("AutoTokenizer.from_pretrained", helper)
+        self.assertIn("SentenceTransformer(", helper)
         self.assertIn("PhenoGPT2 requires exactly one visible CUDA GPU", wrapper)
         self.assertNotIn("negation yes is not supported", main)
         self.assertIn("phenogpt2_negation_model_host_path", main)
         self.assertIn("phenogpt2_embedding_model_host_path", main)
-        self.assertNotIn("SHA256SUMS", main)
         self.assertNotIn("MessageDigest", main)
         self.assertIn("def requireModelDirectory", main)
         self.assertIn("mainCheckpointRoot = requireModelDirectory", main)

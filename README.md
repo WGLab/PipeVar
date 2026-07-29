@@ -85,23 +85,16 @@ PhenoGPT2 modules.
 
 Release status (2026-07-23): the pinned local builds measured 23.36 GB for
 `artifact-slim`, 20.65 GB for `dependency-slim`, and 14.69 GB for
-`runtime-slim` (Docker uncompressed image size). The runtime candidate passes
-package, upstream-import, wrapper, and static workflow checks, but has not been
-published because cold-cache Docker and Singularity GPU/JIT tests are still
-required. Both modules therefore continue to use `phenogpt2_0.2`.
+the compiler-free `runtime-slim` candidate (Docker uncompressed image size).
+Cold-cache vLLM initialization showed that Triton requires a native compiler at
+runtime. The corrected runtime-JIT candidate restores `build-essential`, uses
+explicit GCC/G++ paths, and measures 14.97 GB. It passes package,
+upstream-import, real-checkpoint, wrapper, static workflow, and native Triton
+extension-build checks, but has not been published because cold-cache Docker
+and Singularity GPU/JIT tests are still required. Both modules now select
+`phenogpt2_0.4`.
 
 ```bash
-# Create SHA-256 manifests once, before making the model directories immutable.
-for model in \
-  /data/models/phenogpt2-v1/new_model \
-  /data/models/qwen3-4b-negation \
-  /data/models/qwen3-embedding-0.6b
-do
-  docker run --rm -v "${model}:/model:rw" \
-    beoungl/docker_test:phenogpt2_0.3-depslim \
-    python3 /usr/local/bin/phenogpt2_to_hpo.py write-manifest /model
-done
-
 # The persistent runtime cache is optional, but must already exist when supplied.
 mkdir -p /data/phenogpt2-cache/image-0.3_models-v1_h100
 nextflow run main.nf -profile local_docker \
@@ -109,16 +102,25 @@ nextflow run main.nf -profile local_docker \
   --phenotype_extractor phenogpt2 --GPU yes \
   --phenogpt2_negation yes \
   --phenogpt2_model_host_path /data/models/phenogpt2-v1/new_model \
-  --phenogpt2_negation_model_host_path /data/models/qwen3-4b-negation \
-  --phenogpt2_embedding_model_host_path /data/models/qwen3-embedding-0.6b \
+  --phenogpt2_negation_model_host_path /data/models/phenogpt2-negation \
+  --phenogpt2_embedding_model_host_path /data/models/phenogpt2-embedding \
   --phenogpt2_cache_host_path /data/phenogpt2-cache/image-0.3_models-v1_h100
 ```
 
-All three model directories must contain materialized files and a `SHA256SUMS`
-created by the image helper. PipeVar preflight checks only that the configured
-host directories exist; the container wrapper validates their manifests and
-contents before inference. Negation uses the upstream Qwen model, prompts,
-thresholds, GPU placement, and embedding-based HPO verification unchanged.
+Each path may be either a complete standalone model directory or a complete
+Hugging Face cache repository containing `refs/main` and its referenced
+snapshot. No checksum-manifest filename or model filename is imposed by
+PipeVar. PipeVar preflight checks only that the configured host directories
+exist. Inside the container, the upstream Transformers and SentenceTransformer
+loaders determine whether each mounted model is usable. For offline embedding
+loading, the wrapper discovers the repository identifier used by the pinned
+upstream source and creates the corresponding runtime-cache alias; it does not
+duplicate a model identifier. Upstream prompts, thresholds, GPU placement, and
+embedding-based HPO verification remain unchanged.
+
+The runtime cache also contains CUDA, TorchInductor, Triton, and vLLM
+subdirectories. Keep it writable; use a persistent cache only when it is
+namespaced for the image, checkpoint version, and GPU class.
 
 ### Setup Script
 
@@ -437,10 +439,10 @@ Defaults below come from `nextflow.config`.
 | `--phenogpt2_chunk_batch_size` | `1` | PhenoGPT2 chunk batch size; currently required to remain `1` |
 | `--phenogpt2_wc` | `0` | PhenoGPT2 word-count chunking; `0` disables chunking |
 | `--phenogpt2_attn_implementation` | `eager` | PhenoGPT2 attention implementation |
-| `--phenogpt2_negation` | `no` | Enable the full Qwen negation and embedding-based HPO verification pass |
+| `--phenogpt2_negation` | `no` | Enable the full upstream negation and embedding-based HPO verification pass |
 | `--phenogpt2_model_host_path` | `null` | Required path to an existing `new_model` directory; mounted read-only and validated by the container wrapper |
-| `--phenogpt2_negation_model_host_path` | `null` | Required with negation; existing Qwen negation directory mounted read-only and validated by the wrapper |
-| `--phenogpt2_embedding_model_host_path` | `null` | Required with negation; existing Qwen embedding directory mounted read-only and validated by the wrapper |
+| `--phenogpt2_negation_model_host_path` | `null` | Required with negation; existing negation-model directory mounted read-only and validated by the wrapper |
+| `--phenogpt2_embedding_model_host_path` | `null` | Required with negation; existing embedding-model directory mounted read-only and validated by the wrapper |
 | `--phenogpt2_cache_host_path` | `null` | Optional absolute canonical path to a pre-created writable persistent cache; otherwise each task uses its own work-directory cache |
 | `--phenogpt2_max_forks` | `1` | Maximum concurrent PhenoGPT2 tasks; currently required to remain `1` |
 
@@ -658,8 +660,8 @@ Outputs are published to `--output_directory`. Exact files depend on `--mode`, `
 - xTEA is intended for short-read WGS MEI discovery/genotyping and requires indexed BAM/CRAM input.
 - CNVpytor is experimental for long reads and is intended for large whole-genome CNVs.
 - If using Singularity/Docker profiles, ensure `--annovar_host_path` and `--phenosv_host_path` point to valid host locations.
-- External-model PhenoGPT2 support is text-only with optional full Qwen negation and `--phenogpt2_wc 0`; vision, training, and BERT chunk filtering are not provisioned.
-- Keep all mounted PhenoGPT2 checkpoints immutable and use a new versioned directory for every model change. PipeVar checks that each configured host directory exists, while the PhenoGPT2 container wrapper verifies its SHA-256 manifest before inference. Because Nextflow no longer hashes model contents during preflight, use a fresh work directory or `-resume` only when the mounted model versions are unchanged.
+- External-model PhenoGPT2 support is text-only with optional full upstream negation and `--phenogpt2_wc 0`; vision, training, and BERT chunk filtering are not provisioned.
+- Keep all mounted PhenoGPT2 checkpoints immutable and use a new versioned directory for every model change. PipeVar checks that each configured host directory exists, and the container wrapper uses the upstream loaders to validate model usability. Because Nextflow does not hash model contents during preflight, use a fresh work directory or `-resume` only when the mounted model versions are unchanged.
 - On HPC, model and persistent-cache paths must exist at the identical absolute path on the submit node and every GPU compute node. Persistent caches must be trusted, writable, and namespaced by PhenoGPT2 image, model version, and GPU class.
 - Negation validation targets one scheduler-isolated 80 GB GPU. A 40 GB GPU is supported only after cold-cache and long-note testing completes without OOM. External mounting reduces image transfer size, not checkpoint distribution size or GPU-memory demand.
 

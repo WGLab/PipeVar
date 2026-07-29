@@ -4,9 +4,9 @@ process deepvariant {
 	container "google/deepvariant:${params.deepvariant_version}${params.GPU?.toString()?.trim()?.toLowerCase() == 'yes' ? '-gpu' : ''}"
 
         input:
-	tuple path(bam), path(index)
+	tuple path(bam), path(bam_index)
         val out_prefix
-	tuple path(ref_fa), path(index)
+	tuple path(ref_fa), path(fa_index)
 	val bed_file
 
 	output:
@@ -28,4 +28,3 @@ process deepvariant {
 
 
 }
-

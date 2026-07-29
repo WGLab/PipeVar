@@ -1,6 +1,6 @@
 // Batch extraction of HPO terms from clinical notes with GPU-backed PhenoGPT2.
 process multi_phenogpt2 {
-	container 'beoungl/docker_test:phenogpt2_0.2'
+	container 'beoungl/docker_test:phenogpt2_0.4'
 
 	input:
 	tuple val(out_prefix), path(clinical_note)

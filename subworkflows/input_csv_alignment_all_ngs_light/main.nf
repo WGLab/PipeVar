@@ -56,15 +56,15 @@ workflow INPUT_CSV_ALIGNMENT_ALL_NGS_LIGHT {
 
                 }
         }	
-        multi_prep_gatk_result=multi_prep_gatk(input_bam)
+        multi_prep_gatk_result=multi_prep_gatk(input_bam_with_bam)
 	phen2gene_result=multi_phen2gene(input_bam_no_bam)
+        caller_regions=input_bam_with_bam.map { out_prefix, bam_file, bai_file -> tuple(out_prefix, []) }
         if ( target == "yes" ) {
                 phen2_gene_bed=multi_phen2gene_filter(phen2gene_result,ref_fa,phen2gene_top_n)
-                haplotypecaller_result=multi_haplotypecaller(multi_prep_gatk_result,ref_fa,phen2_gene_bed)
+                caller_regions=phen2_gene_bed
         }
-        else {
-                haplotypecaller_result=multi_haplotypecaller(multi_prep_gatk_result,ref_fa,target)
-        }
+        haplotypecaller_input=multi_prep_gatk_result.join(caller_regions, failOnMismatch: true, failOnDuplicate: true)
+        haplotypecaller_result=multi_haplotypecaller(haplotypecaller_input,ref_fa)
         if ( target == "yes" ) {
                 annovar_input=haplotypecaller_result.join(phen2_gene_bed).map { out_prefix, vcf_file, bed_file -> tuple(out_prefix, vcf_file, bed_file) }
         }
