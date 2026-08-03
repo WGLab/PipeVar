@@ -47,6 +47,7 @@ COMMON OPTIONS
   --phenogpt2_cache_host_path   Optional pre-created persistent cache directory
   --out_prefix <STRING>         Single-sample output prefix
   --output_directory <DIR>      Publish directory
+  --nanocaller_dp <NUMBER>      Missing-GQ NanoCaller depth threshold (default: 20)
 
 NOTES
   - BAM/CRAM inputs require index files (.bai or .crai).
@@ -904,6 +905,11 @@ if (!(params.phenosv_score.toString() ==~ /([0-9]+([.][0-9]+)?|[.][0-9]+)/)) {
       --phenosv_score 0.50
     ================================================================
     """
+}
+
+def nanocallerDpText = params.nanocaller_dp?.toString()?.trim()
+if (!(nanocallerDpText ==~ /([0-9]+([.][0-9]+)?|[.][0-9]+)/)) {
+    error "ERROR: Invalid --nanocaller_dp '${params.nanocaller_dp}'. Provide a finite, non-negative numeric threshold, for example 20."
 }
 
 if (!(params.common_sv_af.toString() ==~ /([0-9]+([.][0-9]+)?|[.][0-9]+)/)) {

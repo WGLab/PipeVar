@@ -197,6 +197,102 @@ class LightCallerWiringTests(unittest.TestCase):
         self.assertIn("tuple path(ref_fa), path(fa_index)", deepvariant)
         self.assertNotRegex(deepvariant, r"tuple path\([^)]*\), path\(index\)")
 
+    def test_nanocaller_rankvar_fallback_is_alias_scoped(self):
+        single_paths = (
+            "subworkflows/single_alignment_long_snp/main.nf",
+            "subworkflows/single_alignment_all_longphase/main.nf",
+        )
+        batch_paths = (
+            "subworkflows/input_csv_alignment_long_snp/main.nf",
+            "subworkflows/input_csv_alignment_all_longphase/main.nf",
+        )
+
+        for relative_path in single_paths:
+            workflow = read(relative_path)
+            self.assertIn(
+                "include { RankVar as RankVarNanoCaller }", workflow, relative_path
+            )
+            self.assertIn('if ( caller_mode == "nanocaller" )', workflow, relative_path)
+            self.assertIn("RankVarNanoCaller(", workflow, relative_path)
+            self.assertIn("rankvar_result = RankVarNanoCaller.out", workflow, relative_path)
+
+        for relative_path in batch_paths:
+            workflow = read(relative_path)
+            self.assertIn(
+                "include { multi_rankvar as multi_rankvar_nanocaller }",
+                workflow,
+                relative_path,
+            )
+            self.assertIn('if ( caller_mode == "nanocaller" )', workflow, relative_path)
+            self.assertIn("multi_rankvar_nanocaller(", workflow, relative_path)
+
+        for relative_path in (
+            "subworkflows/single_alignment_ngs_snp/main.nf",
+            "subworkflows/single_alignment_all_ngs/main.nf",
+            "subworkflows/single_alignment_vcf_snp/main.nf",
+            "subworkflows/input_csv_alignment_ngs_snp/main.nf",
+            "subworkflows/input_csv_alignment_all_ngs/main.nf",
+            "subworkflows/input_csv_alignment_vcf_snp/main.nf",
+        ):
+            workflow = read(relative_path)
+            self.assertNotIn("RankVarNanoCaller", workflow, relative_path)
+            self.assertNotIn("multi_rankvar_nanocaller", workflow, relative_path)
+
+    def test_rankvar_modules_delegate_quality_filtering_to_rankvar(self):
+        for relative_path in (
+            "modules/rankvar/main.nf",
+            "modules/multi_rankvar/main.nf",
+        ):
+            module = read(relative_path)
+            self.assertIn("beoungl/docker_test:rankvar-gqdp-1", module, relative_path)
+            self.assertIn("task.ext.nanocaller_dp", module, relative_path)
+            self.assertIn("--nanocaller_dp=${task.ext.nanocaller_dp}", module, relative_path)
+            self.assertIn("task.ext.rankvar_script", module, relative_path)
+            self.assertIn("'/opt/RankVar/RankVar.py'", module, relative_path)
+            self.assertIn("python $rankvar_script", module, relative_path)
+            self.assertNotIn("python /opt/RankVar/RankVar_nanocaller.py", module, relative_path)
+            self.assertIn("function pass_gt(", module, relative_path)
+            self.assertNotIn("pass_gt_gq", module, relative_path)
+            self.assertNotIn("min_gq", module, relative_path)
+
+        config = read("nextflow.config")
+        self.assertIn('nanocaller_dp = "20"', config)
+        self.assertIn(
+            "withName: 'RankVarNanoCaller|multi_rankvar_nanocaller'", config
+        )
+        self.assertIn("ext.nanocaller_dp = params.nanocaller_dp", config)
+        self.assertIn(
+            "ext.rankvar_script = '/opt/RankVar/RankVar_nanocaller.py'", config
+        )
+
+    def test_nanocaller_dp_is_validated_at_the_entrypoint(self):
+        main = read("main.nf")
+        self.assertIn("def nanocallerDpText = params.nanocaller_dp", main)
+        self.assertIn("Invalid --nanocaller_dp", main)
+        self.assertIn("finite, non-negative numeric threshold", main)
+
+    def test_single_and_batch_rankvar_prefilters_are_equivalent(self):
+        single = read("modules/rankvar/main.nf")
+        batch = read("modules/multi_rankvar/main.nf")
+
+        def prefilter(module):
+            start = module.index("\t# Prefilter ANNOVAR table")
+            end = module.index("\n\n\tpython $rankvar_script", start)
+            return module[start:end].rstrip()
+
+        self.assertEqual(prefilter(single), prefilter(batch))
+
+    def test_no_rankvar_helper_was_added_to_bin_or_scripts(self):
+        for directory_name in ("bin", "scripts"):
+            directory = PIPEVAR / directory_name
+            if not directory.exists():
+                continue
+            for path in directory.rglob("*"):
+                if path.is_file():
+                    lowered = path.name.lower()
+                    self.assertNotIn("rankvar", lowered, path)
+                    self.assertNotIn("nanocaller_dp", lowered, path)
+
 
 if __name__ == "__main__":
     unittest.main()

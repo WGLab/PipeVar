@@ -5,6 +5,7 @@ include { nanocaller } from '../../modules/nanocaller/'
 include { ANNOVAR } from '../../modules/annovar/'
 include { Phen2gene } from '../../modules/phen2gene/'
 include { RankVar } from '../../modules/rankvar/'
+include { RankVar as RankVarNanoCaller } from '../../modules/rankvar/'
 include { Rankscore_analysis } from '../../modules/rankscore_analysis/'
 include { phenotagger } from '../../modules/phenotagger/'
 include { phenogpt2 } from '../../modules/phenogpt2/'
@@ -68,7 +69,14 @@ workflow SINGLE_ALIGNMENT_LONG_SNP {
 	snp_vcf = (caller_mode == "nanocaller") ? nanocaller.out : clair3.out
 	annovar_bed = (target == "yes") ? phen2_gene_bed : target
 	ANNOVAR(snp_vcf,out_prefix,annovar_bed)
-	RankVar(ANNOVAR.out.txt_output,Phen2gene.out,hpo,out_prefix,gnomad,gq,ad,rankvar_filter)
+	if ( caller_mode == "nanocaller" ) {
+		RankVarNanoCaller(ANNOVAR.out.txt_output,Phen2gene.out,hpo,out_prefix,gnomad,gq,ad,rankvar_filter)
+		rankvar_result = RankVarNanoCaller.out
+	}
+	else {
+		RankVar(ANNOVAR.out.txt_output,Phen2gene.out,hpo,out_prefix,gnomad,gq,ad,rankvar_filter)
+		rankvar_result = RankVar.out
+	}
 	Rankscore_analysis(ANNOVAR.out.txt_output,Phen2gene.out,out_prefix,gnomad,rankscore_filter,rankscore_softwares,gq,phen2gene_top_n)
-	snp_prio(out_prefix,Rankscore_analysis.out.rankscore,Rankscore_analysis.out.clinvar,RankVar.out,ANNOVAR.out.vcf_output,hpo,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
+	snp_prio(out_prefix,Rankscore_analysis.out.rankscore,Rankscore_analysis.out.clinvar,rankvar_result,ANNOVAR.out.vcf_output,hpo,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
 }

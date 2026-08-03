@@ -427,6 +427,7 @@ Defaults below come from `nextflow.config`.
 | `--phenosv_score` | `0.50` | Minimum PhenoSV score |
 | `--gq` | `20` | Minimum genotype quality |
 | `--ad` | `15` | Minimum allele depth |
+| `--nanocaller_dp` | `20` | Minimum NanoCaller depth used by RankVar only when GQ is missing; this is a coverage threshold, not a GQ equivalent |
 | `--phen2gene_filter` | `500` | Number of top Phen2Gene genes for targeted mode |
 | `--gene` | `null` | Comma-separated genes or one-gene-per-line file |
 | `--target` | `null` | Enable phenotype-derived targeted calling with `yes` |
@@ -445,6 +446,11 @@ Defaults below come from `nextflow.config`.
 | `--phenogpt2_embedding_model_host_path` | `null` | Required with negation; existing embedding-model directory mounted read-only and validated by the wrapper |
 | `--phenogpt2_cache_host_path` | `null` | Optional absolute canonical path to a pre-created writable persistent cache; otherwise each task uses its own work-directory cache |
 | `--phenogpt2_max_forks` | `1` | Maximum concurrent PhenoGPT2 tasks; currently required to remain `1` |
+
+For NanoCaller-selected long-read paths, RankVar uses genuine GQ when present and
+does not rescue a low GQ with DP. If GQ is missing, DP must be at least
+`--nanocaller_dp` and first-ALT AD must be greater than `--ad`. A passing GQ can
+retain NanoCaller indels without AD. Other callers do not receive the DP fallback.
 
 ### Caller And Feature Toggles
 

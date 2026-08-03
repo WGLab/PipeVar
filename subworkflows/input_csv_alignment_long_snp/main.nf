@@ -3,6 +3,7 @@ include { multi_annovar } from '../../modules/multi_annovar/'
 include { multi_phen2gene } from '../../modules/multi_phen2gene/'
 include { multi_rankscore } from '../../modules/multi_rankscore/'
 include { multi_rankvar } from '../../modules/multi_rankvar/'
+include { multi_rankvar as multi_rankvar_nanocaller } from '../../modules/multi_rankvar/'
 include { multi_clair3 } from '../../modules/multi_clair3/'
 include { multi_nanocaller } from '../../modules/multi_nanocaller/'
 include { multi_phenotagger } from '../../modules/multi_phenotagger/'
@@ -109,7 +110,12 @@ workflow INPUT_CSV_ALIGNMENT_LONG_SNP {
 	join_annovar_phen2gene=annovar_result_txt.join(phen2gene_result)
 	join_annovar_hpo=join_annovar_phen2gene.join(input_bam_no_bam)
 	rankscore_result=multi_rankscore(join_annovar_phen2gene,gnomad,rankscore_filter,rankscore_softwares,gq,phen2gene_top_n)
-	rankvar_result=multi_rankvar(join_annovar_hpo,gnomad,gq,ad,rankvar_filter)
+	if ( caller_mode == "nanocaller" ) {
+		rankvar_result=multi_rankvar_nanocaller(join_annovar_hpo,gnomad,gq,ad,rankvar_filter)
+	}
+	else {
+		rankvar_result=multi_rankvar(join_annovar_hpo,gnomad,gq,ad,rankvar_filter)
+	}
         rankscore_rankvar_join=rankscore_result.join(rankvar_result)
         annovar_result_vcf=annovar_for_downstream.map { item -> tuple(item[0], item[2]) }
         snp_prio_input=rankscore_rankvar_join.join(annovar_result_vcf)

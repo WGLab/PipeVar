@@ -10,6 +10,7 @@ include { PhenoSV } from '../../modules/phenosv/'
 include { ANNOVAR } from '../../modules/annovar/'
 include { Phen2gene } from '../../modules/phen2gene/'
 include { RankVar } from '../../modules/rankvar/'
+include { RankVar as RankVarNanoCaller } from '../../modules/rankvar/'
 include { NanoRepeat } from '../../modules/nanorepeat/'
 include { ANNOVAR_SV } from '../../modules/annovar_sv/'
 include { common_sv_filter } from '../../modules/common_sv_filter/'
@@ -78,7 +79,14 @@ workflow SINGLE_ALIGNMENT_ALL_LONGPHASE {
 	snp_vcf = (caller_mode == "nanocaller") ? nanocaller.out : clair3.out
 	annovar_bed = (target == "yes") ? phen2_gene_bed : target
 	ANNOVAR(snp_vcf,out_prefix,annovar_bed)
-	RankVar(ANNOVAR.out.txt_output,Phen2gene.out,hpo,out_prefix,gnomad,gq,ad,rankvar_filter)
+	if ( caller_mode == "nanocaller" ) {
+		RankVarNanoCaller(ANNOVAR.out.txt_output,Phen2gene.out,hpo,out_prefix,gnomad,gq,ad,rankvar_filter)
+		rankvar_result = RankVarNanoCaller.out
+	}
+	else {
+		RankVar(ANNOVAR.out.txt_output,Phen2gene.out,hpo,out_prefix,gnomad,gq,ad,rankvar_filter)
+		rankvar_result = RankVar.out
+	}
 	rankscore_result=Rankscore_analysis(ANNOVAR.out.txt_output,Phen2gene.out,out_prefix,gnomad,rankscore_filter,rankscore_softwares,gq,phen2gene_top_n)
 	sniffles(bam,out_prefix,ref_fa)
 	cnvpytor_mode = params.cnvpytor ? params.cnvpytor.toString().trim().toLowerCase() : "no"
@@ -105,7 +113,7 @@ workflow SINGLE_ALIGNMENT_ALL_LONGPHASE {
 	SURVIVOR(annovar_sv_for_downstream,out_prefix)
 	PhenoSV(SURVIVOR.out,out_prefix,hpo)
 	NanoRepeat(bam,out_prefix,ref_fa)
-	longphase(bam,ANNOVAR.out.vcf_output,annovar_sv_for_downstream,PhenoSV.out,rankscore_result.rankscore,rankscore_result.clinvar,RankVar.out,hpo,out_prefix,ref_fa,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
+	longphase(bam,ANNOVAR.out.vcf_output,annovar_sv_for_downstream,PhenoSV.out,rankscore_result.rankscore,rankscore_result.clinvar,rankvar_result,hpo,out_prefix,ref_fa,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
 	if ( mito_mode == "yes" ) {
 		variant_html_report_with_mito(out_prefix, longphase.out[0], longphase.out[1], NanoRepeat.out, mito_tsv)
 	}

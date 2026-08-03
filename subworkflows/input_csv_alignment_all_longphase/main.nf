@@ -7,6 +7,7 @@ include { multi_common_sv_filter } from '../../modules/multi_common_sv_filter/'
 include { multi_survivor } from '../../modules/multi_survivor/'
 include { multi_phenosv } from '../../modules/multi_phenosv/'
 include { multi_rankvar } from '../../modules/multi_rankvar/'
+include { multi_rankvar as multi_rankvar_nanocaller } from '../../modules/multi_rankvar/'
 include { multi_sniffles } from '../../modules/multi_sniffles/'
 include { multi_cnvpytor } from '../../modules/multi_cnvpytor/'
 include { multi_merge_longread_sv_callers } from '../../modules/multi_merge_longread_sv_callers/'
@@ -129,7 +130,12 @@ workflow INPUT_CSV_ALIGNMENT_ALL_LONGPHASE {
 	join_annovar_phen2gene=annovar_result_txt.join(phen2gene_result)
 	join_annovar_hpo=join_annovar_phen2gene.join(input_bam_no_bam)
 	rankscore_result=multi_rankscore(join_annovar_phen2gene,gnomad,rankscore_filter,rankscore_softwares,gq,phen2gene_top_n)
-	rankvar_result=multi_rankvar(join_annovar_hpo,gnomad,gq,ad,rankvar_filter)
+	if ( caller_mode == "nanocaller" ) {
+		rankvar_result=multi_rankvar_nanocaller(join_annovar_hpo,gnomad,gq,ad,rankvar_filter)
+	}
+	else {
+		rankvar_result=multi_rankvar(join_annovar_hpo,gnomad,gq,ad,rankvar_filter)
+	}
 	sniffles_result=multi_sniffles(input_bam_with_bam,ref_fa)
 	cnvpytor_mode = params.cnvpytor ? params.cnvpytor.toString().trim().toLowerCase() : "no"
 	cnvpytor_baf_mode = params.cnvpytor_baf ? params.cnvpytor_baf.toString().trim().toLowerCase() : "yes"
