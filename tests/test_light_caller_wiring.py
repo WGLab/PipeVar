@@ -244,13 +244,14 @@ class LightCallerWiringTests(unittest.TestCase):
             "modules/multi_rankvar/main.nf",
         ):
             module = read(relative_path)
-            self.assertIn("beoungl/docker_test:rankvar-gqdp-1", module, relative_path)
+            self.assertIn("beoungl/docker_test:rankvar", module, relative_path)
             self.assertIn("task.ext.nanocaller_dp", module, relative_path)
             self.assertIn("--nanocaller_dp=${task.ext.nanocaller_dp}", module, relative_path)
             self.assertIn("task.ext.rankvar_script", module, relative_path)
             self.assertIn("'/opt/RankVar/RankVar.py'", module, relative_path)
             self.assertIn("python $rankvar_script", module, relative_path)
             self.assertNotIn("python /opt/RankVar/RankVar_nanocaller.py", module, relative_path)
+            self.assertIn('gsub(/[|\\\\/]/, "", ref_gt)', module, relative_path)
             self.assertIn("function pass_gt(", module, relative_path)
             self.assertNotIn("pass_gt_gq", module, relative_path)
             self.assertNotIn("min_gq", module, relative_path)

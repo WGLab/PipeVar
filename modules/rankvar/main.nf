@@ -36,7 +36,8 @@ process RankVar {
 	    }
 	    if (gt_i>0 && gt_i<=ns) gt=trim(smp_a[gt_i])
 	    if (gt=="" || gt=="./." || gt==".|." || gt=="0/0" || gt=="0|0") return 0
-	    ref_gt=gt; gsub(/[|\/]/, "", ref_gt)
+	    # Groovy needs a doubled backslash so AWK receives an escaped slash.
+	    ref_gt=gt; gsub(/[|\\/]/, "", ref_gt)
 	    if (ref_gt!="" && ref_gt !~ /[^0]/) return 0
 	    return 1
 	}
