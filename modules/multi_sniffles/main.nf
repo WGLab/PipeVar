@@ -1,7 +1,7 @@
 
 // Batch structural-variant calling from long-read BAM inputs with Sniffles.
 process multi_sniffles {
-        container ='beoungl/docker_test:sniffles'
+        container ='beoungl/docker_test:sniffles_0.1'
 
 
         input:
@@ -14,13 +14,10 @@ process multi_sniffles {
 	script: 
 	"""
 
-	source /conda/etc/profile.d/conda.sh
-	conda activate sniffles
-	sniffles --allow-overwrite --input $bam --vcf ${out_prefix}.sniffles.vcf --reference $ref_fa
+	sniffles --allow-overwrite --output-rnames --input $bam --vcf ${out_prefix}.sniffles.vcf --reference $ref_fa
 
 	"""
 
 }
-
 
 

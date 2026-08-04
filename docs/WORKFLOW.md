@@ -65,9 +65,9 @@ flowchart TD
 
     subgraph svLane["Structural variant, CNV, and mobile element analysis"]
         svCall["Breakpoint/SV calling\nshort reads: Manta\nlong reads: Sniffles\nVCF input: use supplied calls"]
-        cnvCall["Copy-number variant detection\nshort reads: CNVnator\nlong reads: CNVpytor"]
+        cnvCall["Copy-number variant detection\nshort reads: CNVnator"]
         meiCall["Mobile element insertion detection\nshort reads: xTEA"]
-        svMerge["SV/CNV/MEI evidence merge\nmerge_shortread_sv_callers or merge_longread_sv_callers"]
+        svMerge["Short-read SV/CNV/MEI evidence merge\nmerge_shortread_sv_callers"]
         svAnno["ANNOVAR_SV annotation"]
         survivor["SURVIVOR consolidation"]
         phenosv["PhenoSV phenotype-aware SV scoring"]
@@ -110,6 +110,7 @@ flowchart TD
     rankscore --> snpOnly
 
     svCall --> svMerge
+    svCall -.->|"raw Sniffles with RNAMES"| longphase
     cnvCall --> svMerge
     meiCall --> svMerge
     svMerge --> svAnno --> survivor --> phenosv --> ngsPrio
@@ -183,9 +184,9 @@ flowchart TD
 - CSV mode follows the same scientific workflow as single-sample mode, using
   batch-aware `multi_*` modules.
 - CNV detection and mobile element insertion detection are represented as
-  distinct evidence sources in the nuclear workflow. In the current
-  implementation, short-read CNVs are called with CNVnator, long-read CNVs with
-  CNVpytor, and short-read mobile element insertions with xTEA.
+  distinct short-read evidence sources. CNVnator supplies short-read CNVs and
+  xTEA supplies short-read mobile element insertions. Long-read SV discovery uses
+  Sniffles alone.
 - Optional capabilities such as targeted calling and mitochondrial analysis are
   shown as analysis stages rather than central routing decisions.
 
@@ -344,9 +345,6 @@ flowchart TD
     rankvar["RankVar"]
     rankscore["Rankscore_analysis"]
     sniffles["Sniffles"]
-    cnvpytorChoice{"--cnvpytor yes?"}
-    cnvpytor["CNVpytor"]
-    mergeSv["merge_longread_sv_callers"]
     annovarSv["ANNOVAR_SV"]
     survivor["SURVIVOR"]
     phenosv["PhenoSV"]
@@ -374,12 +372,9 @@ flowchart TD
     annovar --> rankscore --> longphase
 
     input --> sniffles
-    input --> cnvpytorChoice
-    annovar -.->|"SNP VCF for BAF in full mode"| cnvpytorChoice
-    cnvpytorChoice -->|"yes, SV/full only; default no"| cnvpytor
-    sniffles --> mergeSv
-    cnvpytor --> mergeSv
-    mergeSv --> annovarSv --> survivor --> phenosv --> longphase
+    sniffles -->|"complete VCF with RNAMES"| longphase
+    sniffles --> annovarSv --> survivor --> phenosv
+    phenosv -->|"exact-ID intersection after phasing"| longphase
 
     input --> repeat --> longphase
     longphase --> html
@@ -462,8 +457,9 @@ flowchart TD
   Manta and optional CNVnator before `ANNOVAR_SV`.
 - `--cnvnator yes`: short-read SV/full branch, default on. The path normalizes
   the alignment before `CNVnator`.
-- `--cnvpytor yes`: long-read SV/full branch, default off. In SV-only mode it
-  runs read-depth only; in full mode it can use SNP/BAF support from the SNP VCF.
+- Long-read SV/full branches use Sniffles alone. Full-mode LongPhase receives the
+  complete raw Sniffles VCF, while annotation, de novo, common-SV, and PhenoSV
+  filtering define the report-authorized evidence set.
 
 ### Verification Notes
 
@@ -474,7 +470,7 @@ workflows and passes caller mode with `short_snp_caller` and `long_snp_caller`.
 To check the diagrams against the current source:
 
 ```bash
-rg -n "SINGLE_ALIGNMENT_|INPUT_CSV_|short_snp_caller|long_snp_caller|clean_mito|clean_xtea|clean_cnvpytor" main.nf
+rg -n "SINGLE_ALIGNMENT_|INPUT_CSV_|short_snp_caller|long_snp_caller|clean_mito|clean_xtea" main.nf
 rg -n "workflow SINGLE_ALIGNMENT_ALL_NGS|workflow SINGLE_ALIGNMENT_ALL_LONGPHASE|workflow SINGLE_ALIGNMENT_NGS_MITO|workflow SINGLE_ALIGNMENT_LONG_MITO|include \\{" subworkflows/*/main.nf
-rg -n "CNVnator|CNVpytor|xTEA|xtea|merge_shortread_sv_callers|merge_longread_sv_callers" subworkflows modules
+rg -n "CNVnator|xTEA|xtea|merge_shortread_sv_callers|sniffles|longphase" subworkflows modules
 ```

@@ -9,8 +9,6 @@ include { multi_phenosv } from '../../modules/multi_phenosv/'
 include { multi_rankvar } from '../../modules/multi_rankvar/'
 include { multi_rankvar as multi_rankvar_nanocaller } from '../../modules/multi_rankvar/'
 include { multi_sniffles } from '../../modules/multi_sniffles/'
-include { multi_cnvpytor } from '../../modules/multi_cnvpytor/'
-include { multi_merge_longread_sv_callers } from '../../modules/multi_merge_longread_sv_callers/'
 include { multi_clair3 } from '../../modules/multi_clair3/'
 include { multi_nanocaller } from '../../modules/multi_nanocaller/'
 include { multi_nanorepeat } from '../../modules/multi_nanorepeat/'
@@ -137,26 +135,15 @@ workflow INPUT_CSV_ALIGNMENT_ALL_LONGPHASE {
 		rankvar_result=multi_rankvar(join_annovar_hpo,gnomad,gq,ad,rankvar_filter)
 	}
 	sniffles_result=multi_sniffles(input_bam_with_bam,ref_fa)
-	cnvpytor_mode = params.cnvpytor ? params.cnvpytor.toString().trim().toLowerCase() : "no"
-	cnvpytor_baf_mode = params.cnvpytor_baf ? params.cnvpytor_baf.toString().trim().toLowerCase() : "yes"
-	if ( cnvpytor_mode == "yes" ) {
-		cnvpytor_input=input_bam_with_bam.join(snp_result).map { out_prefix, bam_file, bai_file, snp_vcf ->
-			tuple(out_prefix, bam_file, bai_file, snp_vcf)
-		}
-		cnvpytor_reference_conf = Channel.value(params.cnvpytor_reference_conf ? file(params.cnvpytor_reference_conf) : [])
-		cnvpytor_result=multi_cnvpytor(cnvpytor_input,ref_fa,cnvpytor_reference_conf,Channel.value(cnvpytor_baf_mode),Channel.value(params.cnvpytor_bin_sizes),Channel.value(params.cnvpytor_primary_bin),Channel.value(params.cnvpytor_min_size))
-		merged_sv_input=sniffles_result.join(cnvpytor_result.vcf).map { out_prefix, sniffles_vcf, cnvpytor_vcf ->
-			tuple(out_prefix, [sniffles_vcf, cnvpytor_vcf])
-		}
-		sv_result=multi_merge_longread_sv_callers(merged_sv_input)
-	}
-	else {
-		sv_result=sniffles_result
-	}
+	sv_result=sniffles_result
+	sniffles_for_phasing=sniffles_result
 	sv_for_annotation=sv_result
 	if ( denovo_filter == "yes" ) {
 		denovo_sv_result=DENOVO_SV_FILTER_CORE(sv_result,denovo_pedigree,denovo_role_column,denovo_family_column,denovo_vcf_sample_column,denovo_exclude_contigs,denovo_sv_min_reciprocal_overlap)
 		sv_for_annotation=denovo_sv_result.records
+		sniffles_for_phasing=sniffles_result.join(proband_keys, failOnDuplicate: true).map { out_prefix, sniffles_vcf, marker ->
+			tuple(out_prefix, sniffles_vcf)
+		}
 	}
         if ( target == "yes" ) {
 	        sniffles_result_annovar=sv_for_annotation.join(phen2gene_result, failOnMismatch: true, failOnDuplicate: true).join(phen2_gene_bed, failOnMismatch: true, failOnDuplicate: true).map { out_prefix, vcf_file, phen2gene_file, bed_file -> tuple(out_prefix, vcf_file, phen2gene_file, bed_file, "called") }
@@ -175,10 +162,9 @@ workflow INPUT_CSV_ALIGNMENT_ALL_LONGPHASE {
 	phenosv_result=multi_phenosv(phenosv_input)
 	multi_nanorepeat(bam_for_proband_tasks,ref_fa)
 	annovar_join=annovar_for_downstream.map { item -> tuple(item[0], item[2]) }
-	annovar_sv_join=annovar_sv_for_downstream.map { item -> tuple(item[0], item[1]) }
 	join_vcf_bam=annovar_join.join(bam_for_proband_tasks, failOnMismatch: true, failOnDuplicate: true)
-	join_vcf_bam_sv=annovar_sv_join.join(join_vcf_bam)
-	join_vcf_bam_phenosv=phenosv_result.join(join_vcf_bam_sv)
+	join_vcf_bam_sv=sniffles_for_phasing.join(join_vcf_bam, failOnMismatch: true, failOnDuplicate: true)
+	join_vcf_bam_phenosv=phenosv_result.join(join_vcf_bam_sv, failOnMismatch: true, failOnDuplicate: true)
 	join_vcf_bam_rankscore=rankscore_result.join(join_vcf_bam_phenosv)
 	join_vcf_bam_rankvar=rankvar_result.join(join_vcf_bam_rankscore)
 	input_bam_hpo_age=input_bam_no_bam.join(input_meta, failOnMismatch: true, failOnDuplicate: true).map { out_prefix, hpo_path, age_of_onset, sex -> tuple(out_prefix, hpo_path, age_of_onset, sex) }

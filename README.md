@@ -185,7 +185,7 @@ Required:
 - `--mode snp` or `--mode sv`
 - one phenotype source: `--note <FILE>` or `--hpo <FILE>`
 
-Single VCF mode re-annotates and prioritizes an existing VCF. Mitochondrial analysis, xTEA, and CNVpytor require BAM/CRAM input and are not available in VCF-only mode.
+Single VCF mode re-annotates and prioritizes an existing VCF. Mitochondrial analysis and xTEA require BAM/CRAM input and are not available in VCF-only mode.
 
 ### Annotated SNV And Annotated SV
 
@@ -329,17 +329,14 @@ Enable with `--xtea yes`.
 
 The xTEA image is expected to contain the `xtea` command, xTEA scripts under `/opt/xTea/xtea`, the repeat library under `/opt/xtea/rep_lib_annotation`, and the GENCODE GFF3 annotation at `/opt/xtea/gencode.gff3`.
 
-### CNVnator And CNVpytor
+### CNVnator
 
 CNVnator is enabled by default for short-read SV/all-NGS calling with `--cnvnator yes`.
 
-CNVpytor is experimental and disabled by default. Enable with `--cnvpytor yes`.
-
-- Supported only for long-read BAM/CRAM input (`--type ont` or `--type pacbio`).
-- Not supported for VCF-only input, short-read input, targeted CNV interpretation, or mitochondrial CNV interpretation.
-- `--mode sv` runs CNVpytor in read-depth-only mode.
-- Full long-read mode can add SNP/BAF support when SNP calls exist and `--cnvpytor_baf yes`.
-- Calls below the default 100 kb minimum are noisy by default.
+Long-read SV discovery uses Sniffles. Full ONT and PacBio workflows pass the complete
+Sniffles VCF, including supporting read names, to LongPhase. Annotation, common-SV,
+de novo, and phenotype filtering remain a separate evidence branch; only PhenoSV IDs
+that match LongPhase's phased Sniffles output can enter final prioritization.
 
 ### Common-SV Filtering
 
@@ -460,12 +457,6 @@ retain NanoCaller indels without AD. Other callers do not receive the DP fallbac
 | `--annotated_sv` | `no` | Use pre-annotated ANNOVAR SV VCF with annotated SNV + short-read BAM/CRAM |
 | `--cnvnator` | `yes` | Add CNVnator to short-read SV/all-NGS calling |
 | `--cnvnator_bin_size` | `100` | CNVnator read-depth bin size |
-| `--cnvpytor` | `no` | Add experimental CNVpytor to long-read SV/all-longphase BAM/CRAM paths |
-| `--cnvpytor_baf` | `yes` | Use SNP/BAF support for CNVpytor when long-read SNP calls exist |
-| `--cnvpytor_bin_sizes` | `100000` | Space-separated CNVpytor bin sizes |
-| `--cnvpytor_primary_bin` | `100000` | CNVpytor export bin size used for final TSV/VCF |
-| `--cnvpytor_min_size` | `100000` | Minimum CNV size retained from CNVpytor output |
-| `--cnvpytor_reference_conf` | `null` | Optional custom `reference_genomes_conf.py` staged and passed with `-conf`; built-in hg19/hg38 references are detected by CNVpytor from alignment headers |
 | `--xtea` | `no` | Add xTEA mobile-element calling to short-read SV/all-NGS BAM/CRAM paths |
 | `--mito` | `no` | Add mitochondrial analysis for BAM/CRAM input |
 
@@ -505,34 +496,6 @@ nextflow run main.nf \
   --note /data/p1_note.txt \
   --out_prefix p1 \
   --type ont
-```
-
-### Single-Sample Long-Read SV Analysis With CNVpytor
-
-```bash
-nextflow run main.nf \
-  -profile standard \
-  --bam /data/p1_sv.bam \
-  --ref_fa /refs/hg38.fa \
-  --hpo /data/p1_sv_hpo.txt \
-  --out_prefix p1_sv \
-  --type ont \
-  --mode sv \
-  --cnvpytor yes
-```
-
-### Single-Sample Long-Read Full Analysis With CNVpytor SNP/BAF Support
-
-```bash
-nextflow run main.nf \
-  -profile standard \
-  --bam /data/p1_full.bam \
-  --ref_fa /refs/hg38.fa \
-  --hpo /data/p1_full_hpo.txt \
-  --out_prefix p1_full \
-  --type pacbio \
-  --cnvpytor yes \
-  --cnvpytor_baf yes
 ```
 
 ### Single-Sample Short-Read Full Analysis With Mito
@@ -628,12 +591,8 @@ Outputs are published to `--output_directory`. Exact files depend on `--mode`, `
   - `*_xtea.vcf` when `--xtea yes`
   - `*.shortread_sv.merged.vcf`
   - `*.shortread_sv.truvari_collapsed.vcf`
-- Long-read SV/CNV:
-  - `*.sniffles.vcf.gz`
-  - `*.cnvpytor.vcf`
-  - `*.cnvpytor.tsv`
-  - `*.pytor`
-  - `*.longread_sv.merged.vcf`
+- Long-read SV:
+  - `*.sniffles.vcf` (includes `RNAMES` for LongPhase phasing)
 - Downstream SV prioritization:
   - `*.exonic.vcf`
   - `*.phenosv.filtered.tsv` and related filtered artifacts
@@ -664,7 +623,8 @@ Outputs are published to `--output_directory`. Exact files depend on `--mode`, `
 - Short-read mitochondrial analysis also requires a reference dictionary and BWA sidecars: `.dict`, `.amb`, `.ann`, `.bwt`, `.pac`, and `.sa`.
 - The DRAGEN CRAM compatibility path uses `RevertSam --RESTORE_HARDCLIPS false`.
 - xTEA is intended for short-read WGS MEI discovery/genotyping and requires indexed BAM/CRAM input.
-- CNVpytor is experimental for long reads and is intended for large whole-genome CNVs.
+- Long-read raw Sniffles VCFs contain supporting read identifiers and can be larger than VCFs produced without `--output-rnames`.
+- Confirmed trans compound-heterozygous calls require opposite phased genotypes in the same nonmissing phase set; unresolved pairs require `--allow_unphased_comphet yes`.
 - If using Singularity/Docker profiles, ensure `--annovar_host_path` and `--phenosv_host_path` point to valid host locations.
 - External-model PhenoGPT2 support is text-only with optional full upstream negation and `--phenogpt2_wc 0`; vision, training, and BERT chunk filtering are not provisioned.
 - Keep all mounted PhenoGPT2 checkpoints immutable and use a new versioned directory for every model change. PipeVar checks that each configured host directory exists, and the container wrapper uses the upstream loaders to validate model usability. Because Nextflow does not hash model contents during preflight, use a fresh work directory or `-resume` only when the mounted model versions are unchanged.
@@ -692,7 +652,6 @@ Outputs are published to `--output_directory`. Exact files depend on `--mode`, `
 - Sniffles
 - Manta
 - CNVnator
-- CNVpytor
 - xTEA
 - SURVIVOR
 - Truvari

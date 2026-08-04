@@ -5,8 +5,6 @@ include { multi_common_sv_filter } from '../../modules/multi_common_sv_filter/'
 include { multi_survivor } from '../../modules/multi_survivor/'
 include { multi_phenosv } from '../../modules/multi_phenosv/'
 include { multi_sniffles } from '../../modules/multi_sniffles/'
-include { multi_cnvpytor } from '../../modules/multi_cnvpytor/'
-include { multi_merge_longread_sv_callers } from '../../modules/multi_merge_longread_sv_callers/'
 include { multi_nanorepeat } from '../../modules/multi_nanorepeat/'
 include { multi_phenotagger } from '../../modules/multi_phenotagger/'
 include { multi_phenogpt2 } from '../../modules/multi_phenogpt2/'
@@ -35,21 +33,9 @@ workflow INPUT_CSV_ALIGNMENT_LONG_SV {
 	main:
 
         input_bam_no_bam =  input_bam.map { out_prefix, bam_file, bai_file, note_file -> return tuple ( out_prefix,note_file ) }
-        input_bam_with_bam= input_bam.map { out_prefix, bam_file, bai_file, note_file -> return tuple (out_prefix, bam_file, bai_file) }
+	input_bam_with_bam= input_bam.map { out_prefix, bam_file, bai_file, note_file -> return tuple (out_prefix, bam_file, bai_file) }
 	sniffles_result=multi_sniffles(input_bam_with_bam,ref_fa)
-	cnvpytor_mode = params.cnvpytor ? params.cnvpytor.toString().trim().toLowerCase() : "no"
-	if ( cnvpytor_mode == "yes" ) {
-		cnvpytor_input = input_bam_with_bam.map { out_prefix, bam_file, bai_file -> tuple(out_prefix, bam_file, bai_file, bam_file) }
-		cnvpytor_reference_conf = Channel.value(params.cnvpytor_reference_conf ? file(params.cnvpytor_reference_conf) : [])
-		cnvpytor_result=multi_cnvpytor(cnvpytor_input,ref_fa,cnvpytor_reference_conf,Channel.value("no"),Channel.value(params.cnvpytor_bin_sizes),Channel.value(params.cnvpytor_primary_bin),Channel.value(params.cnvpytor_min_size))
-		merged_sv_input=sniffles_result.join(cnvpytor_result.vcf).map { out_prefix, sniffles_vcf, cnvpytor_vcf ->
-			tuple(out_prefix, [sniffles_vcf, cnvpytor_vcf])
-		}
-		sv_result=multi_merge_longread_sv_callers(merged_sv_input)
-	}
-	else {
-		sv_result=sniffles_result
-	}
+	sv_result=sniffles_result
 	sv_for_annotation=sv_result
 	bam_for_proband_tasks=input_bam_with_bam
 	if ( denovo_filter == "yes" ) {

@@ -38,7 +38,6 @@ COMMON OPTIONS
   --light <yes|no>              Use lightweight callers/models where supported
   --mito <yes|no>               Enable mitochondrial analysis for BAM/CRAM input
   --xtea <yes|no>               Enable short-read mobile-element calling
-  --cnvpytor <yes|no>           Enable experimental long-read CNV calling
   --GPU <yes|no>                Enable shared GPU mode for DeepVariant GPU and PhenoGPT2
   --phenotype_extractor <STR>   phenotagger or phenogpt2 for clinical notes
   --phenogpt2_model_host_path   Complete versioned new_model directory (PhenoGPT2 notes)
@@ -52,8 +51,6 @@ COMMON OPTIONS
 NOTES
   - BAM/CRAM inputs require index files (.bai or .crai).
   - Reference FASTA index (.fai) must exist when --ref_fa is supplied.
-  - CNVpytor custom references can use --cnvpytor_reference_conf <reference_genomes_conf.py>;
-    built-in hg19/hg38 references are detected by CNVpytor from alignment headers.
   - Single-file mode requires one phenotype source: --note <FILE> or --hpo <FILE>.
   - PhenoGPT2 clinical-note runs require an external read-only model mount;
     HPO-only inputs do not require a PhenoGPT2 model, cache, or GPU.
@@ -108,9 +105,6 @@ if (clean_gene_filter) {
     }
 }
 def clean_cnvnator = params.cnvnator ? params.cnvnator.toString().trim().toLowerCase() : 'yes'
-def clean_cnvpytor = params.cnvpytor ? params.cnvpytor.toString().trim().toLowerCase() : 'no'
-def clean_cnvpytor_baf = params.cnvpytor_baf ? params.cnvpytor_baf.toString().trim().toLowerCase() : 'yes'
-def clean_cnvpytor_reference_conf = params.cnvpytor_reference_conf ? params.cnvpytor_reference_conf.toString().trim() : null
 def clean_xtea = params.xtea ? params.xtea.toString().trim().toLowerCase() : 'no'
 def clean_mito = params.mito ? params.mito.toString().trim().toLowerCase() : 'no'
 def clean_annotated_snv = params.annotated_snv ? params.annotated_snv.toString().trim().toLowerCase() : 'no'
@@ -576,34 +570,6 @@ if (!valid_yes_no.contains(clean_xtea)) {
     """
 }
 
-if (!valid_yes_no.contains(clean_cnvpytor)) {
-    error """
-    ================================================================
-    ERROR: Invalid CNVpytor Toggle
-    ================================================================
-    You provided: --cnvpytor "${params.cnvpytor}"
-
-    Valid options are:
-      --cnvpytor yes
-      --cnvpytor no
-    ================================================================
-    """
-}
-
-if (!valid_yes_no.contains(clean_cnvpytor_baf)) {
-    error """
-    ================================================================
-    ERROR: Invalid CNVpytor BAF Toggle
-    ================================================================
-    You provided: --cnvpytor_baf "${params.cnvpytor_baf}"
-
-    Valid options are:
-      --cnvpytor_baf yes
-      --cnvpytor_baf no
-    ================================================================
-    """
-}
-
 if (clean_xtea == 'yes') {
     if (params.vcf) {
         error """
@@ -670,56 +636,6 @@ if (clean_mito == 'yes') {
     }
 }
 
-if (clean_cnvpytor == 'yes') {
-    if (params.vcf) {
-        error """
-        ================================================================
-        ERROR: CNVpytor requires BAM/CRAM input
-        ================================================================
-        --cnvpytor yes is only supported for BAM/CRAM input.
-        ================================================================
-        """
-    }
-
-    if (clean_type == 'short') {
-        error """
-        ================================================================
-        ERROR: CNVpytor is long-read only
-        ================================================================
-        --cnvpytor yes currently supports only --type ont or --type pacbio.
-        ================================================================
-        """
-    }
-
-    if (clean_mode == 'snp') {
-        error """
-        ================================================================
-        ERROR: CNVpytor is not available with --mode snp
-        ================================================================
-        Use --mode sv or omit --mode when running --cnvpytor yes.
-        ================================================================
-        """
-    }
-
-    if (clean_mode == 'sv' && clean_cnvpytor_baf == 'yes') {
-        println "WARNING: --cnvpytor_baf yes was requested with --mode sv; CNVpytor will run in RD-only mode for the SV-only long-read branch."
-    }
-
-    if (clean_cnvpytor_reference_conf && !file(clean_cnvpytor_reference_conf).exists()) {
-        error """
-        ================================================================
-        ERROR: CNVpytor Reference Config Not Found
-        ================================================================
-        You provided: --cnvpytor_reference_conf "${params.cnvpytor_reference_conf}"
-
-        Provide an existing CNVpytor reference_genomes_conf.py file, or omit
-        --cnvpytor_reference_conf when using built-in references such as hg19
-        or hg38.
-        ================================================================
-        """
-    }
-}
-
 // CHECK 2c: Validate CNVnator bin size
 if (!(params.cnvnator_bin_size.toString() ==~ /[1-9][0-9]*/)) {
     error """
@@ -734,56 +650,11 @@ if (!(params.cnvnator_bin_size.toString() ==~ /[1-9][0-9]*/)) {
     """
 }
 
-if (!(params.cnvpytor_primary_bin.toString() ==~ /[1-9][0-9]*/)) {
-    error """
-    ================================================================
-    ERROR: Invalid CNVpytor Primary Bin
-    ================================================================
-    You provided: --cnvpytor_primary_bin "${params.cnvpytor_primary_bin}"
-
-    Provide a positive integer, for example:
-      --cnvpytor_primary_bin 100000
-    ================================================================
-    """
-}
-
-if (!(params.cnvpytor_min_size.toString() ==~ /[1-9][0-9]*/)) {
-    error """
-    ================================================================
-    ERROR: Invalid CNVpytor Minimum Size
-    ================================================================
-    You provided: --cnvpytor_min_size "${params.cnvpytor_min_size}"
-
-    Provide a positive integer, for example:
-      --cnvpytor_min_size 100000
-    ================================================================
-    """
-}
-
-def clean_cnvpytor_bin_sizes = params.cnvpytor_bin_sizes ? params.cnvpytor_bin_sizes.toString().trim() : "100000"
-if (!clean_cnvpytor_bin_sizes || !(clean_cnvpytor_bin_sizes ==~ /[1-9][0-9]*(\s+[1-9][0-9]*)*/)) {
-    error """
-    ================================================================
-    ERROR: Invalid CNVpytor Bin Sizes
-    ================================================================
-    You provided: --cnvpytor_bin_sizes "${params.cnvpytor_bin_sizes}"
-
-    Provide one or more positive integers separated by spaces, for example:
-      --cnvpytor_bin_sizes "100000"
-      --cnvpytor_bin_sizes "50000 100000"
-    ================================================================
-    """
-}
-
 params.mode = clean_mode
 params.type = clean_type
 params.light = clean_light
 params.genome = clean_genome
 params.cnvnator = clean_cnvnator
-params.cnvpytor = clean_cnvpytor
-params.cnvpytor_baf = clean_cnvpytor_baf
-params.cnvpytor_bin_sizes = clean_cnvpytor_bin_sizes
-params.cnvpytor_reference_conf = clean_cnvpytor_reference_conf
 params.xtea = clean_xtea
 params.mito = clean_mito
 params.annotated_snv = clean_annotated_snv

@@ -12,9 +12,7 @@
 - Long-read mito uses a mito-specific Clair3 branch and only needs the standard FASTA `.fai` plus BAM/CRAM index.
 - The short-read mitochondrial prep path keeps the current CRAM decode flow and assumes DRAGEN CRAM input was created against the exact supplied reference bundle.
 - The DRAGEN compatibility path uses `gatk RevertSam --RESTORE_HARDCLIPS false` before `bwa mem` realignment.
-- Enable CNVpytor with `--cnvpytor yes` only for long-read BAM/CRAM runs.
-- `--cnvpytor yes` is rejected for VCF-only input, `--type short`, and `--mode snp`.
-- In `--mode sv`, CNVpytor runs in read-depth-only mode and is merged with Sniffles before `ANNOVAR_SV`.
-- In full long-read mode, `--cnvpytor_baf yes` allows CNVpytor to use the branch's existing long-read SNP VCF for SNP/BAF support.
-- CNVpytor is experimental for long reads and intended for large CNVs; calls below 100 kb are noisy by default.
-- CNVpytor is for whole-genome nuclear long-read analysis only; mitochondrial CNV interpretation is out of scope.
+- Long-read BAM/CRAM runs use Sniffles as their structural-variant caller.
+- Full ONT and PacBio workflows send the complete Sniffles VCF with `RNAMES` to LongPhase; targeted, de novo, common-SV, and phenotype filters affect the reporting branch, not the phasing context.
+- PhenoSV evidence is intersected with the phased Sniffles output by exact VCF ID before final prioritization.
+- Confirmed trans compound heterozygotes require matching nonmissing `PS`; missing or different phase sets follow `--allow_unphased_comphet`.

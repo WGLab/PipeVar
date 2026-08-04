@@ -1,12 +1,12 @@
 
 // Phase SNV/SV evidence and aggregate ranked evidence into final prioritized VCF.
 process longphase {
-	container ='beoungl/docker_test:longphase_0.2.29'
+	container ='beoungl/docker_test:longphase_0.2.30'
 
 	input:
 	tuple path(bam_path), path(index)
 	path annovar_vcf
-	path annovar_sv_vcf
+	path sv_phase_vcf
 	path sv_pathogenic
 	path snv_rankscore
 	path snv_pathogenic
@@ -24,14 +24,14 @@ process longphase {
 
 	
 	script:
-	def platform_args = task.ext.args ?: '--ont'
+	def platform_args = task.ext.args != null ? task.ext.args : '--ont'
 	def min_score = params.phenosv_score ?: '0.50'
 	def gene_filter = params.gene ?: ''
 	def sv_only = params.prioritize_sv_only ?: 'no'
 
 
 		"""
-		/longphase_linux-x64 phase -s $annovar_vcf --sv-file=$annovar_sv_vcf -t ${task.cpus} -o ${out_prefix}_phased $platform_args -b $bam_path -r $ref_fa
+		/longphase_linux-x64 phase -s $annovar_vcf --sv-file=$sv_phase_vcf -t ${task.cpus} -o ${out_prefix}_phased $platform_args -b $bam_path -r $ref_fa
 
 		/longphase_linux-x64 haplotag -r $ref_fa -s ${out_prefix}_phased.vcf --sv-file ${out_prefix}_phased_SV.vcf -b $bam_path -t ${task.cpus} -o ${out_prefix}_haplotag
 

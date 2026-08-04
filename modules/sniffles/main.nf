@@ -1,7 +1,7 @@
 
 // Call structural variants from long-read alignments using Sniffles.
 process sniffles {
-        container ='beoungl/docker_test:sniffles'
+        container ='beoungl/docker_test:sniffles_0.1'
 
 
         input:
@@ -15,13 +15,10 @@ process sniffles {
 	script: 
 	"""
 
-	source /conda/etc/profile.d/conda.sh
-	conda activate sniffles
-	sniffles --allow-overwrite --input $bam --vcf ${out_prefix}.sniffles.vcf --reference $ref_fa
+	sniffles --allow-overwrite --output-rnames --input $bam --vcf ${out_prefix}.sniffles.vcf --reference $ref_fa
 
 	"""
 
 }
-
 
 

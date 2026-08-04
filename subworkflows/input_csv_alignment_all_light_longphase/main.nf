@@ -87,10 +87,9 @@ workflow INPUT_CSV_ALIGNMENT_ALL_LIGHT_LONGPHASE {
 	phenosv_result=multi_phenosv(phenosv_input)
 	multi_nanorepeat(input_bam_with_bam,ref_fa)
 	annovar_join=annovar_result.map { item -> tuple(item[0], item[2]) }
-        annovar_sv_join=annovar_sv_result.map { item -> tuple(item[0], item[1]) }
-	join_vcf_bam=annovar_join.join(input_bam_with_bam)
-	join_vcf_bam_sv=annovar_sv_join.join(join_vcf_bam)
-	join_vcf_bam_phenosv=phenosv_result.join(join_vcf_bam_sv)
+	join_vcf_bam=annovar_join.join(input_bam_with_bam, failOnMismatch: true, failOnDuplicate: true)
+	join_vcf_bam_sv=sniffles_result.join(join_vcf_bam, failOnMismatch: true, failOnDuplicate: true)
+	join_vcf_bam_phenosv=phenosv_result.join(join_vcf_bam_sv, failOnMismatch: true, failOnDuplicate: true)
 	join_vcf_bam_rankscore=rankscore_result.join(join_vcf_bam_phenosv)
 	join_vcf_bam_rankvar=rankvar_result.join(join_vcf_bam_rankscore)
 	input_bam_hpo_age=input_bam_no_bam.join(input_meta).map { out_prefix, hpo_path, age_of_onset, sex -> tuple(out_prefix, hpo_path, age_of_onset, sex) }

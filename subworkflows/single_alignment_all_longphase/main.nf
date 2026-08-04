@@ -3,8 +3,6 @@
 include { sniffles } from '../../modules/sniffles/'
 include { clair3 } from '../../modules/clair3/'
 include { nanocaller } from '../../modules/nanocaller/'
-include { CNVpytor } from '../../modules/cnvpytor/'
-include { merge_longread_sv_callers } from '../../modules/merge_longread_sv_callers/'
 include { SURVIVOR } from '../../modules/survivor/'
 include { PhenoSV } from '../../modules/phenosv/'
 include { ANNOVAR } from '../../modules/annovar/'
@@ -89,22 +87,8 @@ workflow SINGLE_ALIGNMENT_ALL_LONGPHASE {
 	}
 	rankscore_result=Rankscore_analysis(ANNOVAR.out.txt_output,Phen2gene.out,out_prefix,gnomad,rankscore_filter,rankscore_softwares,gq,phen2gene_top_n)
 	sniffles(bam,out_prefix,ref_fa)
-	cnvpytor_mode = params.cnvpytor ? params.cnvpytor.toString().trim().toLowerCase() : "no"
-	cnvpytor_baf_mode = params.cnvpytor_baf ? params.cnvpytor_baf.toString().trim().toLowerCase() : "yes"
-	if ( cnvpytor_mode == "yes" ) {
-		cnvpytor_reference_conf = Channel.value(params.cnvpytor_reference_conf ? file(params.cnvpytor_reference_conf) : [])
-		CNVpytor(bam,out_prefix,ref_fa,cnvpytor_reference_conf,snp_vcf,Channel.value(cnvpytor_baf_mode),Channel.value(params.cnvpytor_bin_sizes),Channel.value(params.cnvpytor_primary_bin),Channel.value(params.cnvpytor_min_size))
-		sv_merge_inputs = sniffles.out.combine(CNVpytor.out.vcf).map { combined_vcfs ->
-			combined_vcfs.flatten()
-		}
-		merge_longread_sv_callers(sv_merge_inputs,out_prefix)
-		sv_vcf = merge_longread_sv_callers.out
-	}
-	else {
-		sv_vcf = sniffles.out
-	}
 	annovar_sv_bed = (target == "yes") ? phen2_gene_bed : target
-	ANNOVAR_SV(sv_vcf,out_prefix,Phen2gene.out,annovar_sv_bed,"called")
+	ANNOVAR_SV(sniffles.out,out_prefix,Phen2gene.out,annovar_sv_bed,"called")
 	annovar_sv_for_downstream = ANNOVAR_SV.out
 	if ( params.common_sv_filter.toString().trim().toLowerCase() == "yes" ) {
 		common_sv_filter(ANNOVAR_SV.out,out_prefix)
@@ -113,7 +97,7 @@ workflow SINGLE_ALIGNMENT_ALL_LONGPHASE {
 	SURVIVOR(annovar_sv_for_downstream,out_prefix)
 	PhenoSV(SURVIVOR.out,out_prefix,hpo)
 	NanoRepeat(bam,out_prefix,ref_fa)
-	longphase(bam,ANNOVAR.out.vcf_output,annovar_sv_for_downstream,PhenoSV.out,rankscore_result.rankscore,rankscore_result.clinvar,rankvar_result,hpo,out_prefix,ref_fa,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
+	longphase(bam,ANNOVAR.out.vcf_output,sniffles.out,PhenoSV.out,rankscore_result.rankscore,rankscore_result.clinvar,rankvar_result,hpo,out_prefix,ref_fa,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
 	if ( mito_mode == "yes" ) {
 		variant_html_report_with_mito(out_prefix, longphase.out[0], longphase.out[1], NanoRepeat.out, mito_tsv)
 	}

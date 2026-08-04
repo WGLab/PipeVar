@@ -1,10 +1,10 @@
 
 // Batch longphase phasing and evidence aggregation into prioritized VCFs.
 process multi_longphase {
-	container ='beoungl/docker_test:longphase_0.2.29'
+	container ='beoungl/docker_test:longphase_0.2.30'
 
 	input:
-	tuple val(out_prefix), path(snv_rankvar), path(snv_rankscore), path(snv_pathogenic), path(sv_pathogenic), path(sv_vcf_path), path(snv_vcf_path), path(bam_path), path(bam_index), path(hpo_path), val(age_of_onset), val(sex)
+	tuple val(out_prefix), path(snv_rankvar), path(snv_rankscore), path(snv_pathogenic), path(sv_pathogenic), path(sv_phase_vcf), path(snv_vcf_path), path(bam_path), path(bam_index), path(hpo_path), val(age_of_onset), val(sex)
 	tuple path(ref_fa), path(fa_index)
 
 	val(inheritance_mode)
@@ -15,7 +15,7 @@ process multi_longphase {
 	tuple path("${out_prefix}.prio.vcf"), path("${out_prefix}.prio_gene.vcf"), path("${out_prefix}_haplotag.bam")
 	
 	script:
-	def platform_args = task.ext.args ?: '--ont'
+	def platform_args = task.ext.args != null ? task.ext.args : '--ont'
 	def min_score = params.phenosv_score ?: '0.50'
 	def gene_filter = params.gene ?: ''
 	def sv_only = params.prioritize_sv_only ?: 'no'
@@ -27,7 +27,7 @@ process multi_longphase {
 	#Join the bam path, vcfs and output files
 
 
-		/longphase_linux-x64 phase -s $snv_vcf_path --sv-file=$sv_vcf_path -t ${task.cpus} -o ${out_prefix}_phased $platform_args -b $bam_path -r $ref_fa
+		/longphase_linux-x64 phase -s $snv_vcf_path --sv-file=$sv_phase_vcf -t ${task.cpus} -o ${out_prefix}_phased $platform_args -b $bam_path -r $ref_fa
 
 		/longphase_linux-x64 haplotag -r $ref_fa -s ${out_prefix}_phased.vcf --sv-file ${out_prefix}_phased_SV.vcf -b $bam_path -t ${task.cpus} -o ${out_prefix}_haplotag
 
