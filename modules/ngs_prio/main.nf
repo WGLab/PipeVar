@@ -1,7 +1,7 @@
 
 // Integrate NGS SNV/SV evidence and produce a prioritized VCF.
 process ngs_prio {
-	container ='beoungl/docker_test:longphase_0.2.29'
+	container ='beoungl/docker_test:longphase_0.2.31'
 
 	input:
 	val(out_prefix)
@@ -31,7 +31,7 @@ process ngs_prio {
 
 	#No bam file processing, so only sv + snp processing.
 
-        bash /phenosv_vcf_and_tsv.sh $sv_pathogenic $sv_vcf_path $out_prefix
+	        bash /phenosv_vcf_and_tsv.sh $sv_pathogenic $sv_vcf_path $sv_vcf_path $out_prefix
 	mv ${out_prefix}.phenosv.vcf ${out_prefix}.phenosv.unfiltered.vcf
 	python3 /filter_phenosv_vcf.py ${out_prefix}.phenosv.unfiltered.vcf ${out_prefix}.phenosv.vcf --min-score $min_score --genes "$gene_filter"
 

@@ -1,7 +1,7 @@
 
 // Batch SV evidence merging (PhenoSV + SV annotation) to prioritized VCF.
 process multi_sv_prio {
-	container ='beoungl/docker_test:longphase_0.2.29'
+	container ='beoungl/docker_test:longphase_0.2.31'
 
 	input:
 	tuple val(out_prefix), path(sv_pathogenic), path(annovar_sv_vcf), path(hpo_path), val(age_of_onset), val(sex)
@@ -22,7 +22,7 @@ process multi_sv_prio {
 	"""
 	#Final process to organize the results and show them in ACMG guideline format; might take long to develop.
 
-	bash /phenosv_vcf_and_tsv.sh $sv_pathogenic $annovar_sv_vcf $out_prefix
+		bash /phenosv_vcf_and_tsv.sh $sv_pathogenic $annovar_sv_vcf $annovar_sv_vcf $out_prefix
 	mv ${out_prefix}.phenosv.vcf ${out_prefix}.phenosv.unfiltered.vcf
 	python3 /filter_phenosv_vcf.py ${out_prefix}.phenosv.unfiltered.vcf ${out_prefix}.phenosv.vcf --min-score $min_score --genes "$gene_filter"
 

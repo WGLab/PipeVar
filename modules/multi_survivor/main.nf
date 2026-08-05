@@ -21,7 +21,7 @@ process multi_survivor {
 
 	# Always emit a BED output. If no SV rows pass filters, keep header-only file.
 	{
-	    echo -e "#chrom\tstart\tend\tsvtype\tgene"
+	    echo -e "#CHROM\tSTART\tEND\tID\tSVTYPE"
 	    awk -F'\t' -v OFS='\t' '{print \$1,\$2,\$5,\$7,\$11}' ${out_prefix}.int.bed | \
 	    sed -e 's/\\bINS\\b/insertion/g' \
 	        -e 's/\\bDEL\\b/deletion/g' \

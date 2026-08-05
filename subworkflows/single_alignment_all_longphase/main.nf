@@ -97,7 +97,7 @@ workflow SINGLE_ALIGNMENT_ALL_LONGPHASE {
 	SURVIVOR(annovar_sv_for_downstream,out_prefix)
 	PhenoSV(SURVIVOR.out,out_prefix,hpo)
 	NanoRepeat(bam,out_prefix,ref_fa)
-	longphase(bam,ANNOVAR.out.vcf_output,sniffles.out,PhenoSV.out,rankscore_result.rankscore,rankscore_result.clinvar,rankvar_result,hpo,out_prefix,ref_fa,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
+	longphase(bam,ANNOVAR.out.vcf_output,sniffles.out,annovar_sv_for_downstream,PhenoSV.out,rankscore_result.rankscore,rankscore_result.clinvar,rankvar_result,hpo,out_prefix,ref_fa,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
 	if ( mito_mode == "yes" ) {
 		variant_html_report_with_mito(out_prefix, longphase.out[0], longphase.out[1], NanoRepeat.out, mito_tsv)
 	}

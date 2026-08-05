@@ -163,7 +163,7 @@ workflow INPUT_CSV_ALIGNMENT_ALL_LONGPHASE {
 	multi_nanorepeat(bam_for_proband_tasks,ref_fa)
 	annovar_join=annovar_for_downstream.map { item -> tuple(item[0], item[2]) }
 	join_vcf_bam=annovar_join.join(bam_for_proband_tasks, failOnMismatch: true, failOnDuplicate: true)
-	join_vcf_bam_sv=sniffles_for_phasing.join(join_vcf_bam, failOnMismatch: true, failOnDuplicate: true)
+	join_vcf_bam_sv=sniffles_for_phasing.join(annovar_sv_for_downstream, failOnMismatch: true, failOnDuplicate: true).join(join_vcf_bam, failOnMismatch: true, failOnDuplicate: true)
 	join_vcf_bam_phenosv=phenosv_result.join(join_vcf_bam_sv, failOnMismatch: true, failOnDuplicate: true)
 	join_vcf_bam_rankscore=rankscore_result.join(join_vcf_bam_phenosv)
 	join_vcf_bam_rankvar=rankvar_result.join(join_vcf_bam_rankscore)

@@ -335,8 +335,10 @@ CNVnator is enabled by default for short-read SV/all-NGS calling with `--cnvnato
 
 Long-read SV discovery uses Sniffles. Full ONT and PacBio workflows pass the complete
 Sniffles VCF, including supporting read names, to LongPhase. Annotation, common-SV,
-de novo, and phenotype filtering remain a separate evidence branch; only PhenoSV IDs
-that match LongPhase's phased Sniffles output can enter final prioritization.
+de novo, and phenotype filtering remain a separate evidence branch. PipeVar uses the
+whole-event PhenoSV score from the `Elements=SV` row, obtains gene symbols from the
+curated ANNOVAR `Gene.refGene` annotation, and joins both to LongPhase's phased
+Sniffles output by exact VCF ID.
 
 ### Common-SV Filtering
 
@@ -595,7 +597,11 @@ Outputs are published to `--output_directory`. Exact files depend on `--mode`, `
   - `*.sniffles.vcf` (includes `RNAMES` for LongPhase phasing)
 - Downstream SV prioritization:
   - `*.exonic.vcf`
-  - `*.phenosv.filtered.tsv` and related filtered artifacts
+  - `*.phenosv.filtered.tsv`, with one whole-SV row per passing event and columns
+    `SV_ID`, `CHROM`, `START`, `END`, `SVTYPE`, `PATHOGENICITY`, `PHEN2GENE`,
+    `PHENOSV_SCORE`, and `PHENOSV_TYPE`
+  - Final prioritized VCFs use ANNOVAR genes with the event-level `PHENO_SCORE`;
+    PhenoSV gene-row scores are not used as independent evidence.
 
 ### Repeat Expansion Outputs
 

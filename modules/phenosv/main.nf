@@ -1,7 +1,7 @@
 
 // Score and prioritize structural variants with phenotype-aware PhenoSV model.
 process PhenoSV {
-        container ='beoungl/docker_test:phenosv'
+        container ='beoungl/docker_test:phenosv_0.1'
 
 
 	input:
@@ -30,35 +30,21 @@ process PhenoSV {
 
 	mkdir -p \$phenosv_dir
 
-	# If upstream SV filtering produced no records, emit an empty output and continue.
-	# Header/comment-only BED should be treated as empty input.
+	# Always emit the canonical event TSV header, including for empty SV input.
 	data_rows=\$(awk 'NF && \$0 !~ /^#/' $bed | wc -l)
 	if [[ ! -s $bed ]] || [[ \$data_rows -eq 0 ]]; then
-	    : > ${out_prefix}.phenosv.filtered.tsv
+	    printf 'SV_ID\tCHROM\tSTART\tEND\tSVTYPE\tPATHOGENICITY\tPHEN2GENE\tPHENOSV_SCORE\tPHENOSV_TYPE\n' > ${out_prefix}.phenosv.filtered.tsv
 	    exit 0
 	fi
 
 
 	python3 /opt/PhenoSV/phenosv/model/phenosv.py --sv_file $bed $args --target_folder ${out_prefix}_phenosv --target_file_name  \$phenosv_dir/phenosv_out --HPO "\$HPO_STRING"
 
-	awk -F',' -v min_score="$min_score" '\$6+0 >= min_score && \$7 != ""' \$phenosv_dir/phenosv_out.csv | awk -F',' '{print \$7"\t"\$0}' | sort -k1,1 > ${out_prefix}_phenosv_top.join.tsv || true
-
-	sort -k4,4 $bed > ${out_prefix}.sorted.bed
-
-	if [[ ! -s ${out_prefix}_phenosv_top.join.tsv ]]; then
-	    : > ${out_prefix}.phenosv.filtered.tsv
-	else
-
-	join -t\$'\t' -1 1 -2 4 ${out_prefix}_phenosv_top.join.tsv ${out_prefix}.sorted.bed | awk -F'\t' 'BEGIN{OFS="\t"} { id=\$1; \$1=""; sub(/^\t/, ""); print \$0, id}' | sed 's/,/\t/g' | awk -F'\t' 'BEGIN{OFS="\t"} {print \$8,\$9,\$10,\$12,\$3,\$4,\$5,\$6}' > ${out_prefix}.phenosv.filtered.tsv || true
-
-	# `join` returns non-zero when there are no overlaps; keep pipeline alive with empty output.
-	if [[ ! -s ${out_prefix}.phenosv.filtered.tsv ]]; then
-	    : > ${out_prefix}.phenosv.filtered.tsv
-	fi
-	fi
-
-	rm -f ${out_prefix}_phenosv_top.join.tsv
-	rm -f ${out_prefix}.sorted.bed
+	python3 /normalize_phenosv_events.py \
+	    \$phenosv_dir/phenosv_out.csv \
+	    $bed \
+	    ${out_prefix}.phenosv.filtered.tsv \
+	    --min-score "$min_score"
 
 
 	
