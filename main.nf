@@ -49,8 +49,8 @@ COMMON OPTIONS
   --nanocaller_dp <NUMBER>      Missing-GQ NanoCaller depth threshold (default: 20)
   --include_clinvar_report      Include/exclude ClinVar-exclusive report entries;
                                 P/LP classification is unchanged (default: yes)
-  --allow_unphased_comphet      Permit unresolved AR pairs (default: no); proven
-                                same-phase-set cis pairs are always rejected
+  --allow_unphased_comphet      Permit unresolved AR pairs (default: no); PS is
+                                optional and missing PS falls back to phased GT
 
 NOTES
   - BAM/CRAM inputs require index files (.bai or .crai).
@@ -60,6 +60,8 @@ NOTES
     HPO-only inputs do not require a PhenoGPT2 model, cache, or GPU.
   - PhenoSV receives simple DEL/DUP/INV/INS events as BED and BND/TRA
     adjacencies as BEDPE. Light mode warns that translocation accuracy is reduced.
+  - Valid PS metadata is retained when present. Missing or malformed PS uses GT
+    orientation; different valid phase sets remain unresolved.
   - Detailed input schemas, parameter defaults, examples, and outputs are in README.md.
 ================================================================================
 """

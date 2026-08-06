@@ -373,7 +373,7 @@ the pinned upstream implementation still applies its deletion-like internal dupl
 transformation. The reserved `survivor_0.1` and `phenosv_0.2` images must be built before
 these paths can run.
 
-This repair also reserves `rankscore_0.2.22`, `longphase_0.2.32`, and
+This repair also reserves `rankscore_0.2.22`, `longphase_0.2.33`, and
 `mito_annotation_0.4.2`. These tags are intentionally unpublished in this source change;
 a post-build mixed DEL/DUP/INV/INS/BND smoke test is a release gate before publication.
 
@@ -390,14 +390,19 @@ Compound-heterozygous evaluation follows this phase contract:
 
 | Pair state | Result |
 | --- | --- |
-| Same nonmissing PS, opposite phased orientations (`1|0` + `0|1`) | Confirmed trans; accepted |
-| Same nonmissing PS, same known phased orientation | Proven cis; always rejected |
-| Missing or different PS | Unresolved; requires `--allow_unphased_comphet yes` |
+| Same valid PS, opposite phased orientations (`1|0` + `0|1`) | Confirmed trans; accepted |
+| Same valid PS, same phased orientation | Proven cis; always rejected |
+| Different valid PS values | Unresolved; requires `--allow_unphased_comphet yes` |
+| Either PS missing or malformed, opposite phased orientations | GT-orientation trans; accepted |
+| Either PS missing or malformed, same phased orientation | GT-orientation cis; always rejected |
 | Slash-unphased pair | Unresolved; requires the opt-in |
 | Mixed phased and slash-unphased pair | Unresolved; requires the opt-in |
 
-SNP-only assignment resolves both `GT` and `PS` through FORMAT field names, including
-`GT:PS` and `PS:GT`, and preserves the original VCF ID and phase set through merging.
+Assignment resolves `GT` and optional `PS` through FORMAT field names, including
+`GT:PS` and `PS:GT`. Valid integer PS values and original VCF IDs are preserved;
+missing PS is accepted, while malformed PS is warned, omitted, and evaluated using GT.
+GT orientation without a shared phase block is a heuristic: orientation may flip between
+blocks, so GT-fallback trans/cis labels are not equivalent to shared-PS confirmation.
 
 ### Common-SV Filtering
 
@@ -477,7 +482,7 @@ Defaults below come from `nextflow.config`.
 | `--gnomad` | `0.0001` | Maximum gnomAD AF for SNP prioritization |
 | `--inheritance_mode` | `ml` | `ml`, `omim`, or `gnomad`; `gnomad` maps to LOEUF fallback lists |
 | `--include_clinvar_report` | `yes` | Include ClinVar-only calls in final prioritized outputs |
-| `--allow_unphased_comphet` | `no` | Allow unresolved AR pairs (missing/different PS, slash-unphased, or mixed phased/unphased); proven cis pairs remain excluded |
+| `--allow_unphased_comphet` | `no` | Allow unresolved AR pairs with different valid PS, slash-unphased GT, or mixed phased/unphased GT; GT fallback handles missing/malformed PS |
 | `--prioritize_sv_only` | `no` | In combined final prioritization, report only SV/PhenoSV evidence |
 | `--rankscore` | `0.50` | Minimum RankScore cutoff |
 | `--rankscore_softwares` | `null` | Comma-separated RankScore software list; null means all built-in tools |
@@ -689,7 +694,7 @@ Outputs are published to `--output_directory`. Exact files depend on `--mode`, `
 - The DRAGEN CRAM compatibility path uses `RevertSam --RESTORE_HARDCLIPS false`.
 - xTEA is intended for short-read WGS MEI discovery/genotyping and requires indexed BAM/CRAM input.
 - Long-read raw Sniffles VCFs contain supporting read identifiers and can be larger than VCFs produced without `--output-rnames`.
-- Confirmed trans compound-heterozygous calls require opposite phased genotypes in the same nonmissing phase set; proven same-set/same-orientation cis pairs are always rejected, and all unresolved pair states require `--allow_unphased_comphet yes`.
+- Compound-heterozygous calls use matching valid PS when available and otherwise fall back to pipe-phased GT orientation. Different valid PS values, slash-unphased GT, and mixed phased/unphased GT require `--allow_unphased_comphet yes`; same-orientation cis pairs are rejected unless their valid PS values differ, in which case the pair is unresolved.
 - If using Singularity/Docker profiles, ensure `--annovar_host_path` and `--phenosv_host_path` point to valid host locations.
 - External-model PhenoGPT2 support is text-only with optional full upstream negation and `--phenogpt2_wc 0`; vision, training, and BERT chunk filtering are not provisioned.
 - Keep all mounted PhenoGPT2 checkpoints immutable and use a new versioned directory for every model change. PipeVar checks that each configured host directory exists, and the container wrapper uses the upstream loaders to validate model usability. Because Nextflow does not hash model contents during preflight, use a fresh work directory or `-resume` only when the mounted model versions are unchanged.

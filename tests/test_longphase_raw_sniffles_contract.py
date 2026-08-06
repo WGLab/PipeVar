@@ -37,7 +37,7 @@ class RawSnifflesLongPhaseContractTests(unittest.TestCase):
         actual = {
             path
             for path in (REPO / "modules").glob("*/main.nf")
-            if "longphase_0.2.32" in path.read_text(encoding="utf-8")
+            if "longphase_0.2.33" in path.read_text(encoding="utf-8")
         }
         self.assertEqual(expected, actual)
         for path in (REPO / "modules/longphase/main.nf", REPO / "modules/multi_longphase/main.nf"):
@@ -106,18 +106,23 @@ class RawSnifflesLongPhaseContractTests(unittest.TestCase):
         self.assertIn("quay.io/biocontainers/cnvpytor:1.3.2--pyhdfd78af_0", read(retained[0]))
         self.assertIn("quay.io/biocontainers/cnvpytor:1.3.2--pyhdfd78af_0", read(retained[1]))
 
-    def test_longphase_container_preserves_ps_and_requires_same_phase_set(self):
+    def test_longphase_container_treats_ps_as_optional_metadata(self):
         assign = (DOCKER_WORK / "longphase/assign_dom_or_rec.py").read_text(encoding="utf-8")
         assign_sv = (DOCKER_WORK / "longphase/assign_dom_or_rec_sv_only.py").read_text(encoding="utf-8")
         prioritizer = (DOCKER_WORK / "longphase/prio_gene_only.py").read_text(encoding="utf-8")
         assign_snp = (DOCKER_WORK / "longphase/assign_dom_or_rec_snp_only.py").read_text(encoding="utf-8")
         for source in (assign, assign_sv, assign_snp):
             self.assertIn('header.formats.add("PS"', source)
+            self.assertIn("from phase_set import normalize_optional_ps, write_optional_ps", source)
+            self.assertIn("write_optional_ps(", source)
             self.assertRegex(source, r"row(?:\[|\.get\()['\"]ps['\"]")
             self.assertRegex(source, r"'id': (?:parts\[2\]|record_id)")
             self.assertIn("rec.id = str(row['id'])", source)
-        self.assertIn("ps1 is not None and ps1 == ps2", prioritizer)
-        self.assertIn("Every other non-trans heterozygous pairing is unresolved", prioritizer)
+        dockerfile = (DOCKER_WORK / "longphase/Dockerfile").read_text(encoding="utf-8")
+        self.assertIn("COPY phase_set.py phase_set.py", dockerfile)
+        self.assertIn("if ps1 is not None and ps2 is not None", prioritizer)
+        self.assertIn("return ps1 == ps2", prioritizer)
+        self.assertIn("using GT only", (DOCKER_WORK / "longphase/phase_set.py").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

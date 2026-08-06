@@ -45,7 +45,7 @@ class RepairContractTests(unittest.TestCase):
         pinned = {
             path.parent.name
             for path in (REPO / "modules").glob("*/main.nf")
-            if "longphase_0.2.32" in path.read_text(encoding="utf-8")
+            if "longphase_0.2.33" in path.read_text(encoding="utf-8")
         }
         self.assertEqual(prioritization, pinned)
         for merge_module in (
@@ -53,7 +53,7 @@ class RepairContractTests(unittest.TestCase):
             "merge_shortread_sv_callers", "multi_merge_shortread_sv_callers",
         ):
             self.assertNotIn(
-                "longphase_0.2.32",
+                "longphase_0.2.33",
                 (REPO / "modules" / merge_module / "main.nf").read_text(encoding="utf-8"),
             )
 
