@@ -1,0 +1,9 @@
+##fileformat=VCFv4.2
+##contig=<ID=chr1,length=1000000>
+##contig=<ID=chr2,length=1000000>
+##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Structural variant type">
+##INFO=<ID=MATEID,Number=.,Type=String,Description="Mate breakend IDs">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	sample
+chr1	150	manta_bnd_1	N	N]chr2:250]	60	PASS	SVTYPE=BND;MATEID=manta_bnd_2	GT	0/1
+chr2	250	manta_bnd_2	N	[chr1:150[N	60	PASS	SVTYPE=BND;MATEID=manta_bnd_1	GT	0/1

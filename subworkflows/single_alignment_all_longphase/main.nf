@@ -85,7 +85,7 @@ workflow SINGLE_ALIGNMENT_ALL_LONGPHASE {
 		RankVar(ANNOVAR.out.txt_output,Phen2gene.out,hpo,out_prefix,gnomad,gq,ad,rankvar_filter)
 		rankvar_result = RankVar.out
 	}
-	rankscore_result=Rankscore_analysis(ANNOVAR.out.txt_output,Phen2gene.out,out_prefix,gnomad,rankscore_filter,rankscore_softwares,gq,phen2gene_top_n)
+	rankscore_result=Rankscore_analysis(ANNOVAR.out.txt_output,Phen2gene.out,out_prefix,gnomad,rankscore_filter,rankscore_softwares,gq,ad,phen2gene_top_n)
 	sniffles(bam,out_prefix,ref_fa)
 	annovar_sv_bed = (target == "yes") ? phen2_gene_bed : target
 	ANNOVAR_SV(sniffles.out,out_prefix,Phen2gene.out,annovar_sv_bed,"called")
@@ -95,7 +95,7 @@ workflow SINGLE_ALIGNMENT_ALL_LONGPHASE {
 		annovar_sv_for_downstream = common_sv_filter.out.filtered_vcf
 	}
 	SURVIVOR(annovar_sv_for_downstream,out_prefix)
-	PhenoSV(SURVIVOR.out,out_prefix,hpo)
+	PhenoSV(SURVIVOR.out.phenosv_inputs,out_prefix,hpo)
 	NanoRepeat(bam,out_prefix,ref_fa)
 	longphase(bam,ANNOVAR.out.vcf_output,sniffles.out,annovar_sv_for_downstream,PhenoSV.out,rankscore_result.rankscore,rankscore_result.clinvar,rankvar_result,hpo,out_prefix,ref_fa,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
 	if ( mito_mode == "yes" ) {

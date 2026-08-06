@@ -1,7 +1,7 @@
 
 // Batch RankScore filtering and ClinVar extraction from ANNOVAR outputs.
 process multi_rankscore {
-	container ='beoungl/docker_test:rankscore_0.2.21'
+	container ='beoungl/docker_test:rankscore_0.2.22'
 
 
 	input:
@@ -10,6 +10,7 @@ process multi_rankscore {
 	val rankscore_filter
 	val rankscore_softwares
 	val gq
+	val ad
 	val phen2gene_top_n
 
 	output:
@@ -18,7 +19,7 @@ process multi_rankscore {
 	"""
 
 
-	bash /rankscore/clinvar.sh $annovar_output $phen2_gene $out_prefix $gnomad_af $rankscore_filter $phen2gene_top_n $gq $rankscore_softwares
+	bash /rankscore/clinvar.sh $annovar_output $phen2_gene $out_prefix $gnomad_af $rankscore_filter $phen2gene_top_n $gq $ad $rankscore_softwares
 
 	"""
 }

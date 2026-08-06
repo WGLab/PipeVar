@@ -72,7 +72,7 @@ workflow INPUT_CSV_ALIGNMENT_ALL_LIGHT_LONGPHASE {
 	annovar_result_txt=annovar_result.map { item -> tuple(item[0], item[1]) }
 	join_annovar_phen2gene=annovar_result_txt.join(phen2gene_result)
 	join_annovar_hpo=join_annovar_phen2gene.join(input_bam_no_bam)
-	rankscore_result=multi_rankscore(join_annovar_phen2gene,gnomad,rankscore_filter,rankscore_softwares,gq,phen2gene_top_n)
+	rankscore_result=multi_rankscore(join_annovar_phen2gene,gnomad,rankscore_filter,rankscore_softwares,gq,ad,phen2gene_top_n)
 	rankvar_result=multi_rankvar(join_annovar_hpo,gnomad,gq,ad,rankvar_filter)
 	sniffles_result=multi_sniffles(input_bam_with_bam,ref_fa)
         if ( target == "yes" ) {

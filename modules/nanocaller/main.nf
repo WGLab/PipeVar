@@ -1,7 +1,7 @@
 
 // Call SNP/indel variants from long-read alignments using NanoCaller.
 process nanocaller {
-        container ='beoungl/docker_test:nanocaller_0.1'
+        container ='beoungl/docker_test:nanocaller_0.3'
 
 
         input:
@@ -38,4 +38,3 @@ process nanocaller {
 
 
 }
-

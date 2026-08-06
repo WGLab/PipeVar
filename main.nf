@@ -47,6 +47,10 @@ COMMON OPTIONS
   --out_prefix <STRING>         Single-sample output prefix
   --output_directory <DIR>      Publish directory
   --nanocaller_dp <NUMBER>      Missing-GQ NanoCaller depth threshold (default: 20)
+  --include_clinvar_report      Include/exclude ClinVar-exclusive report entries;
+                                P/LP classification is unchanged (default: yes)
+  --allow_unphased_comphet      Permit unresolved AR pairs (default: no); proven
+                                same-phase-set cis pairs are always rejected
 
 NOTES
   - BAM/CRAM inputs require index files (.bai or .crai).
@@ -54,6 +58,8 @@ NOTES
   - Single-file mode requires one phenotype source: --note <FILE> or --hpo <FILE>.
   - PhenoGPT2 clinical-note runs require an external read-only model mount;
     HPO-only inputs do not require a PhenoGPT2 model, cache, or GPU.
+  - PhenoSV receives simple DEL/DUP/INV/INS events as BED and BND/TRA
+    adjacencies as BEDPE. Light mode warns that translocation accuracy is reduced.
   - Detailed input schemas, parameter defaults, examples, and outputs are in README.md.
 ================================================================================
 """
@@ -164,7 +170,7 @@ def manifestPhenotypeFormats = [] as Set
 def manifestAnnotatedRowsWithAlignment = 0
 def manifestAnnotatedRowsWithoutAlignment = 0
 def manifestAnnotatedRowsWithPreannotatedSv = 0
-def manifestAnnotatedRowsWithCalledSv = 0
+def manifestAnnotatedRowsWithoutPreannotatedSv = 0
 
 if (params.input_csv) {
     def manifestFile = file(params.input_csv)
@@ -241,18 +247,18 @@ if (params.input_csv) {
                         error "ERROR: Unified input CSV sample '${sample}' requires alignment_path ending in .bam or .cram when provided with input_kind=annotated_snv."
                     }
                     manifestAnnotatedRowsWithAlignment += 1
-                    if (svVcfPath) {
-                        manifestAnnotatedRowsWithPreannotatedSv += 1
-                    }
-                    else {
-                        manifestAnnotatedRowsWithCalledSv += 1
-                    }
                 }
                 else {
-                    if (svVcfPath) {
-                        error "ERROR: Unified input CSV sample '${sample}' provides sv_vcf_path without alignment_path; annotated SV import is supported only with the annotated all-NGS BAM/CRAM path."
+                    if (alignmentIndexPath) {
+                        error "ERROR: Unified input CSV sample '${sample}' provides alignment_index_path without alignment_path."
                     }
                     manifestAnnotatedRowsWithoutAlignment += 1
+                }
+                if (svVcfPath) {
+                    manifestAnnotatedRowsWithPreannotatedSv += 1
+                }
+                else {
+                    manifestAnnotatedRowsWithoutPreannotatedSv += 1
                 }
             }
             else if (inputKind in ['vcf_snv', 'vcf_sv']) {
@@ -303,8 +309,8 @@ if (params.input_csv) {
         if (manifestAnnotatedRowsWithAlignment > 0 && manifestAnnotatedRowsWithoutAlignment > 0) {
             error "ERROR: Unified annotated_snv manifests must either provide alignment_path for every row or for none of them in v1."
         }
-        if (manifestAnnotatedRowsWithPreannotatedSv > 0 && manifestAnnotatedRowsWithCalledSv > 0) {
-            error "ERROR: Unified annotated_snv manifests with alignment_path must either provide sv_vcf_path for every row or leave it blank for every row in v1."
+        if (manifestAnnotatedRowsWithPreannotatedSv > 0 && manifestAnnotatedRowsWithoutPreannotatedSv > 0) {
+            error "ERROR: Unified annotated_snv manifests must either provide sv_vcf_path for every row or leave it blank for every row in v1."
         }
     }
 }
@@ -956,14 +962,19 @@ if (manifestUsesUnifiedSchema && manifestInputKinds == (['annotated_snv'] as Set
     if (clean_target == 'yes') {
         error "ERROR: --target yes is not supported for annotated_snv manifest mode."
     }
+    if (clean_mito == 'yes' && manifestAnnotatedRowsWithoutAlignment > 0) {
+        error "ERROR: --mito yes requires alignment_path for every annotated_snv manifest row."
+    }
 }
 
 // 3. Check for Missing Reference (Mandatory for BAM/CRAM)
 // Logic: If BAM is being processed (either single or via CSV), Ref is required.
-def unifiedManifestNeedsReference = manifestUsesUnifiedSchema && manifestRowsForValidation.any { row -> row.input_kind != 'annotated_snv' }
+def unifiedManifestNeedsReference = manifestUsesUnifiedSchema && manifestRowsForValidation.any { row ->
+    (row.input_kind ?: '').toString().trim().toLowerCase() != 'annotated_snv'
+}
 def annotatedHybridNeedsReference = clean_annotated_snv == 'yes' && params.bam
 def annotatedManifestNeedsReference = manifestUsesUnifiedSchema && manifestRowsForValidation.any { row ->
-    row.input_kind == 'annotated_snv' && row.containsKey('alignment_path') && row.alignment_path
+    (row.input_kind ?: '').toString().trim().toLowerCase() == 'annotated_snv' && row.containsKey('alignment_path') && row.alignment_path
 }
 def unifiedManifestNeedsExpansionHunter = manifestUsesUnifiedSchema && (
     manifestInputKinds.any { it in ['bam_ngs', 'cram_ngs'] } || annotatedManifestNeedsReference
@@ -1055,6 +1066,7 @@ include { SINGLE_ALIGNMENT_NGS_SV } from './subworkflows/single_alignment_ngs_sv
 include { SINGLE_ALIGNMENT_VCF_SNP } from './subworkflows/single_alignment_vcf_snp'
 include { SINGLE_ALIGNMENT_VCF_SV } from './subworkflows/single_alignment_vcf_sv'
 include { SINGLE_ANNOTATED_SNV_SNP } from './subworkflows/single_annotated_snv_snp'
+include { SINGLE_ANNOTATED_SNV_SV } from './subworkflows/single_annotated_snv_sv'
 include { SINGLE_ANNOTATED_ALL_NGS } from './subworkflows/single_annotated_all_ngs'
 include { SINGLE_ANNOTATED_SNV_CALLED_SV_NGS } from './subworkflows/single_annotated_snv_called_sv_ngs'
 
@@ -1069,6 +1081,7 @@ include { INPUT_CSV_NGS_SNP } from './subworkflows/input_csv_alignment_ngs_snp'
 include { INPUT_CSV_ALIGNMENT_VCF_SNP } from './subworkflows/input_csv_alignment_vcf_snp'
 include { INPUT_CSV_ALIGNMENT_VCF_SV } from './subworkflows/input_csv_alignment_vcf_sv'
 include { INPUT_CSV_ANNOTATED_SNV_SNP } from './subworkflows/input_csv_annotated_snv_snp'
+include { INPUT_CSV_ANNOTATED_SNV_SV } from './subworkflows/input_csv_annotated_snv_sv'
 include { INPUT_CSV_ANNOTATED_ALL_NGS } from './subworkflows/input_csv_annotated_all_ngs'
 include { INPUT_CSV_ANNOTATED_SNV_CALLED_SV_NGS } from './subworkflows/input_csv_annotated_snv_called_sv_ngs'
 
@@ -1084,6 +1097,7 @@ workflow {
 	def annovar_txt = null
 	def annovar_sv_vcf = null
 	def input_annotated_snv = null
+	def input_annotated_snv_sv = null
 	def input_annotated_ngs = null
 	def input_annotated_called_ngs = null
 	def csv_manifest_mode = null
@@ -1159,7 +1173,7 @@ workflow {
     }
 		if ( manifestUsesUnifiedSchema ) {
 		if ( manifestInputKinds == (['annotated_snv'] as Set) ) {
-		if (manifestAnnotatedRowsWithPreannotatedSv > 0) {
+		if (manifestAnnotatedRowsWithPreannotatedSv > 0 && manifestAnnotatedRowsWithAlignment > 0) {
 		input_annotated_ngs = Channel
     .fromPath( params.input_csv )
     .splitCsv( header:true )
@@ -1191,12 +1205,34 @@ workflow {
         )
     }
     input_annotated_snv = null
+    input_annotated_snv_sv = null
     input_annotated_called_ngs = null
     input_vcf = null
     input_bam = null
     csv_manifest_mode = 'annotated_all_ngs'
 		}
-		else if (manifestAnnotatedRowsWithCalledSv > 0) {
+		else if (manifestAnnotatedRowsWithPreannotatedSv > 0) {
+		input_annotated_snv_sv = Channel
+    .fromPath( params.input_csv )
+    .splitCsv( header:true )
+    .map { row ->
+        return tuple(
+            row.sample,
+            file(row.snv_txt_path, checkIfExists: true),
+            file(row.snv_vcf_path, checkIfExists: true),
+            file(row.sv_vcf_path, checkIfExists: true),
+            phenotypeFileForRow(row, 'phenotype_path'),
+            (row.phenotype_format ?: '').toString().trim().toLowerCase()
+        )
+    }
+    input_annotated_snv = null
+    input_annotated_ngs = null
+    input_annotated_called_ngs = null
+    input_vcf = null
+    input_bam = null
+    csv_manifest_mode = 'annotated_snv_sv'
+		}
+		else if (manifestAnnotatedRowsWithAlignment > 0) {
 		input_annotated_called_ngs = Channel
     .fromPath( params.input_csv )
     .splitCsv( header:true )
@@ -1227,6 +1263,7 @@ workflow {
         )
     }
     input_annotated_snv = null
+    input_annotated_snv_sv = null
     input_annotated_ngs = null
     input_vcf = null
     input_bam = null
@@ -1245,6 +1282,7 @@ workflow {
             (row.phenotype_format ?: '').toString().trim().toLowerCase()
         )
     }
+    input_annotated_snv_sv = null
     input_annotated_ngs = null
     input_annotated_called_ngs = null
     input_vcf = null
@@ -1512,6 +1550,9 @@ eh_variant_catalog = Channel
         if ( input_annotated_ngs != null ) {
             INPUT_CSV_ANNOTATED_ALL_NGS(input_annotated_ngs, input_meta, ref_fa, ref_fa, eh_variant_catalog, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_ref_fa, mito_contig, clean_denovo_filter, denovo_pedigree, clean_denovo_role_column, clean_denovo_family_column, clean_denovo_vcf_sample_column, clean_denovo_exclude_contigs, params.denovo_sv_min_reciprocal_overlap)
         }
+        else if ( input_annotated_snv_sv != null ) {
+            INPUT_CSV_ANNOTATED_SNV_SV(input_annotated_snv_sv, input_meta, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, inheritance_mode, include_clinvar_report, allow_unphased_comphet, clean_denovo_filter, denovo_pedigree, clean_denovo_role_column, clean_denovo_family_column, clean_denovo_vcf_sample_column, clean_denovo_exclude_contigs, params.denovo_sv_min_reciprocal_overlap)
+        }
         else if ( input_annotated_called_ngs != null ) {
             INPUT_CSV_ANNOTATED_SNV_CALLED_SV_NGS(input_annotated_called_ngs, input_meta, ref_fa, ref_fa, eh_variant_catalog, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_ref_fa, mito_contig, clean_denovo_filter, denovo_pedigree, clean_denovo_role_column, clean_denovo_family_column, clean_denovo_vcf_sample_column, clean_denovo_exclude_contigs, params.denovo_sv_min_reciprocal_overlap)
         }
@@ -1570,6 +1611,9 @@ eh_variant_catalog = Channel
             else {
                 SINGLE_ANNOTATED_SNV_CALLED_SV_NGS(bam, annovar_txt, vcf, out_prefix, ref_fa, ref_fa, eh_variant_catalog, note, is_note, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, inheritance_mode, include_clinvar_report, allow_unphased_comphet, mito_ref_fa, mito_contig)
             }
+        }
+        else if ( clean_annotated_snv == 'yes' && clean_annotated_sv == 'yes' && params.vcf ) {
+            SINGLE_ANNOTATED_SNV_SV(annovar_txt, vcf, annovar_sv_vcf, out_prefix, note, is_note, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
         }
         else if ( clean_annotated_snv == 'yes' && params.vcf ) {
             SINGLE_ANNOTATED_SNV_SNP(annovar_txt, vcf, out_prefix, note, is_note, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, inheritance_mode, include_clinvar_report, allow_unphased_comphet)

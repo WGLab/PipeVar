@@ -1,7 +1,7 @@
 
 // Batch longphase phasing and evidence aggregation into prioritized VCFs.
 process multi_longphase {
-	container ='beoungl/docker_test:longphase_0.2.31'
+	container ='beoungl/docker_test:longphase_0.2.32'
 
 	input:
 	tuple val(out_prefix), path(snv_rankvar), path(snv_rankscore), path(snv_pathogenic), path(sv_pathogenic), path(sv_phase_vcf), path(sv_annotation_vcf), path(snv_vcf_path), path(bam_path), path(bam_index), path(hpo_path), val(age_of_onset), val(sex)

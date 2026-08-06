@@ -92,7 +92,7 @@ workflow SINGLE_ALIGNMENT_NGS_SV {
 		annovar_sv_for_downstream = common_sv_filter.out.filtered_vcf
 	}
 	SURVIVOR(annovar_sv_for_downstream,out_prefix)
-	PhenoSV(SURVIVOR.out,out_prefix,hpo)
+	PhenoSV(SURVIVOR.out.phenosv_inputs,out_prefix,hpo)
 	ExpansionHunter(bam,out_prefix,ref_fa,eh_variant_catalog)
 	eh_filter(out_prefix,ExpansionHunter.out)
 		sv_prio(out_prefix,PhenoSV.out,annovar_sv_for_downstream,hpo,inheritance_mode,include_clinvar_report,allow_unphased_comphet)

@@ -123,7 +123,7 @@ workflow INPUT_CSV_NGS_SNP {
         join_annovar_hpo=join_annovar_phen2gene.join(input_bam_no_bam)
         multi_eh_result=multi_expansionhunter(bam_for_proband_tasks,ref_fa,eh_variant_catalog)
         multi_eh_filter(multi_eh_result)
-	rankscore_result=multi_rankscore(join_annovar_phen2gene,gnomad,rankscore_filter,rankscore_softwares,gq,phen2gene_top_n)
+	rankscore_result=multi_rankscore(join_annovar_phen2gene,gnomad,rankscore_filter,rankscore_softwares,gq,ad,phen2gene_top_n)
         rankvar_result=multi_rankvar(join_annovar_hpo,gnomad,gq,ad,rankvar_filter)
         rankscore_rankvar_join=rankscore_result.join(rankvar_result)
         annovar_result_vcf=annovar_for_downstream.map { item -> tuple(item[0], item[2]) }

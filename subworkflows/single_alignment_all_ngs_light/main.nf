@@ -61,12 +61,11 @@ workflow SINGLE_ALIGNMENT_ALL_NGS_LIGHT {
 	annovar_bed = (target == "yes") ? phen2_gene_bed : target
 	ANNOVAR(haplotypecaller.out,out_prefix,annovar_bed)
 	RankVar(ANNOVAR.out.txt_output,Phen2gene.out,hpo,out_prefix,gnomad,gq,ad,rankvar_filter)
-	rankscore_result=Rankscore_analysis(ANNOVAR.out.txt_output,Phen2gene.out,out_prefix,gnomad,rankscore_filter,rankscore_softwares,gq,phen2gene_top_n)
+	rankscore_result=Rankscore_analysis(ANNOVAR.out.txt_output,Phen2gene.out,out_prefix,gnomad,rankscore_filter,rankscore_softwares,gq,ad,phen2gene_top_n)
 	Manta(bam,out_prefix,ref_fa)
 	SURVIVOR(Manta.out,out_prefix)
-	PhenoSV(SURVIVOR.out,out_prefix,hpo)
+	PhenoSV(SURVIVOR.out.phenosv_inputs,out_prefix,hpo)
 	ExpansionHunter(bam,out_prefix,ref_fa,eh_variant_catalog)
 	eh_filter(out_prefix,ExpansionHunter.out)
 
 }
-

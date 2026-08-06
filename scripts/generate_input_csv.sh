@@ -428,7 +428,7 @@ generate_unified_csv() {
   alignment_prefixes=()
   declare -A sv_vcf_map=()
   sv_vcf_prefixes=()
-  local primary_dir primary_suffix secondary_dir secondary_suffix include_alignment="no"
+  local primary_dir primary_suffix secondary_dir secondary_suffix include_alignment="no" include_sv="no"
 
   if [[ "$INPUT_KIND" == "annotated_snv" ]]; then
     read -r -p "Enter ANNOVAR TXT directory: " primary_dir
@@ -443,7 +443,11 @@ generate_unified_csv() {
     read -r -p "Enter ANNOVAR VCF suffix [.hg38_multianno.vcf]: " secondary_suffix
     secondary_suffix="$(trim_spaces "$secondary_suffix")"
     secondary_suffix="${secondary_suffix:-.hg38_multianno.vcf}"
-    read -r -p "Also include BAM/CRAM paths for SV/STR/mito analysis? [y/N]: " include_alignment
+    read -r -p "Include annotated SV VCF paths? [y/N]: " include_sv
+    include_sv="$(trim_spaces "$include_sv")"
+    include_sv="${include_sv,,}"
+    [[ "$include_sv" == "y" || "$include_sv" == "yes" ]] && include_sv="yes" || include_sv="no"
+    read -r -p "Also include BAM/CRAM paths for STR/mito or SV calling? [y/N]: " include_alignment
     include_alignment="$(trim_spaces "$include_alignment")"
     include_alignment="${include_alignment,,}"
     [[ "$include_alignment" == "y" || "$include_alignment" == "yes" ]] && include_alignment="yes" || include_alignment="no"
@@ -468,7 +472,7 @@ generate_unified_csv() {
     [[ "${#secondary_map[@]}" -gt 0 ]] || { echo "ERROR: no ANNOVAR VCF files matched suffix '$secondary_suffix' in $secondary_dir" >&2; exit 1; }
   fi
   if [[ "$include_alignment" == "yes" ]]; then
-    local alignment_dir alignment_suffix sv_vcf_dir sv_vcf_suffix alignment_choice
+    local alignment_dir alignment_suffix alignment_choice
     read -r -p "Enter alignment directory: " alignment_dir
     alignment_dir="$(trim_spaces "$alignment_dir")"
     [[ -d "$alignment_dir" ]] || { echo "ERROR: directory not found: $alignment_dir" >&2; exit 1; }
@@ -486,6 +490,9 @@ MSG
     esac
     load_prefix_map "$alignment_dir" "$alignment_suffix" alignment_map alignment_prefixes
     [[ "${#alignment_map[@]}" -gt 0 ]] || { echo "ERROR: no alignment files matched suffix '$alignment_suffix' in $alignment_dir" >&2; exit 1; }
+  fi
+  if [[ "$include_sv" == "yes" ]]; then
+    local sv_vcf_dir sv_vcf_suffix
     read -r -p "Enter annotated SV VCF directory: " sv_vcf_dir
     sv_vcf_dir="$(trim_spaces "$sv_vcf_dir")"
     [[ -d "$sv_vcf_dir" ]] || { echo "ERROR: directory not found: $sv_vcf_dir" >&2; exit 1; }
@@ -522,9 +529,11 @@ MSG
         if [[ "$include_alignment" == "yes" ]]; then
           alignment_path="$(resolve_match_or_skip "$sample" "alignment" alignment_map alignment_prefixes)"
           [[ -n "$alignment_path" ]] || { missing_count=$((missing_count + 1)); continue; }
+          alignment_index_path="$(discover_alignment_index "$alignment_path")"
+        fi
+        if [[ "$include_sv" == "yes" ]]; then
           sv_vcf_path="$(resolve_match_or_skip "$sample" "annotated SV VCF" sv_vcf_map sv_vcf_prefixes)"
           [[ -n "$sv_vcf_path" ]] || { missing_count=$((missing_count + 1)); continue; }
-          alignment_index_path="$(discover_alignment_index "$alignment_path")"
         fi
       elif [[ "$INPUT_KIND" == "vcf_snv" || "$INPUT_KIND" == "vcf_sv" ]]; then
         vcf_path="$primary_path"
@@ -563,6 +572,10 @@ update_existing_annotated_snv_csv() {
   out_csv="$(trim_spaces "$out_csv")"
   out_csv="${out_csv:-updated_annotated_snv.csv}"
   reject_csv_field "output path" "$out_csv"
+  if [[ "$(readlink -m -- "$input_csv")" == "$(readlink -m -- "$out_csv")" ]]; then
+    echo "ERROR: input and output CSV paths must be different: $input_csv" >&2
+    exit 1
+  fi
   read -r -p "Enter annotated SV VCF directory: " sv_vcf_dir
   sv_vcf_dir="$(trim_spaces "$sv_vcf_dir")"
   [[ -d "$sv_vcf_dir" ]] || { echo "ERROR: directory not found: $sv_vcf_dir" >&2; exit 1; }
@@ -582,7 +595,7 @@ update_existing_annotated_snv_csv() {
   IFS= read -r header < "$input_csv" || { echo "ERROR: CSV is empty: $input_csv" >&2; exit 1; }
   local headers=()
   IFS=',' read -r -a headers <<< "$header"
-  local sample_idx=-1 input_kind_idx=-1 snv_vcf_idx=-1 sv_idx=-1 alignment_idx=-1 added_sv_column="no"
+  local sample_idx=-1 input_kind_idx=-1 snv_vcf_idx=-1 sv_idx=-1 added_sv_column="no"
   local idx column
   for idx in "${!headers[@]}"; do
     column="$(trim_spaces "${headers[$idx]}")"
@@ -592,10 +605,9 @@ update_existing_annotated_snv_csv() {
       input_kind) input_kind_idx=$idx ;;
       snv_vcf_path) snv_vcf_idx=$idx ;;
       sv_vcf_path) sv_idx=$idx ;;
-      alignment_path) alignment_idx=$idx ;;
     esac
   done
-  (( sample_idx >= 0 && input_kind_idx >= 0 && alignment_idx >= 0 )) || { echo "ERROR: CSV must include sample, input_kind, and alignment_path columns." >&2; exit 1; }
+  (( sample_idx >= 0 && input_kind_idx >= 0 )) || { echo "ERROR: CSV must include sample and input_kind columns." >&2; exit 1; }
   if (( sv_idx < 0 )); then
     if (( snv_vcf_idx >= 0 )); then
       sv_idx=$((snv_vcf_idx + 1))
@@ -606,7 +618,7 @@ update_existing_annotated_snv_csv() {
     fi
     added_sv_column="yes"
   fi
-  local row_count=0 updated_count=0 skipped_count=0 missing_count=0
+  local row_count=0 updated_count=0 non_annotated_count=0 existing_count=0 missing_count=0
   {
     csv_join_row "${headers[@]}"
     local line
@@ -621,18 +633,18 @@ update_existing_annotated_snv_csv() {
         values+=("")
       done
       row_count=$((row_count + 1))
-      local sample input_kind current_sv alignment_path matched_prefix matched_sv
+      local sample input_kind current_sv matched_prefix matched_sv
       sample="$(trim_spaces "${values[$sample_idx]}")"
       input_kind="$(trim_spaces "${values[$input_kind_idx]}")"
+      input_kind="${input_kind,,}"
       current_sv="$(trim_spaces "${values[$sv_idx]}")"
-      alignment_path="$(trim_spaces "${values[$alignment_idx]}")"
-      if [[ "$input_kind" != "annotated_snv" || -z "$alignment_path" ]]; then
-        skipped_count=$((skipped_count + 1))
+      if [[ "$input_kind" != "annotated_snv" ]]; then
+        non_annotated_count=$((non_annotated_count + 1))
         csv_join_row "${values[@]}"
         continue
       fi
       if [[ -n "$current_sv" && "$overwrite_existing" != "yes" ]]; then
-        skipped_count=$((skipped_count + 1))
+        existing_count=$((existing_count + 1))
         csv_join_row "${values[@]}"
         continue
       fi
@@ -656,7 +668,8 @@ update_existing_annotated_snv_csv() {
   echo "Done."
   echo "  Rows scanned     : $row_count"
   echo "  SV paths updated : $updated_count"
-  echo "  Rows skipped     : $skipped_count"
+  echo "  Non-annotated    : $non_annotated_count"
+  echo "  Existing kept    : $existing_count"
   echo "  Missing matches  : $missing_count"
   echo "  Output CSV       : $out_csv"
 }

@@ -69,7 +69,7 @@ workflow SINGLE_ANNOTATED_SNV_CALLED_SV_NGS {
 	}
 	Phen2gene(hpo, out_prefix)
 	RankVar(validated_annovar_txt, Phen2gene.out, hpo, out_prefix, gnomad, gq, ad, rankvar_filter)
-	rankscore_result = Rankscore_analysis(validated_annovar_txt, Phen2gene.out, out_prefix, gnomad, rankscore_filter, rankscore_softwares, gq, phen2gene_top_n)
+	rankscore_result = Rankscore_analysis(validated_annovar_txt, Phen2gene.out, out_prefix, gnomad, rankscore_filter, rankscore_softwares, gq, ad, phen2gene_top_n)
 
 	Manta(bam, out_prefix, ref_fa)
 	xtea_mode = params.xtea ? params.xtea.toString().trim().toLowerCase() : "no"
@@ -119,7 +119,7 @@ workflow SINGLE_ANNOTATED_SNV_CALLED_SV_NGS {
 		annovar_sv_for_downstream = common_sv_filter.out.filtered_vcf
 	}
 	SURVIVOR(annovar_sv_for_downstream, out_prefix)
-	PhenoSV(SURVIVOR.out, out_prefix, hpo)
+	PhenoSV(SURVIVOR.out.phenosv_inputs, out_prefix, hpo)
 	ExpansionHunter(bam, out_prefix, eh_ref_fa, eh_variant_catalog)
 	eh_filter(out_prefix, ExpansionHunter.out)
 	ngs_prio(out_prefix, RankVar.out, rankscore_result.out.rankscore, rankscore_result.out.clinvar, PhenoSV.out, annovar_sv_for_downstream, validated_annovar_vcf, hpo, inheritance_mode, include_clinvar_report, allow_unphased_comphet)

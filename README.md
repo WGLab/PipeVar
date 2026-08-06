@@ -216,6 +216,20 @@ To import annotated SVs instead of calling SVs from BAM/CRAM, add:
 - `--annotated_sv yes`
 - `--annovar_sv_vcf <SV multianno VCF>`
 
+An alignment is optional when both SNV and SV inputs are already annotated:
+
+```bash
+nextflow run main.nf \
+  --annotated_snv yes \
+  --annotated_sv yes \
+  --annovar_txt sample.hg38_multianno.txt \
+  --vcf sample.hg38_multianno.vcf \
+  --annovar_sv_vcf sample.sv.hg38_multianno.vcf \
+  --hpo sample.hpo.txt
+```
+
+This VCF-only route performs combined SNV/SV prioritization and writes the final HTML report, but it does not run STR or mitochondrial analysis and does not require `--ref_fa`.
+
 Annotated SNV mode is SNP-led. Use `--mode snp` or omit `--mode`; `--mode sv` is not supported for this input family.
 
 ### Legacy CSV
@@ -287,7 +301,7 @@ Optional/conditional columns:
 | `sex` | all CSV prioritization flows | Per-sample sex metadata |
 | `snv_txt_path` | `annotated_snv` | ANNOVAR multianno TXT |
 | `snv_vcf_path` | `annotated_snv` | Matching ANNOVAR multianno VCF |
-| `sv_vcf_path` | annotated all-NGS import | Optional annotated SV VCF when every annotated row has alignment input |
+| `sv_vcf_path` | `annotated_snv` combined SNV/SV modes | Annotated SV VCF; may be used with or without alignment input |
 | `vcf_path` | `vcf_snv`, `vcf_sv` | Existing VCF input |
 | `alignment_path` | `bam_ngs`, `cram_ngs`, annotated hybrid modes | BAM/CRAM input |
 | `alignment_index_path` | alignment-backed modes | Optional explicit BAM/CRAM index path |
@@ -297,10 +311,12 @@ Current unified manifest constraints:
 - Samples must be unique.
 - Mixed `input_kind` sets are limited to supported homogeneous groups, except mixed `bam_ngs` and `cram_ngs`.
 - Annotated SNV rows either all provide `alignment_path` or none do.
-- Annotated SNV rows with `alignment_path` either all provide `sv_vcf_path` or all leave it blank.
+- Annotated SNV rows either all provide `sv_vcf_path` or all leave it blank.
 - Mixed `phenotype_format` values are not supported for non-annotated CSV modes.
 
-Run `scripts/generate_input_csv.sh` to build legacy or unified CSV manifests interactively.
+The four homogeneous `annotated_snv` manifest combinations are SNV only, annotated SNV+SV without alignment, annotated SNV plus alignment with SV calling, and annotated SNV+SV plus alignment. The no-alignment combinations cannot run STR or mitochondrial analysis.
+
+Run `scripts/generate_input_csv.sh` to build legacy or unified CSV manifests interactively. Its annotated-SNV update action can add `sv_vcf_path` to manifests with or without alignments; choose a separate output path so the source CSV remains unchanged.
 
 ## Feature Options
 
@@ -339,6 +355,49 @@ de novo, and phenotype filtering remain a separate evidence branch. PipeVar uses
 whole-event PhenoSV score from the `Elements=SV` row, obtains gene symbols from the
 curated ANNOVAR `Gene.refGene` annotation, and joins both to LongPhase's phased
 Sniffles output by exact VCF ID.
+
+At the SURVIVOR/PhenoSV boundary, PipeVar_mito creates four staged files: a canonical
+simple-SV BED with `DEL`, `DUP`, `INV`, and `INS`; a temporary PhenoSV BED using
+`deletion`, `duplication`, `inversion`, and `insertion`; a headerless nine-column BEDPE
+for BND/TRA adjacencies; and a member TSV mapping each scored adjacency to its original
+VCF ID or reciprocal pair of IDs. Simple BED and BEDPE partitions are scored separately
+and merged beneath one output header. Reciprocal BND scores are expanded back to both
+original IDs, so downstream VCF reconstruction retains the original ALT, `SVTYPE=BND`,
+`MATEID`, genotype, and record IDs. Valid BNDs without `MATEID` are scored as singleton
+adjacencies.
+
+PhenoSV-light continues to score BEDPE input but emits a reduced-translocation-accuracy
+warning. The pinned upstream PhenoSV checkout is not modified: PipeVar sends
+`duplication` at the tool boundary and restores canonical `DUP` in its own output, while
+the pinned upstream implementation still applies its deletion-like internal duplication
+transformation. The reserved `survivor_0.1` and `phenosv_0.2` images must be built before
+these paths can run.
+
+This repair also reserves `rankscore_0.2.22`, `longphase_0.2.32`, and
+`mito_annotation_0.4.2`. These tags are intentionally unpublished in this source change;
+a post-build mixed DEL/DUP/INV/INS/BND smoke test is a release gate before publication.
+
+### ClinVar And Compound-Heterozygous Semantics
+
+ClinVar filtering reads the `CLNSIG` column by header name rather than searching whole
+ANNOVAR rows. Accepted values are canonicalized to `Pathogenic`, `Likely_pathogenic`, or
+`Pathogenic/Likely_pathogenic`; low-penetrance P/LP assertions collapse to the matching
+base class. Conflicting, VUS, benign, and risk-only assertions are excluded. The
+`--include_clinvar_report` toggle controls only ClinVar-exclusive report entries and does
+not alter P/LP classification or upgrade likely pathogenic calls to pathogenic.
+
+Compound-heterozygous evaluation follows this phase contract:
+
+| Pair state | Result |
+| --- | --- |
+| Same nonmissing PS, opposite phased orientations (`1|0` + `0|1`) | Confirmed trans; accepted |
+| Same nonmissing PS, same known phased orientation | Proven cis; always rejected |
+| Missing or different PS | Unresolved; requires `--allow_unphased_comphet yes` |
+| Slash-unphased pair | Unresolved; requires the opt-in |
+| Mixed phased and slash-unphased pair | Unresolved; requires the opt-in |
+
+SNP-only assignment resolves both `GT` and `PS` through FORMAT field names, including
+`GT:PS` and `PS:GT`, and preserves the original VCF ID and phase set through merging.
 
 ### Common-SV Filtering
 
@@ -418,7 +477,7 @@ Defaults below come from `nextflow.config`.
 | `--gnomad` | `0.0001` | Maximum gnomAD AF for SNP prioritization |
 | `--inheritance_mode` | `ml` | `ml`, `omim`, or `gnomad`; `gnomad` maps to LOEUF fallback lists |
 | `--include_clinvar_report` | `yes` | Include ClinVar-only calls in final prioritized outputs |
-| `--allow_unphased_comphet` | `no` | Allow unphased `0/1` or `1/0` AR pairs as compound het |
+| `--allow_unphased_comphet` | `no` | Allow unresolved AR pairs (missing/different PS, slash-unphased, or mixed phased/unphased); proven cis pairs remain excluded |
 | `--prioritize_sv_only` | `no` | In combined final prioritization, report only SV/PhenoSV evidence |
 | `--rankscore` | `0.50` | Minimum RankScore cutoff |
 | `--rankscore_softwares` | `null` | Comma-separated RankScore software list; null means all built-in tools |
@@ -630,7 +689,7 @@ Outputs are published to `--output_directory`. Exact files depend on `--mode`, `
 - The DRAGEN CRAM compatibility path uses `RevertSam --RESTORE_HARDCLIPS false`.
 - xTEA is intended for short-read WGS MEI discovery/genotyping and requires indexed BAM/CRAM input.
 - Long-read raw Sniffles VCFs contain supporting read identifiers and can be larger than VCFs produced without `--output-rnames`.
-- Confirmed trans compound-heterozygous calls require opposite phased genotypes in the same nonmissing phase set; unresolved pairs require `--allow_unphased_comphet yes`.
+- Confirmed trans compound-heterozygous calls require opposite phased genotypes in the same nonmissing phase set; proven same-set/same-orientation cis pairs are always rejected, and all unresolved pair states require `--allow_unphased_comphet yes`.
 - If using Singularity/Docker profiles, ensure `--annovar_host_path` and `--phenosv_host_path` point to valid host locations.
 - External-model PhenoGPT2 support is text-only with optional full upstream negation and `--phenogpt2_wc 0`; vision, training, and BERT chunk filtering are not provisioned.
 - Keep all mounted PhenoGPT2 checkpoints immutable and use a new versioned directory for every model change. PipeVar checks that each configured host directory exists, and the container wrapper uses the upstream loaders to validate model usability. Because Nextflow does not hash model contents during preflight, use a fresh work directory or `-resume` only when the mounted model versions are unchanged.

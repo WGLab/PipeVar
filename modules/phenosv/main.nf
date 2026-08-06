@@ -1,11 +1,11 @@
 
 // Score and prioritize structural variants with phenotype-aware PhenoSV model.
 process PhenoSV {
-        container ='beoungl/docker_test:phenosv_0.1'
+	container ='beoungl/docker_test:phenosv_0.2'
 
 
 	input:
-	path bed
+	tuple path(canonical_bed), path(phenosv_bed), path(phenosv_bedpe), path(members_tsv)
 	val out_prefix
 	path hpo
 
@@ -16,6 +16,7 @@ process PhenoSV {
 	script:
 	def args   = task.ext.args ?: ''
 	def min_score = params.phenosv_score ?: '0.50'
+	def light_mode = args.contains('PhenoSV-light')
 
 	"""
 
@@ -30,21 +31,39 @@ process PhenoSV {
 
 	mkdir -p \$phenosv_dir
 
-	# Always emit the canonical event TSV header, including for empty SV input.
-	data_rows=\$(awk 'NF && \$0 !~ /^#/' $bed | wc -l)
-	if [[ ! -s $bed ]] || [[ \$data_rows -eq 0 ]]; then
-	    printf 'SV_ID\tCHROM\tSTART\tEND\tSVTYPE\tPATHOGENICITY\tPHEN2GENE\tPHENOSV_SCORE\tPHENOSV_TYPE\n' > ${out_prefix}.phenosv.filtered.tsv
-	    exit 0
+	printf 'SV_ID\tCHROM\tSTART\tEND\tSVTYPE\tPATHOGENICITY\tPHEN2GENE\tPHENOSV_SCORE\tPHENOSV_TYPE\n' > ${out_prefix}.phenosv.simple.tsv
+	printf 'SV_ID\tCHROM\tSTART\tEND\tSVTYPE\tPATHOGENICITY\tPHEN2GENE\tPHENOSV_SCORE\tPHENOSV_TYPE\n' > ${out_prefix}.phenosv.bnd.tsv
+
+	simple_rows=\$(awk 'NF {count++} END {print count+0}' $phenosv_bed)
+	if [[ \$simple_rows -gt 0 ]]; then
+	    mkdir -p \$phenosv_dir/simple
+	    python3 /opt/PhenoSV/phenosv/model/phenosv.py --sv_file $phenosv_bed $args --target_folder \$phenosv_dir/simple --target_file_name \$phenosv_dir/simple/phenosv_out --HPO "\$HPO_STRING"
+	    python3 /normalize_phenosv_events.py \
+	        \$phenosv_dir/simple/phenosv_out.csv \
+	        $canonical_bed \
+	        ${out_prefix}.phenosv.simple.tsv \
+	        --members $members_tsv \
+	        --min-score "$min_score"
 	fi
 
+	bedpe_rows=\$(awk 'NF {count++} END {print count+0}' $phenosv_bedpe)
+	if [[ \$bedpe_rows -gt 0 ]]; then
+	    if [[ "${light_mode}" == "true" ]]; then
+	        echo "WARNING: PhenoSV-light has reduced accuracy for translocations; scoring BEDPE input as requested." >&2
+	    fi
+	    mkdir -p \$phenosv_dir/bnd
+	    python3 /opt/PhenoSV/phenosv/model/phenosv.py --sv_file $phenosv_bedpe $args --target_folder \$phenosv_dir/bnd --target_file_name \$phenosv_dir/bnd/phenosv_out --HPO "\$HPO_STRING"
+	    python3 /normalize_phenosv_events.py \
+	        \$phenosv_dir/bnd/phenosv_out.csv \
+	        $phenosv_bedpe \
+	        ${out_prefix}.phenosv.bnd.tsv \
+	        --members $members_tsv \
+	        --min-score "$min_score"
+	fi
 
-	python3 /opt/PhenoSV/phenosv/model/phenosv.py --sv_file $bed $args --target_folder ${out_prefix}_phenosv --target_file_name  \$phenosv_dir/phenosv_out --HPO "\$HPO_STRING"
-
-	python3 /normalize_phenosv_events.py \
-	    \$phenosv_dir/phenosv_out.csv \
-	    $bed \
-	    ${out_prefix}.phenosv.filtered.tsv \
-	    --min-score "$min_score"
+	head -n 1 ${out_prefix}.phenosv.simple.tsv > ${out_prefix}.phenosv.filtered.tsv
+	tail -n +2 ${out_prefix}.phenosv.simple.tsv >> ${out_prefix}.phenosv.filtered.tsv
+	tail -n +2 ${out_prefix}.phenosv.bnd.tsv >> ${out_prefix}.phenosv.filtered.tsv
 
 
 	
