@@ -2,7 +2,6 @@
 
 include { SURVIVOR } from '../../modules/survivor/'
 include { PhenoSV } from '../../modules/phenosv/'
-include { Phen2gene } from '../../modules/phen2gene/'
 include { Manta } from '../../modules/manta/'
 include { xtea } from '../../modules/xtea/'
 include { normalize_shortread_alignment } from '../../modules/normalize_shortread_alignment/'
@@ -43,7 +42,6 @@ workflow SINGLE_ALIGNMENT_NGS_SV {
 			hpo=phenotagger.out
 		}
 	}
-	Phen2gene(hpo,out_prefix)
 	Manta(bam,out_prefix,ref_fa)
 	xtea_mode = params.xtea ? params.xtea.toString().trim().toLowerCase() : "no"
 	xtea_vcf = null
@@ -85,7 +83,7 @@ workflow SINGLE_ALIGNMENT_NGS_SV {
 		sv_vcf=Manta.out
 	}
 
-	ANNOVAR_SV(sv_vcf,out_prefix,Phen2gene.out,"null","called")
+	ANNOVAR_SV(sv_vcf,out_prefix,"called")
 	annovar_sv_for_downstream = ANNOVAR_SV.out
 	if ( params.common_sv_filter.toString().trim().toLowerCase() == "yes" ) {
 		common_sv_filter(ANNOVAR_SV.out,out_prefix)

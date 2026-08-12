@@ -3,10 +3,8 @@ include { multi_annovar_sv } from '../../modules/multi_annovar_sv/'
 include { multi_common_sv_filter } from '../../modules/multi_common_sv_filter/'
 include { multi_survivor } from '../../modules/multi_survivor/'
 include { multi_phenosv } from '../../modules/multi_phenosv/'
-include { multi_phen2gene } from '../../modules/multi_phen2gene/'
 include { multi_phenotagger } from '../../modules/multi_phenotagger/'
 include { multi_phenogpt2 } from '../../modules/multi_phenogpt2/'
-include { multi_phen2gene_filter } from '../../modules/multi_reduce_region_phen2gene/'
 include { multi_sv_prio } from '../../modules/multi_sv_prio/'
 include { DENOVO_SV_FILTER_CORE } from '../denovo_sv_filter_core'
 
@@ -18,9 +16,7 @@ workflow INPUT_CSV_ALIGNMENT_VCF_SV {
 	input_vcf
 	input_meta
 	ref_fa
-	phen2gene_top_n
 	is_note
-	target
 	inheritance_mode
 	include_clinvar_report
 	allow_unphased_comphet
@@ -55,14 +51,7 @@ workflow INPUT_CSV_ALIGNMENT_VCF_SV {
 
                 }
         }
-        phen2gene_result=multi_phen2gene(input_vcf_no_vcf)
-        if ( target == "yes" ) {
-	        phen2_gene_bed=multi_phen2gene_filter(phen2gene_result,ref_fa,phen2gene_top_n)
-	        sv_result_annovar=sv_for_annotation.join(phen2gene_result, failOnMismatch: true, failOnDuplicate: true).join(phen2_gene_bed, failOnMismatch: true, failOnDuplicate: true).map { out_prefix, vcf_file, phen2gene_file, bed_file -> tuple(out_prefix, vcf_file, phen2gene_file, bed_file, "called") }
-        }
-        else {
-	        sv_result_annovar=sv_for_annotation.join(phen2gene_result, failOnMismatch: true, failOnDuplicate: true).map { out_prefix, vcf_file, phen2gene_file -> tuple(out_prefix, vcf_file, phen2gene_file, target, "called") }
-        }
+	sv_result_annovar=sv_for_annotation.map { out_prefix, vcf_file -> tuple(out_prefix, vcf_file, "called") }
 	annovar_sv_result=multi_annovar_sv(sv_result_annovar)
 	annovar_sv_for_downstream = annovar_sv_result
 	if ( params.common_sv_filter.toString().trim().toLowerCase() == "yes" ) {

@@ -63,6 +63,21 @@ class RepairContractTests(unittest.TestCase):
         self.assertIn("accepted_clnsig", source)
         self.assertNotIn("&& /Pathogenic/", source)
 
+    def test_preannotated_validator_requires_gt_but_not_ps(self):
+        module = (REPO / "modules/validate_preannotated_annovar_pair/main.nf").read_text(encoding="utf-8")
+        validator = (
+            DOCKER_WORK
+            / "validate_preannotated_annovar_pair/validate_preannotated_annovar_pair.py"
+        ).read_text(encoding="utf-8")
+        dockerfile = (
+            DOCKER_WORK / "validate_preannotated_annovar_pair/Dockerfile"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("validate_preannotated_annovar_pair_0.3", module)
+        self.assertIn("validate_preannotated_annovar_pair_0.3", dockerfile)
+        self.assertIn("procps", dockerfile)
+        self.assertIn('if "GT" not in format_fields', validator)
+        self.assertIn("PS is optional", validator)
 
 if __name__ == "__main__":
     unittest.main()

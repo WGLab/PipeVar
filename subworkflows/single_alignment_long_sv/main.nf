@@ -3,7 +3,6 @@
 include { sniffles } from '../../modules/sniffles/'
 include { SURVIVOR } from '../../modules/survivor/'
 include { PhenoSV } from '../../modules/phenosv/'
-include { Phen2gene } from '../../modules/phen2gene/'
 include { NanoRepeat } from '../../modules/nanorepeat/'
 include { ANNOVAR_SV } from '../../modules/annovar_sv/'
 include { common_sv_filter } from '../../modules/common_sv_filter/'
@@ -37,9 +36,8 @@ workflow SINGLE_ALIGNMENT_LONG_SV {
 			hpo=phenotagger.out
 		}
 	}
-	Phen2gene(hpo,out_prefix)
 	sniffles(bam,out_prefix,ref_fa)
-	ANNOVAR_SV(sniffles.out,out_prefix,Phen2gene.out,"null","called")
+	ANNOVAR_SV(sniffles.out,out_prefix,"called")
 	annovar_sv_for_downstream = ANNOVAR_SV.out
 	if ( params.common_sv_filter.toString().trim().toLowerCase() == "yes" ) {
 		common_sv_filter(ANNOVAR_SV.out,out_prefix)

@@ -87,8 +87,7 @@ workflow SINGLE_ALIGNMENT_ALL_LONGPHASE {
 	}
 	rankscore_result=Rankscore_analysis(ANNOVAR.out.txt_output,Phen2gene.out,out_prefix,gnomad,rankscore_filter,rankscore_softwares,gq,ad,phen2gene_top_n)
 	sniffles(bam,out_prefix,ref_fa)
-	annovar_sv_bed = (target == "yes") ? phen2_gene_bed : target
-	ANNOVAR_SV(sniffles.out,out_prefix,Phen2gene.out,annovar_sv_bed,"called")
+	ANNOVAR_SV(sniffles.out,out_prefix,"called")
 	annovar_sv_for_downstream = ANNOVAR_SV.out
 	if ( params.common_sv_filter.toString().trim().toLowerCase() == "yes" ) {
 		common_sv_filter(ANNOVAR_SV.out,out_prefix)

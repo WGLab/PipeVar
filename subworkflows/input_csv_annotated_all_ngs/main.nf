@@ -98,8 +98,8 @@ workflow INPUT_CSV_ANNOTATED_ALL_NGS {
 		denovo_sv_result = DENOVO_SV_FILTER_CORE(annotated_sv_input, denovo_pedigree, denovo_role_column, denovo_family_column, denovo_vcf_sample_column, denovo_exclude_contigs, denovo_sv_min_reciprocal_overlap)
 		sv_for_annotation = denovo_sv_result.records
 	}
-	sv_result_annovar = sv_for_annotation.join(phen2gene_result, failOnMismatch: true, failOnDuplicate: true).map { out_prefix, vcf_file, phen2gene_file ->
-		tuple(out_prefix, vcf_file, phen2gene_file, "null", "preannotated")
+	sv_result_annovar = sv_for_annotation.map { out_prefix, vcf_file ->
+		tuple(out_prefix, vcf_file, "preannotated")
 	}
 	annovar_sv_result = multi_annovar_sv(sv_result_annovar)
 	annovar_sv_for_downstream = annovar_sv_result

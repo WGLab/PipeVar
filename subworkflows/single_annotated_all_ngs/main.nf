@@ -67,7 +67,7 @@ workflow SINGLE_ANNOTATED_ALL_NGS {
 	RankVar(validated_annovar_txt, Phen2gene.out, hpo, out_prefix, gnomad, gq, ad, rankvar_filter)
 	rankscore_result = Rankscore_analysis(validated_annovar_txt, Phen2gene.out, out_prefix, gnomad, rankscore_filter, rankscore_softwares, gq, ad, phen2gene_top_n)
 
-	ANNOVAR_SV(annovar_sv_vcf, out_prefix, Phen2gene.out, "null", "preannotated")
+	ANNOVAR_SV(annovar_sv_vcf, out_prefix, "preannotated")
 	annovar_sv_for_downstream = ANNOVAR_SV.out
 	if ( params.common_sv_filter.toString().trim().toLowerCase() == "yes" ) {
 		common_sv_filter(ANNOVAR_SV.out, out_prefix)

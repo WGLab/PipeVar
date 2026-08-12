@@ -126,8 +126,7 @@ workflow SINGLE_ALIGNMENT_ALL_NGS {
 		sv_vcf=Manta.out
 	}
 
-	sv_annovar_bed = (target == "yes") ? phen2_gene_bed : target
-	ANNOVAR_SV(sv_vcf,out_prefix,Phen2gene.out,sv_annovar_bed,"called")
+	ANNOVAR_SV(sv_vcf,out_prefix,"called")
 	annovar_sv_for_downstream = ANNOVAR_SV.out
 	if ( params.common_sv_filter.toString().trim().toLowerCase() == "yes" ) {
 		common_sv_filter(ANNOVAR_SV.out,out_prefix)

@@ -2,12 +2,10 @@
 
 include { SURVIVOR } from '../../modules/survivor/'
 include { PhenoSV } from '../../modules/phenosv/'
-include { Phen2gene } from '../../modules/phen2gene/'
 include { ANNOVAR_SV } from '../../modules/annovar_sv/'
 include { common_sv_filter } from '../../modules/common_sv_filter/'
 include { phenotagger } from '../../modules/phenotagger/'
 include { phenogpt2 } from '../../modules/phenogpt2/'
-include { phen2gene_filter } from '../../modules/reduce_region_phen2gene/'
 include { sv_prio } from '../../modules/sv_prio/'
 
 
@@ -18,9 +16,7 @@ workflow SINGLE_ALIGNMENT_VCF_SV {
 	out_prefix
 	ref_fa
 	note
-	phen2gene_top_n
 	is_note
-	target
 	inheritance_mode
 	include_clinvar_report
 	allow_unphased_comphet
@@ -38,15 +34,7 @@ workflow SINGLE_ALIGNMENT_VCF_SV {
 			hpo=phenotagger.out
 		}
 	}
-		Phen2gene(hpo,out_prefix)
-		if ( target == "yes" ) {
-			phen2_gene_bed=phen2gene_filter(Phen2gene.out,ref_fa,out_prefix,phen2gene_top_n)
-			annovar_sv_bed = phen2_gene_bed
-		}
-		else {
-			annovar_sv_bed = target
-		}
-		ANNOVAR_SV(vcf,out_prefix,Phen2gene.out,annovar_sv_bed,"called")
+		ANNOVAR_SV(vcf,out_prefix,"called")
 		annovar_sv_for_downstream = ANNOVAR_SV.out
 		if ( params.common_sv_filter.toString().trim().toLowerCase() == "yes" ) {
 			common_sv_filter(ANNOVAR_SV.out,out_prefix)

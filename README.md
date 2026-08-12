@@ -373,8 +373,9 @@ the pinned upstream implementation still applies its deletion-like internal dupl
 transformation. The reserved `survivor_0.1` and `phenosv_0.2` images must be built before
 these paths can run.
 
-This repair also reserves `rankscore_0.2.22`, `longphase_0.2.33`, and
-`mito_annotation_0.4.2`. These tags are intentionally unpublished in this source change;
+This repair also reserves `rankscore_0.2.22`, `longphase_0.2.33`,
+`validate_preannotated_annovar_pair_0.3`, and `mito_annotation_0.4.2`. These tags are
+intentionally unpublished in this source change;
 a post-build mixed DEL/DUP/INV/INS/BND smoke test is a release gate before publication.
 
 ### ClinVar And Compound-Heterozygous Semantics
@@ -444,6 +445,10 @@ Configure role, family, and sample mapping columns with `--denovo_role_column`, 
 `--target yes` restricts SNP calling to phenotype-derived gene regions where supported.
 
 `--phen2gene_filter <INT>` sets the number of top Phen2Gene genes retained for targeted mode.
+
+SV annotation is not restricted by `--target` or Phen2Gene scores. Called and imported
+SVs are retained at this stage when ANNOVAR reports `Func.refGene=exonic`; optional
+common-SV filtering and PhenoSV scoring still apply downstream.
 
 `--gene <SYMBOLS|FILE>` restricts final prioritization to comma-separated gene symbols or a one-gene-per-line file.
 

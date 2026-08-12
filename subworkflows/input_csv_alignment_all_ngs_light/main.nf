@@ -80,12 +80,7 @@ workflow INPUT_CSV_ALIGNMENT_ALL_NGS_LIGHT {
         multi_eh_result=multi_expansionhunter(input_bam_with_bam,ref_fa_no_dict,eh_variant_catalog)
         multi_eh_filter(multi_eh_result)
         manta_result=multi_manta(input_bam_with_bam,ref_fa_no_dict)
-        if ( target == "yes" ) {
-	        manta_result_annovar=manta_result.join(phen2gene_result).join(phen2_gene_bed).map { out_prefix, vcf_file, phen2gene_file, bed_file -> tuple(out_prefix, vcf_file, phen2gene_file, bed_file, "called") }
-        }
-        else {
-	        manta_result_annovar=manta_result.join(phen2gene_result).map { out_prefix, vcf_file, phen2gene_file -> tuple(out_prefix, vcf_file, phen2gene_file, target, "called") }
-        }
+	manta_result_annovar=manta_result.map { out_prefix, vcf_file -> tuple(out_prefix, vcf_file, "called") }
 	annovar_sv_result=multi_annovar_sv(manta_result_annovar)
         survivor_result=multi_survivor(annovar_sv_result)
         phenosv_input=survivor_result.join(input_bam_no_bam)

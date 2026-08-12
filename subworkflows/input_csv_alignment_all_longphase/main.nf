@@ -145,12 +145,7 @@ workflow INPUT_CSV_ALIGNMENT_ALL_LONGPHASE {
 			tuple(out_prefix, sniffles_vcf)
 		}
 	}
-        if ( target == "yes" ) {
-	        sniffles_result_annovar=sv_for_annotation.join(phen2gene_result, failOnMismatch: true, failOnDuplicate: true).join(phen2_gene_bed, failOnMismatch: true, failOnDuplicate: true).map { out_prefix, vcf_file, phen2gene_file, bed_file -> tuple(out_prefix, vcf_file, phen2gene_file, bed_file, "called") }
-        }
-        else {
-	        sniffles_result_annovar=sv_for_annotation.join(phen2gene_result, failOnMismatch: true, failOnDuplicate: true).map { out_prefix, vcf_file, phen2gene_file -> tuple(out_prefix, vcf_file, phen2gene_file, target, "called") }
-        }
+	sniffles_result_annovar=sv_for_annotation.map { out_prefix, vcf_file -> tuple(out_prefix, vcf_file, "called") }
 	annovar_sv_result=multi_annovar_sv(sniffles_result_annovar)
 	annovar_sv_for_downstream = annovar_sv_result
 	if ( params.common_sv_filter.toString().trim().toLowerCase() == "yes" ) {

@@ -112,7 +112,7 @@ workflow SINGLE_ANNOTATED_SNV_CALLED_SV_NGS {
 		sv_vcf = Manta.out
 	}
 
-	ANNOVAR_SV(sv_vcf, out_prefix, Phen2gene.out, "null", "called")
+	ANNOVAR_SV(sv_vcf, out_prefix, "called")
 	annovar_sv_for_downstream = ANNOVAR_SV.out
 	if ( params.common_sv_filter.toString().trim().toLowerCase() == "yes" ) {
 		common_sv_filter(ANNOVAR_SV.out, out_prefix)

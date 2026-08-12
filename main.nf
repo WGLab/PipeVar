@@ -1564,7 +1564,7 @@ eh_variant_catalog = Channel
         else if ( input_vcf != null ) {
             def effective_csv_mode = clean_mode ?: csv_manifest_mode
             if ( effective_csv_mode == 'sv' ) {
-                INPUT_CSV_ALIGNMENT_VCF_SV(input_vcf, input_meta, ref_fa, phen2gene_top_n, is_note, target, inheritance_mode, include_clinvar_report, allow_unphased_comphet, clean_denovo_filter, denovo_pedigree, clean_denovo_role_column, clean_denovo_family_column, clean_denovo_vcf_sample_column, clean_denovo_exclude_contigs, params.denovo_sv_min_reciprocal_overlap)
+                INPUT_CSV_ALIGNMENT_VCF_SV(input_vcf, input_meta, ref_fa, is_note, inheritance_mode, include_clinvar_report, allow_unphased_comphet, clean_denovo_filter, denovo_pedigree, clean_denovo_role_column, clean_denovo_family_column, clean_denovo_vcf_sample_column, clean_denovo_exclude_contigs, params.denovo_sv_min_reciprocal_overlap)
             }
             else if ( effective_csv_mode == 'snp' ) {
                 INPUT_CSV_ALIGNMENT_VCF_SNP(input_vcf, input_meta, ref_fa, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, inheritance_mode, include_clinvar_report, allow_unphased_comphet, clean_denovo_filter, denovo_pedigree, clean_denovo_role_column, clean_denovo_family_column, clean_denovo_vcf_sample_column, clean_denovo_exclude_contigs, params.denovo_sv_min_reciprocal_overlap)
@@ -1622,7 +1622,7 @@ eh_variant_catalog = Channel
         }
         else if ( params.vcf ) {
             if ( clean_mode == 'sv' ) {
-                SINGLE_ALIGNMENT_VCF_SV(vcf, out_prefix, ref_fa,  note, phen2gene_top_n, is_note, target, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
+                SINGLE_ALIGNMENT_VCF_SV(vcf, out_prefix, ref_fa, note, is_note, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
             }
             else if ( clean_mode == 'snp' ) {
                 SINGLE_ALIGNMENT_VCF_SNP(vcf, out_prefix, ref_fa,  note, rankscore_filter, rankscore_softwares, phen2gene_top_n, gnomad, gq, ad, rankvar_filter, is_note, target, inheritance_mode, include_clinvar_report, allow_unphased_comphet)

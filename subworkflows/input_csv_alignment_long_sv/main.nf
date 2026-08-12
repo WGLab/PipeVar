@@ -1,5 +1,4 @@
 
-include { multi_phen2gene } from '../../modules/multi_phen2gene/'
 include { multi_annovar_sv } from '../../modules/multi_annovar_sv/'
 include { multi_common_sv_filter } from '../../modules/multi_common_sv_filter/'
 include { multi_survivor } from '../../modules/multi_survivor/'
@@ -53,8 +52,7 @@ workflow INPUT_CSV_ALIGNMENT_LONG_SV {
                         input_bam_no_bam=multi_phenotagger(input_bam_no_bam)
                 }
 	}
-	phen2gene_result=multi_phen2gene(input_bam_no_bam)
-	sniffles_result_annovar=sv_for_annotation.join(phen2gene_result, failOnMismatch: true, failOnDuplicate: true).map { out_prefix, vcf_file, phen2gene_file -> tuple(out_prefix, vcf_file, phen2gene_file, "null", "called") }
+	sniffles_result_annovar=sv_for_annotation.map { out_prefix, vcf_file -> tuple(out_prefix, vcf_file, "called") }
 	annovar_sv_result=multi_annovar_sv(sniffles_result_annovar)
 	annovar_sv_for_downstream = annovar_sv_result
 	if ( params.common_sv_filter.toString().trim().toLowerCase() == "yes" ) {

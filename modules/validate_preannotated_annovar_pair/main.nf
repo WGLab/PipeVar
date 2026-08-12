@@ -1,6 +1,6 @@
 // Validate pre-annotated ANNOVAR TXT/VCF pairs before SNP prioritization.
 process validate_preannotated_annovar_pair {
-	container = 'beoungl/docker_test:validate_preannotated_annovar_pair_0.1'
+	container = 'beoungl/docker_test:validate_preannotated_annovar_pair_0.3'
 
 	input:
 	tuple val(out_prefix), path(annovar_txt), path(annovar_vcf)
