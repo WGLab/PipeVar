@@ -8,6 +8,14 @@ DOCKER_WORK = REPO.parent / "docker_work"
 
 
 class RepairContractTests(unittest.TestCase):
+    def test_survivor_single_and_batch_use_embedded_phenosv_converter(self):
+        dockerfile = (DOCKER_WORK / "survivor/Dockerfile").read_text(encoding="utf-8")
+        self.assertIn("COPY prepare_phenosv_inputs.py /prepare_phenosv_inputs.py", dockerfile)
+        for relative in ("modules/survivor/main.nf", "modules/multi_survivor/main.nf"):
+            source = (REPO / relative).read_text(encoding="utf-8")
+            self.assertIn("beoungl/docker_test:survivor_0.2", source)
+            self.assertIn("python3 /prepare_phenosv_inputs.py", source)
+
     def test_phenosv_modules_partition_merge_and_warn_in_light_mode(self):
         for relative in ("modules/phenosv/main.nf", "modules/multi_phenosv/main.nf"):
             source = (REPO / relative).read_text(encoding="utf-8")
@@ -16,12 +24,14 @@ class RepairContractTests(unittest.TestCase):
             self.assertIn("members_tsv", source)
             self.assertIn("--members $members_tsv", source)
             self.assertIn("PhenoSV-light has reduced accuracy for translocations", source)
+            self.assertIn("PHENOSV_EVENT_ID", source)
+            self.assertIn("PHENOSV_GENE_SCORE", source)
             self.assertEqual(1, source.count("head -n 1 ${out_prefix}.phenosv.simple.tsv"))
             self.assertIn("tail -n +2 ${out_prefix}.phenosv.bnd.tsv", source)
 
     def test_phenosv_image_does_not_patch_upstream_checkout(self):
         dockerfile = (DOCKER_WORK / "phenosv/Dockerfile").read_text(encoding="utf-8")
-        self.assertIn("phenosv_0.2", dockerfile)
+        self.assertIn("phenosv_0.3", dockerfile)
         self.assertNotRegex(dockerfile, r"sed .*PhenoSV|operation_function|git apply|patch ")
 
     def test_rankscore_ad_is_wired_to_all_callers(self):
@@ -45,7 +55,7 @@ class RepairContractTests(unittest.TestCase):
         pinned = {
             path.parent.name
             for path in (REPO / "modules").glob("*/main.nf")
-            if "longphase_0.2.33" in path.read_text(encoding="utf-8")
+            if "longphase_0.2.34" in path.read_text(encoding="utf-8")
         }
         self.assertEqual(prioritization, pinned)
         for merge_module in (
@@ -53,7 +63,7 @@ class RepairContractTests(unittest.TestCase):
             "merge_shortread_sv_callers", "multi_merge_shortread_sv_callers",
         ):
             self.assertNotIn(
-                "longphase_0.2.33",
+                "longphase_0.2.34",
                 (REPO / "modules" / merge_module / "main.nf").read_text(encoding="utf-8"),
             )
 

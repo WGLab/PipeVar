@@ -1,7 +1,7 @@
 
 // Score and prioritize structural variants with phenotype-aware PhenoSV model.
 process PhenoSV {
-	container ='beoungl/docker_test:phenosv_0.2'
+	container ='beoungl/docker_test:phenosv_0.3'
 
 
 	input:
@@ -31,8 +31,8 @@ process PhenoSV {
 
 	mkdir -p \$phenosv_dir
 
-	printf 'SV_ID\tCHROM\tSTART\tEND\tSVTYPE\tPATHOGENICITY\tPHEN2GENE\tPHENOSV_SCORE\tPHENOSV_TYPE\n' > ${out_prefix}.phenosv.simple.tsv
-	printf 'SV_ID\tCHROM\tSTART\tEND\tSVTYPE\tPATHOGENICITY\tPHEN2GENE\tPHENOSV_SCORE\tPHENOSV_TYPE\n' > ${out_prefix}.phenosv.bnd.tsv
+	printf 'SV_ID\tPHENOSV_EVENT_ID\tCHROM\tSTART\tEND\tSVTYPE\tPATHOGENICITY\tPHEN2GENE\tPHENOSV_SCORE\tPHENOSV_TYPE\tPHENOSV_GENE\tPHENOSV_GENE_SCORE\n' > ${out_prefix}.phenosv.simple.tsv
+	printf 'SV_ID\tPHENOSV_EVENT_ID\tCHROM\tSTART\tEND\tSVTYPE\tPATHOGENICITY\tPHEN2GENE\tPHENOSV_SCORE\tPHENOSV_TYPE\tPHENOSV_GENE\tPHENOSV_GENE_SCORE\n' > ${out_prefix}.phenosv.bnd.tsv
 
 	simple_rows=\$(awk 'NF {count++} END {print count+0}' $phenosv_bed)
 	if [[ \$simple_rows -gt 0 ]]; then

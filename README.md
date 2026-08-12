@@ -352,9 +352,11 @@ CNVnator is enabled by default for short-read SV/all-NGS calling with `--cnvnato
 Long-read SV discovery uses Sniffles. Full ONT and PacBio workflows pass the complete
 Sniffles VCF, including supporting read names, to LongPhase. Annotation, common-SV,
 de novo, and phenotype filtering remain a separate evidence branch. PipeVar uses the
-whole-event PhenoSV score from the `Elements=SV` row, obtains gene symbols from the
-curated ANNOVAR `Gene.refGene` annotation, and joins both to LongPhase's phased
-Sniffles output by exact VCF ID.
+whole-event PhenoSV score from the `Elements=SV` row for thresholding and reporting,
+while selecting exactly one gene name from the highest-scoring PhenoSV gene row for
+that event. Curated ANNOVAR `Gene.refGene` overlaps remain audit metadata and do not
+expand the selected PhenoSV event into multiple gene results. Evidence is joined to
+LongPhase's phased Sniffles output by exact VCF ID.
 
 At the SURVIVOR/PhenoSV boundary, PipeVar_mito creates four staged files: a canonical
 simple-SV BED with `DEL`, `DUP`, `INV`, and `INS`; a temporary PhenoSV BED using
@@ -363,17 +365,34 @@ for BND/TRA adjacencies; and a member TSV mapping each scored adjacency to its o
 VCF ID or reciprocal pair of IDs. Simple BED and BEDPE partitions are scored separately
 and merged beneath one output header. Reciprocal BND scores are expanded back to both
 original IDs, so downstream VCF reconstruction retains the original ALT, `SVTYPE=BND`,
-`MATEID`, genotype, and record IDs. Valid BNDs without `MATEID` are scored as singleton
-adjacencies.
+`MATEID`, genotype, and record IDs. Both mates share a `PHENOSV_EVENT_ID`, allowing
+prioritization and reports to count the adjacency once while variant VCFs retain both
+physical records. Valid BNDs without `MATEID` are scored as singleton adjacencies.
+
+SV type resolution at this boundary validates `INFO/SVTYPE` against the VCF ALT rather
+than trusting either field alone. A single symbolic ALT can supply a missing type and
+can refine DRAGEN's generic `SVTYPE=CNV` to `DEL` or `DUP`; first-level symbolic
+subtypes such as `<DUP:TANDEM>` and `<INS:ME:ALU>` map to their canonical families.
+Valid bracket ALT can likewise supply a missing `BND` type. Concrete INFO/ALT
+conflicts, multiallelic ALT, `<CNV>`, LOH, missing/non-variant ALT, and unclassifiable
+literal alleles are warned and skipped instead of being guessed from `SVLEN`, copy
+number, or record ID.
+
+Simple events normally retain the unique coordinates emitted by `SURVIVOR vcftobed`.
+If SURVIVOR omits an otherwise valid DRAGEN-style `CNV` record whose ALT is exactly one
+`<DEL>` or `<DUP>`, PipeVar uses validated VCF `POS`/`END` as a BED interval and reports
+the fallback in the conversion summary. Canonical PhenoSV intermediates then carry
+`DEL` or `DUP`, but exact-ID downstream reconstruction preserves the original DRAGEN
+ALT, `SVTYPE=CNV`, coordinates, genotype, and other VCF fields.
 
 PhenoSV-light continues to score BEDPE input but emits a reduced-translocation-accuracy
 warning. The pinned upstream PhenoSV checkout is not modified: PipeVar sends
 `duplication` at the tool boundary and restores canonical `DUP` in its own output, while
 the pinned upstream implementation still applies its deletion-like internal duplication
-transformation. The reserved `survivor_0.1` and `phenosv_0.2` images must be built before
+transformation. The reserved `survivor_0.2` and `phenosv_0.3` images must be built before
 these paths can run.
 
-This repair also reserves `rankscore_0.2.22`, `longphase_0.2.33`,
+This repair also reserves `rankscore_0.2.22`, `longphase_0.2.34`,
 `validate_preannotated_annovar_pair_0.3`, and `mito_annotation_0.4.2`. These tags are
 intentionally unpublished in this source change;
 a post-build mixed DEL/DUP/INV/INS/BND smoke test is a release gate before publication.
@@ -666,11 +685,14 @@ Outputs are published to `--output_directory`. Exact files depend on `--mode`, `
   - `*.sniffles.vcf` (includes `RNAMES` for LongPhase phasing)
 - Downstream SV prioritization:
   - `*.exonic.vcf`
-  - `*.phenosv.filtered.tsv`, with one whole-SV row per passing event and columns
-    `SV_ID`, `CHROM`, `START`, `END`, `SVTYPE`, `PATHOGENICITY`, `PHEN2GENE`,
-    `PHENOSV_SCORE`, and `PHENOSV_TYPE`
-  - Final prioritized VCFs use ANNOVAR genes with the event-level `PHENO_SCORE`;
-    PhenoSV gene-row scores are not used as independent evidence.
+  - `*.phenosv.filtered.tsv`, with one row per passing physical SV record and columns
+    `SV_ID`, `PHENOSV_EVENT_ID`, `CHROM`, `START`, `END`, `SVTYPE`, `PATHOGENICITY`,
+    `PHEN2GENE`, `PHENOSV_SCORE`, `PHENOSV_TYPE`, `PHENOSV_GENE`, and
+    `PHENOSV_GENE_SCORE`. Reciprocal BND member rows share the logical event ID.
+  - Final prioritized VCFs use the selected `PHENOSV_GENE` with the whole-event
+    `PHENO_SCORE`. `PHENOSV_GENE_SCORE` records why the gene was selected but is not
+    used for thresholding or final scoring; all ANNOVAR overlaps are retained only in
+    `ANNOVAR_IMPACTED_GENES`.
 
 ### Repeat Expansion Outputs
 

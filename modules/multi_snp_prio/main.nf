@@ -1,7 +1,7 @@
 
 // Batch SNP evidence merging (ClinVar/RankScore/RankVar) to prioritized VCF.
 process multi_snp_prio {
-	container ='beoungl/docker_test:longphase_0.2.33'
+	container ='beoungl/docker_test:longphase_0.2.34'
 
 	input:
 	tuple val(out_prefix), path(snv_rankscore), path(snv_pathogenic), path(snv_rankvar), path(annovar_vcf), path(hpo_path), val(age_of_onset), val(sex)

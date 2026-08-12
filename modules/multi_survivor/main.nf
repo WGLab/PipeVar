@@ -2,7 +2,7 @@
 
 // Batch conversion/aggregation of SV calls into BED format via SURVIVOR.
 process multi_survivor {
-        container ='beoungl/docker_test:survivor_0.1'
+        container ='beoungl/docker_test:survivor_0.2'
 
         input:
         tuple val(out_prefix), path(vcf)

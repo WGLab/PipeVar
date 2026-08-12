@@ -14,5 +14,5 @@
 - The DRAGEN compatibility path uses `gatk RevertSam --RESTORE_HARDCLIPS false` before `bwa mem` realignment.
 - Long-read BAM/CRAM runs use Sniffles as their structural-variant caller.
 - Full ONT and PacBio workflows send the complete Sniffles VCF with `RNAMES` to LongPhase; targeted, de novo, common-SV, and phenotype filters affect the reporting branch, not the phasing context.
-- PipeVar retains only the whole-event PhenoSV `Elements=SV` score, imports genes from the curated ANNOVAR `Gene.refGene` field, and intersects both with the phased Sniffles output by exact VCF ID before final prioritization.
+- PipeVar uses the whole-event PhenoSV `Elements=SV` score for filtering and reporting, selects one gene from the highest-scoring PhenoSV gene row, retains ANNOVAR overlaps as audit-only metadata, and intersects the event with phased Sniffles output by exact VCF ID before final prioritization.
 - `PS` is optional. Matching valid PS values retain phase-set-aware trans/cis handling; if either PS is missing or malformed, PipeVar falls back to pipe-phased GT orientation. Different valid PS values and slash/mixed GT pairs follow `--allow_unphased_comphet`. GT fallback across unknown phase blocks is heuristic.
