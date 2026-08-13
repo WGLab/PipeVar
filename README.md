@@ -392,12 +392,30 @@ the pinned upstream implementation still applies its deletion-like internal dupl
 transformation. The reserved `survivor_0.2` and `phenosv_0.3` images must be built before
 these paths can run.
 
-This repair also reserves `rankscore_0.2.22`, `longphase_0.2.34`,
+This repair also reserves `rankscore_0.2.22`, `longphase_0.2.35`,
 `validate_preannotated_annovar_pair_0.3`, and `mito_annotation_0.4.2`. These tags are
 intentionally unpublished in this source change;
 a post-build mixed DEL/DUP/INV/INS/BND smoke test is a release gate before publication.
 
 ### ClinVar And Compound-Heterozygous Semantics
+
+Final evidence ordering is `ClinVar > RankVar+RankScore > RankVar >
+{RankScore, PhenoSV, Duplication}`. RankScore and PhenoSV share one priority class;
+their 0-1 scores are compared directly, followed by deterministic category and variant
+coordinate tie-breakers. RankVar therefore remains higher priority even when its score is
+lower. The same equivalence-class ordering is used for compound-heterozygous pairs.
+A `RankVar+RankScore` SNV paired with a PhenoSV AR event therefore ranks above both
+`RankScore+PhenoSV` and `PhenoSV+PhenoSV` AR pairs, regardless of their within-class
+scores.
+
+PhenoSV events carry `PIPEVAR_SVTYPE`, a canonical SV family retained separately from
+the caller's original `SVTYPE`. This preserves caller provenance while allowing validated
+records such as `SVTYPE=CNV;ALT=<DUP>` to be handled as duplications. A duplication with
+at least one numeric alternate GT allele is reported once as `MODEL=Duplication` and
+`PRIO_CAT=PhenoSV_DUP`, independent of AD/AR prediction and without participating in
+compound-heterozygous pairing. Reference and entirely missing genotypes are excluded.
+Existing common-SV, PhenoSV-score, selected-gene, and optional gene-list filters still
+apply before this standalone duplication rule.
 
 ClinVar filtering reads the `CLNSIG` column by header name rather than searching whole
 ANNOVAR rows. Accepted values are canonicalized to `Pathogenic`, `Likely_pathogenic`, or
@@ -692,7 +710,9 @@ Outputs are published to `--output_directory`. Exact files depend on `--mode`, `
   - Final prioritized VCFs use the selected `PHENOSV_GENE` with the whole-event
     `PHENO_SCORE`. `PHENOSV_GENE_SCORE` records why the gene was selected but is not
     used for thresholding or final scoring; all ANNOVAR overlaps are retained only in
-    `ANNOVAR_IMPACTED_GENES`.
+    `ANNOVAR_IMPACTED_GENES`. `PIPEVAR_SVTYPE` records the canonical SV family without
+    replacing the original caller `SVTYPE`; standalone duplications additionally carry
+    `MODEL=Duplication` and `PRIO_CAT=PhenoSV_DUP`.
 
 ### Repeat Expansion Outputs
 

@@ -55,7 +55,7 @@ class RepairContractTests(unittest.TestCase):
         pinned = {
             path.parent.name
             for path in (REPO / "modules").glob("*/main.nf")
-            if "longphase_0.2.34" in path.read_text(encoding="utf-8")
+            if "longphase_0.2.35" in path.read_text(encoding="utf-8")
         }
         self.assertEqual(prioritization, pinned)
         for merge_module in (
@@ -63,9 +63,16 @@ class RepairContractTests(unittest.TestCase):
             "merge_shortread_sv_callers", "multi_merge_shortread_sv_callers",
         ):
             self.assertNotIn(
-                "longphase_0.2.34",
+                "longphase_0.2.35",
                 (REPO / "modules" / merge_module / "main.nf").read_text(encoding="utf-8"),
             )
+
+    def test_common_sv_filter_uses_canonical_duplication_image(self):
+        for module in ("common_sv_filter", "multi_common_sv_filter"):
+            source = (REPO / "modules" / module / "main.nf").read_text(encoding="utf-8")
+            self.assertIn("common_sv_filter_0.4", source)
+        dockerfile = (DOCKER_WORK / "common_sv_filter/Dockerfile").read_text(encoding="utf-8")
+        self.assertIn("common_sv_filter_0.4", dockerfile)
 
     def test_rankscore_clinvar_filter_is_header_indexed(self):
         source = (DOCKER_WORK / "rankscore/clinvar.sh").read_text(encoding="utf-8")

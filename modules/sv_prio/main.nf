@@ -1,7 +1,7 @@
 
 // Merge SV evidence sources into a final prioritized SV VCF.
 process sv_prio {
-	container ='beoungl/docker_test:longphase_0.2.34'
+	container ='beoungl/docker_test:longphase_0.2.35'
 
 	input:
 	val(out_prefix) 

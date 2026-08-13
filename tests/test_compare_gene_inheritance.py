@@ -85,6 +85,22 @@ class InheritanceComparisonTests(unittest.TestCase):
         self.assertEqual(("AD", "AR"), encoded)
         self.assertEqual(("AD", "AR"), legacy)
 
+    def test_pipevar_skips_standalone_duplication_for_inheritance_comparison(self):
+        path = self.write(
+            self.root / "pipevar_dup.tsv",
+            "#RANK\tGENE\tPRIORITY_TIER\tVCF_LINE\n"
+            "1\tGENEDUP\tPhenoSV_DUP\t"
+            "chr1\t100\tdup1\tN\t<DUP>\t.\tPASS\tGene=GENEDUP;MODEL=Duplication;PIPEVAR_SVTYPE=DUP\tGT\t0/1\n"
+            "2\tGENEAR\tRankVar_AR_Hom\t"
+            "chr1\t200\t.\tA\tG\t.\tPASS\tGene=GENEAR;MODEL=Recessive\tGT\t1/1\n",
+        )
+
+        rankings = MODULE.read_pipevar(path)
+
+        self.assertEqual([("GENEAR", "AR", 2)], [
+            (item.gene, item.inheritance, item.rank) for item in rankings
+        ])
+
     def test_exomiser_accepts_duplicate_ranks_and_x_recessive(self):
         path = self.write(
             self.root / "genes.tsv",

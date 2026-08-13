@@ -297,6 +297,19 @@ def parse_info_models(vcf_tail: str) -> tuple[str, ...]:
     return tuple(models)
 
 
+def has_standalone_duplication_model(vcf_tail: str) -> bool:
+    for record in vcf_tail.split(" ||| "):
+        fields = record.split("\t")
+        if len(fields) < 8:
+            continue
+        for item in fields[7].split(";"):
+            if item.startswith("MODEL="):
+                values = re.split(r"[,|]+", item.split("=", 1)[1])
+                if any(value.strip().upper() == "DUPLICATION" for value in values):
+                    return True
+    return False
+
+
 def infer_pipevar_tier_model(tier: str) -> str | None:
     normalized = tier.strip().upper()
     if "HEMIZYGOUS" in normalized:
@@ -333,11 +346,14 @@ def read_pipevar(path: Path) -> tuple[InheritanceRanking, ...]:
         gene = normalize_gene(fields[indices["GENE"]])
         if not gene:
             raise ResultFormatError(f"row {line_number} has an empty GENE")
-        models = parse_info_models(fields[vcf_index]) if vcf_index is not None and len(fields) > vcf_index else ()
+        vcf_tail = fields[vcf_index] if vcf_index is not None and len(fields) > vcf_index else ""
+        models = parse_info_models(vcf_tail) if vcf_tail else ()
         if not models:
             fallback = infer_pipevar_tier_model(fields[indices["PRIORITY_TIER"]])
             models = (fallback,) if fallback else ()
         if not models:
+            if has_standalone_duplication_model(vcf_tail):
+                continue
             raise ResultFormatError(
                 f"row {line_number} has no recognized inheritance prediction"
             )

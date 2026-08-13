@@ -1,6 +1,6 @@
 // Filter common structural variants from a single ANNOVAR SV VCF.
 process common_sv_filter {
-	container = 'beoungl/docker_test:common_sv_filter_0.3'
+	container = 'beoungl/docker_test:common_sv_filter_0.4'
 
 	input:
 	path vcf
