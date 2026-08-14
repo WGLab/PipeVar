@@ -190,6 +190,8 @@ Single VCF mode re-annotates and prioritizes an existing VCF. Mitochondrial anal
 ### Annotated SNV And Annotated SV
 
 Annotated SNV mode starts from ANNOVAR multianno SNV outputs.
+PipeVar validates the supplied TXT/VCF pair in place and passes the original paths
+downstream; it does not create full-size `*.validated.hg38_multianno.*` copies.
 
 Single-sample annotated SNV required:
 
@@ -392,12 +394,28 @@ the pinned upstream implementation still applies its deletion-like internal dupl
 transformation. The reserved `survivor_0.2` and `phenosv_0.3` images must be built before
 these paths can run.
 
-This repair also reserves `rankscore_0.2.22`, `longphase_0.2.35`,
-`validate_preannotated_annovar_pair_0.3`, and `mito_annotation_0.4.2`. These tags are
+This repair also reserves `rankscore_0.3.0`, `rankvar_0.2.0`, `longphase_0.4.0`,
+`validate_preannotated_annovar_pair_0.4`, and `mito_annotation_0.4.2`. These tags are
 intentionally unpublished in this source change;
 a post-build mixed DEL/DUP/INV/INS/BND smoke test is a release gate before publication.
 
 ### ClinVar And Compound-Heterozygous Semantics
+
+Small-variant population filtering is inheritance-aware. RankVar and RankScore first
+receive candidates at the permissive AR ceiling (`--gnomad_af_ar`, default `0.01`).
+Final scenario construction then applies `--gnomad_af_ad` (default `0.001`) to
+AD, XLD, and de novo hypotheses and the AR ceiling to AR and XLR hypotheses. A
+dual-mode record can therefore fail its dominant hypothesis while remaining eligible
+for a recessive homozygous or compound-heterozygous hypothesis. Exact threshold
+values pass. Missing or absent gnomAD fields retain the historical behavior and are
+normalized to zero; malformed non-missing values fail validation.
+
+PipeVar selects the maximum available gnomAD 4.1 exome/genome group-max FAF95,
+falling back to the maximum group-max observed AF when FAF95 is unavailable. The
+selected value and source are retained in `PIPEVAR_GNOMAD_AF` and
+`PIPEVAR_GNOMAD_SOURCE`. ClinVar P/LP candidates are retained through assignment
+regardless of AF so conflicts remain auditable, but they are not automatically rescued
+into a frequency-incompatible primary scenario.
 
 Final evidence ordering is `ClinVar > RankVar+RankScore > RankVar >
 {RankScore, PhenoSV, Duplication}`. RankScore and PhenoSV share one priority class;
@@ -444,9 +462,25 @@ blocks, so GT-fallback trans/cis labels are not equivalent to shared-PS confirma
 
 ### Common-SV Filtering
 
-Common-SV filtering removes common SVs before PhenoSV and final SV prioritization. It is enabled by default in `nextflow.config` with `--common_sv_filter yes`.
+Common-SV filtering is inheritance-aware and is enabled by default with
+`--common_sv_filter yes`. The `common_sv_filter_0.5` image packages a sample-column-free,
+compressed copy of `common_svs_filter.vcf`, generated with `AF>0.004`; its observed AF
+range is 0.005–0.96. This cohort frequency is explicitly distinct from gnomAD.
 
-Matching thresholds are controlled by `--common_sv_af`, `--common_sv_reciprocal_overlap`, `--common_sv_distance`, `--common_sv_ins_distance`, and `--common_sv_ins_identity`.
+The common-SV matcher retains its DEL/DUP/INV/CNV/INS matching rules. Matches above
+the permissive AR ceiling (`--common_sv_af_ar`, default `0.01`) are removed before
+PhenoSV. Matches at or below that ceiling are annotated with the cohort ID, AF, match
+method, overlap, and insertion identity and continue to assignment. Final scenarios use
+`--common_sv_af_ad` (default `0.005`) for AD, XLD, de novo, duplication, ClinVar-only,
+and other unknown-MOI SVs, and the AR ceiling for AR/XLR SVs. Exact ceiling values pass;
+a dual-mode SV at AF 0.008 therefore loses only its dominant scenario. BND/TRA remain
+unevaluated, mitochondrial events are exempt, and disabling the filter produces
+`NOT_EVALUATED` decisions rather than an implied AF of zero.
+
+The deprecated `--common_sv_af` option maps one supplied value to both ceilings when
+used alone and cannot be mixed with either new option. Matching geometry remains
+configurable through `--common_sv_reciprocal_overlap`, `--common_sv_distance`,
+`--common_sv_ins_distance`, and `--common_sv_ins_identity`.
 
 ### De Novo Filtering
 
@@ -521,7 +555,9 @@ Defaults below come from `nextflow.config`.
 | --- | --- | --- |
 | `--note` | `null` | Clinical note path, or `no` in CSV mode to treat `note_path` as HPO |
 | `--hpo` | `null` | HPO term file |
-| `--gnomad` | `0.0001` | Maximum gnomAD AF for SNP prioritization |
+| `--gnomad_af_ad` | `0.001` | Maximum normalized gnomAD AF for AD, XLD, and de novo small-variant scenarios |
+| `--gnomad_af_ar` | `0.01` | Maximum normalized gnomAD AF for AR/XLR scenarios and upstream candidate retention |
+| `--gnomad` | `null` | Deprecated universal cutoff; when supplied alone, maps to both AD and AR thresholds |
 | `--inheritance_mode` | `ml` | `ml`, `omim`, or `gnomad`; `gnomad` maps to LOEUF fallback lists |
 | `--include_clinvar_report` | `yes` | Include ClinVar-only calls in final prioritized outputs |
 | `--allow_unphased_comphet` | `no` | Allow unresolved AR pairs with different valid PS, slash-unphased GT, or mixed phased/unphased GT; GT fallback handles missing/malformed PS |
@@ -572,8 +608,10 @@ retain NanoCaller indels without AD. Other callers do not receive the DP fallbac
 
 | Parameter | Default | Description |
 | --- | --- | --- |
-| `--common_sv_filter` | `yes` | Remove common SVs before PhenoSV and final SV prioritization |
-| `--common_sv_af` | `0.01` | Minimum AF used to treat baked common SV database records as common |
+| `--common_sv_filter` | `yes` | Annotate common-SV matches, remove those above the permissive AR ceiling, and apply inheritance-aware final filtering |
+| `--common_sv_af_ad` | `0.005` | Maximum custom-cohort AF for AD/XLD/de novo/unknown-MOI SV scenarios |
+| `--common_sv_af_ar` | `0.01` | Maximum custom-cohort AF for AR/XLR SV scenarios and upstream retention |
+| `--common_sv_af` | `null` | Deprecated universal cutoff; when supplied alone, maps to both SV thresholds |
 | `--common_sv_reciprocal_overlap` | `0.5` | Minimum reciprocal overlap for interval SV matching |
 | `--common_sv_distance` | `1000` | Breakpoint fallback distance for interval SV matching |
 | `--common_sv_ins_distance` | `500` | Insertion position window for common matching |
@@ -687,6 +725,7 @@ Outputs are published to `--output_directory`. Exact files depend on `--mode`, `
   - `*.clinvar.txt`
   - `*.rank_var.tsv`
   - `*.rankscore_filtered.tsv`
+  - `*.frequency_audit.tsv`, with one row per assigned variant/gene/model and its normalized AF, source, threshold, decision, reason, and common-SV match provenance where applicable
   - ANNOVAR intermediate/final files such as `*.hg38_multianno.*`
   - `*.mito.annotated.tsv`
   - `*.mito.annotated.vcf.gz`
@@ -703,6 +742,9 @@ Outputs are published to `--output_directory`. Exact files depend on `--mode`, `
   - `*.sniffles.vcf` (includes `RNAMES` for LongPhase phasing)
 - Downstream SV prioritization:
   - `*.exonic.vcf`
+  - `*.common_sv_filtered.vcf`, containing unmatched SVs and retained common-cohort matches at or below the permissive ceiling
+  - `*.common_sv_removed.vcf`, containing annotated matches above the permissive ceiling
+  - `*.common_sv_filter.summary.tsv`, with retained/removed and match counts
   - `*.phenosv.filtered.tsv`, with one row per passing physical SV record and columns
     `SV_ID`, `PHENOSV_EVENT_ID`, `CHROM`, `START`, `END`, `SVTYPE`, `PATHOGENICITY`,
     `PHEN2GENE`, `PHENOSV_SCORE`, `PHENOSV_TYPE`, `PHENOSV_GENE`, and

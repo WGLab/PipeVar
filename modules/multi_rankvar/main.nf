@@ -1,7 +1,7 @@
 
 // Batch RankVar prioritization combining annotation, phenotype genes, and HPO.
 process multi_rankvar {
-        container ='beoungl/docker_test:rankvar_0.1'
+	container ='beoungl/docker_test:rankvar_0.2.0'
 	
 	input:
 	tuple val(out_prefix), path(vcf), path(phen2gene), path(hpo) 
@@ -19,6 +19,10 @@ process multi_rankvar {
 	"""
 	source /conda/etc/profile.d/conda.sh
 	conda activate rankvar
+	python /opt/RankVar/normalize_gnomad_frequency.py normalize \
+	    --input $vcf \
+	    --output ${out_prefix}.gnomad_normalized.txt \
+	    --max-af $gnomad
 
 	# Prefilter ANNOVAR table before RankVar to reduce input size:
 	# exonic/splicing only + non-reference GT from Otherinfo12/Otherinfo13.
@@ -49,16 +53,22 @@ process multi_rankvar {
 	    pass_qc = 0
 	    if (fmt_idx>0 && smp_idx>0) pass_qc = pass_gt(\$(fmt_idx), \$(smp_idx))
 	    if (pass_qc) print
-	}' $vcf > ${out_prefix}.rankvar_temp.txt
+	}' ${out_prefix}.gnomad_normalized.txt > ${out_prefix}.rankvar_temp.txt
 
 
-	python $rankvar_script --annovar ${out_prefix}.rankvar_temp.txt --output ${out_prefix}_rankvar --hpo_ids $hpo --phen2gene $phen2gene --gq $gq --ad $ad --gnomad $gnomad $nanocaller_dp_arg
+	# The shared normalizer is the AF authority; disable RankVar's internal,
+	# implementation-specific population-frequency pruning.
+	python $rankvar_script --annovar ${out_prefix}.rankvar_temp.txt --output ${out_prefix}_rankvar --hpo_ids $hpo --phen2gene $phen2gene --gq $gq --ad $ad --gnomad 1 $nanocaller_dp_arg
 	
 		
 
 
 	# This pathogenicity score cutoff is configurable via workflow param.
-	awk -F'\t' -v cutoff="$rankvar_filter" 'NR==1 || \$12 > cutoff' ${out_prefix}_rankvar/rank_var.tsv > ${out_prefix}.rank_var.tsv
+	awk -F'\t' -v cutoff="$rankvar_filter" 'NR==1 || \$12 > cutoff' ${out_prefix}_rankvar/rank_var.tsv > ${out_prefix}.rank_var.unannotated.tsv
+	python /opt/RankVar/normalize_gnomad_frequency.py annotate \
+	    --input ${out_prefix}.rank_var.unannotated.tsv \
+	    --annotations ${out_prefix}.rankvar_temp.txt \
+	    --output ${out_prefix}.rank_var.tsv
 
 	# Replace ANNOVAR-normalized coordinates with VCF-origin coordinates (Otherinfo4/5/7/8)
 	# to preserve matching with phased VCF records in splicing variants.
@@ -97,7 +107,7 @@ process multi_rankvar {
 	}
 	' $vcf ${out_prefix}.rank_var.tsv > ${out_prefix}.rank_var.tsv.tmp && mv ${out_prefix}.rank_var.tsv.tmp ${out_prefix}.rank_var.tsv
 
-	rm ${out_prefix}.rankvar_temp.txt
+	rm ${out_prefix}.gnomad_normalized.txt ${out_prefix}.rankvar_temp.txt ${out_prefix}.rank_var.unannotated.tsv
 
 	"""
 }

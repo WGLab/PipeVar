@@ -313,7 +313,10 @@ def read_exomiser_ranking(path: Path) -> tuple[RankedGene, ...]:
         if gene in seen_genes:
             continue
         seen_genes.add(gene)
-        rankings.append(RankedGene(gene, len(rankings) + 1, raw_rank))
+        # Exomiser #RANK is the authoritative GeneScore rank. A gene can
+        # appear more than once for different MOIs, so retain its first/best
+        # native rank without compressing the remaining genes into a new list.
+        rankings.append(RankedGene(gene, raw_rank, raw_rank))
     return tuple(rankings)
 
 
@@ -489,7 +492,7 @@ def write_detail_report(path: Path, results: Iterable[SampleResult]) -> None:
         "exomiser_status",
         "exomiser_error",
         "exomiser_matched_gene",
-        "exomiser_best_unique_rank",
+        "exomiser_best_rank",
         "exomiser_best_raw_rank",
         "exomiser_top1",
         "exomiser_top5",
@@ -529,7 +532,7 @@ def write_detail_report(path: Path, results: Iterable[SampleResult]) -> None:
                     "exomiser_status": result.exomiser_result.status,
                     "exomiser_error": result.exomiser_result.error,
                     "exomiser_matched_gene": result.exomiser_match.matched_gene,
-                    "exomiser_best_unique_rank": display_optional(
+                    "exomiser_best_rank": display_optional(
                         result.exomiser_match.rank
                     ),
                     "exomiser_best_raw_rank": display_optional(
@@ -568,9 +571,10 @@ def format_top_rankings(
     )
 
 
-def not_found_category(result: SampleResult) -> str:
-    pipevar_missing = result.pipevar_match.rank is None
-    exomiser_missing = result.exomiser_match.rank is None
+def not_found_category(result: SampleResult, cutoff: int = CUTOFFS[-1]) -> str:
+    """Return which primary tool missed the truth gene at the requested cutoff."""
+    pipevar_missing = not hit_at_cutoff(result.pipevar_match, cutoff)
+    exomiser_missing = not hit_at_cutoff(result.exomiser_match, cutoff)
     if pipevar_missing and exomiser_missing:
         return "both"
     if pipevar_missing:
@@ -584,13 +588,18 @@ def write_not_found_report(path: Path, results: Iterable[SampleResult]) -> int:
     fieldnames = [
         "sample_id",
         "truth_genes",
-        "not_found_in",
-        "pipevar_truth_gene_found",
-        "exomiser_truth_gene_found",
-        "rankvar_truth_gene_found",
+        "not_in_top20",
+        "pipevar_truth_gene_top20",
+        "exomiser_truth_gene_top20",
+        "rankvar_truth_gene_top20",
+        "pipevar_truth_gene_found_anywhere",
+        "exomiser_truth_gene_found_anywhere",
+        "rankvar_truth_gene_found_anywhere",
         "pipevar_status",
         "pipevar_error",
         "pipevar_path",
+        "pipevar_matched_gene",
+        "pipevar_best_rank",
         "pipevar_top20_genes",
         "rankvar_status",
         "rankvar_error",
@@ -601,6 +610,8 @@ def write_not_found_report(path: Path, results: Iterable[SampleResult]) -> int:
         "exomiser_status",
         "exomiser_error",
         "exomiser_path",
+        "exomiser_matched_gene",
+        "exomiser_best_rank",
         "exomiser_top20_genes",
     ]
     diagnostic_results = [
@@ -617,19 +628,32 @@ def write_not_found_report(path: Path, results: Iterable[SampleResult]) -> int:
                     {
                         "sample_id": result.truth.sample_id,
                         "truth_genes": ";".join(result.truth.genes),
-                        "not_found_in": not_found_category(result),
-                        "pipevar_truth_gene_found": int(
+                        "not_in_top20": not_found_category(result),
+                        "pipevar_truth_gene_top20": int(
+                            hit_at_cutoff(result.pipevar_match, 20)
+                        ),
+                        "exomiser_truth_gene_top20": int(
+                            hit_at_cutoff(result.exomiser_match, 20)
+                        ),
+                        "rankvar_truth_gene_top20": int(
+                            hit_at_cutoff(result.rankvar_match, 20)
+                        ),
+                        "pipevar_truth_gene_found_anywhere": int(
                             result.pipevar_match.rank is not None
                         ),
-                        "exomiser_truth_gene_found": int(
+                        "exomiser_truth_gene_found_anywhere": int(
                             result.exomiser_match.rank is not None
                         ),
-                        "rankvar_truth_gene_found": int(
+                        "rankvar_truth_gene_found_anywhere": int(
                             result.rankvar_match.rank is not None
                         ),
                         "pipevar_status": result.pipevar_result.status,
                         "pipevar_error": result.pipevar_result.error,
                         "pipevar_path": result.pipevar_path,
+                        "pipevar_matched_gene": result.pipevar_match.matched_gene,
+                        "pipevar_best_rank": display_optional(
+                            result.pipevar_match.rank
+                        ),
                         "pipevar_top20_genes": format_top_rankings(
                             result.pipevar_result.rankings
                         ),
@@ -646,6 +670,10 @@ def write_not_found_report(path: Path, results: Iterable[SampleResult]) -> int:
                         "exomiser_status": result.exomiser_result.status,
                         "exomiser_error": result.exomiser_result.error,
                         "exomiser_path": result.exomiser_path,
+                        "exomiser_matched_gene": result.exomiser_match.matched_gene,
+                        "exomiser_best_rank": display_optional(
+                            result.exomiser_match.rank
+                        ),
                         "exomiser_top20_genes": format_top_rankings(
                             result.exomiser_result.rankings
                         ),

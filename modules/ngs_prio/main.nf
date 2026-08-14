@@ -1,7 +1,7 @@
 
 // Integrate NGS SNV/SV evidence and produce a prioritized VCF.
 process ngs_prio {
-	container ='beoungl/docker_test:longphase_0.2.35'
+	container ='beoungl/docker_test:longphase_0.4.0'
 
 	input:
 	val(out_prefix)
@@ -19,6 +19,7 @@ process ngs_prio {
 	output:
 	path "${out_prefix}.prio.vcf"
 	path "${out_prefix}.prio_gene.vcf"
+	path "${out_prefix}.frequency_audit.tsv"
 
 	
 	script:
@@ -45,8 +46,8 @@ process ngs_prio {
 	fi
 
 	# Keep the ranked gene-level report and also emit a ranked variant-level VCF.
-	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio_gene.vcf gene --include-clinvar $include_clinvar_report --allow-unphased-comphet $allow_unphased_comphet --genes "$gene_filter"
-	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio.vcf variant --include-clinvar $include_clinvar_report --allow-unphased-comphet $allow_unphased_comphet --genes "$gene_filter"
+	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio_gene.vcf gene --include-clinvar $include_clinvar_report --allow-unphased-comphet $allow_unphased_comphet --genes "$gene_filter" --gnomad-af-ad ${params.gnomad_af_ad} --gnomad-af-ar ${params.gnomad_af_ar} --common-sv-af-ad ${params.common_sv_af_ad} --common-sv-af-ar ${params.common_sv_af_ar} --common-sv-filter ${params.common_sv_filter} --de-novo ${params.denovo_filter} --frequency-audit ${out_prefix}.frequency_audit.tsv
+	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio.vcf variant --include-clinvar $include_clinvar_report --allow-unphased-comphet $allow_unphased_comphet --genes "$gene_filter" --gnomad-af-ad ${params.gnomad_af_ad} --gnomad-af-ar ${params.gnomad_af_ar} --common-sv-af-ad ${params.common_sv_af_ad} --common-sv-af-ar ${params.common_sv_af_ar} --common-sv-filter ${params.common_sv_filter} --de-novo ${params.denovo_filter}
 
 	"""
 

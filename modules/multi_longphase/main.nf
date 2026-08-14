@@ -1,7 +1,7 @@
 
 // Batch longphase phasing and evidence aggregation into prioritized VCFs.
 process multi_longphase {
-	container ='beoungl/docker_test:longphase_0.2.35'
+	container ='beoungl/docker_test:longphase_0.4.0'
 
 	input:
 	tuple val(out_prefix), path(snv_rankvar), path(snv_rankscore), path(snv_pathogenic), path(sv_pathogenic), path(sv_phase_vcf), path(sv_annotation_vcf), path(snv_vcf_path), path(bam_path), path(bam_index), path(hpo_path), val(age_of_onset), val(sex)
@@ -12,7 +12,7 @@ process multi_longphase {
 	val(allow_unphased_comphet)
 
 	output:
-	tuple path("${out_prefix}.prio.vcf"), path("${out_prefix}.prio_gene.vcf"), path("${out_prefix}_haplotag.bam")
+	tuple path("${out_prefix}.prio.vcf"), path("${out_prefix}.prio_gene.vcf"), path("${out_prefix}_haplotag.bam"), path("${out_prefix}.frequency_audit.tsv")
 	
 	script:
 	def platform_args = task.ext.args != null ? task.ext.args : '--ont'
@@ -86,8 +86,8 @@ process multi_longphase {
 	    python3 /assign_dom_or_rec.py ${out_prefix}.clinvar.vcf ${out_prefix}.phenosv.vcf ${out_prefix}.rankscore.vcf ${out_prefix}.rankvar.vcf $hpo_path $age_of_onset $inheritance_mode ${out_prefix}.assigned.vcf --phenosv-score $min_score --genes "$gene_filter"
 	fi
 
-	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio_gene.vcf gene --include-clinvar $include_clinvar_report --allow-unphased-comphet $allow_unphased_comphet --genes "$gene_filter" --sex $sex
-	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio.vcf variant --include-clinvar $include_clinvar_report --allow-unphased-comphet $allow_unphased_comphet --genes "$gene_filter" --sex $sex
+	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio_gene.vcf gene --include-clinvar $include_clinvar_report --allow-unphased-comphet $allow_unphased_comphet --genes "$gene_filter" --sex $sex --gnomad-af-ad ${params.gnomad_af_ad} --gnomad-af-ar ${params.gnomad_af_ar} --common-sv-af-ad ${params.common_sv_af_ad} --common-sv-af-ar ${params.common_sv_af_ar} --common-sv-filter ${params.common_sv_filter} --de-novo ${params.denovo_filter} --frequency-audit ${out_prefix}.frequency_audit.tsv
+	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio.vcf variant --include-clinvar $include_clinvar_report --allow-unphased-comphet $allow_unphased_comphet --genes "$gene_filter" --sex $sex --gnomad-af-ad ${params.gnomad_af_ad} --gnomad-af-ar ${params.gnomad_af_ar} --common-sv-af-ad ${params.common_sv_af_ad} --common-sv-af-ar ${params.common_sv_af_ar} --common-sv-filter ${params.common_sv_filter} --de-novo ${params.denovo_filter}
 
 
 	"""

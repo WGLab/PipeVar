@@ -1,4 +1,4 @@
-def pipelineVersion = params.pipeline_version ?: "0.3.0"
+def pipelineVersion = params.pipeline_version ?: "0.5.0"
 
 def helpMessage = """
 ================================================================================
@@ -47,6 +47,10 @@ COMMON OPTIONS
   --out_prefix <STRING>         Single-sample output prefix
   --output_directory <DIR>      Publish directory
   --nanocaller_dp <NUMBER>      Missing-GQ NanoCaller depth threshold (default: 20)
+  --gnomad_af_ad <FLOAT>        Dominant/XLD/de novo AF ceiling (default: 0.001)
+  --gnomad_af_ar <FLOAT>        Recessive/XLR and upstream AF ceiling (default: 0.01)
+  --common_sv_af_ad <FLOAT>     Dominant/XLD/de novo/unknown SV ceiling (default: 0.005)
+  --common_sv_af_ar <FLOAT>     Recessive/XLR and upstream SV ceiling (default: 0.01)
   --include_clinvar_report      Include/exclude ClinVar-exclusive report entries;
                                 P/LP classification is unchanged (default: yes)
   --allow_unphased_comphet      Permit unresolved AR pairs (default: no); PS is
@@ -117,6 +121,68 @@ def clean_xtea = params.xtea ? params.xtea.toString().trim().toLowerCase() : 'no
 def clean_mito = params.mito ? params.mito.toString().trim().toLowerCase() : 'no'
 def clean_annotated_snv = params.annotated_snv ? params.annotated_snv.toString().trim().toLowerCase() : 'no'
 def clean_annotated_sv = params.annotated_sv ? params.annotated_sv.toString().trim().toLowerCase() : 'no'
+
+def legacyGnomadText = params.gnomad?.toString()?.trim()
+def gnomadAdText = params.gnomad_af_ad?.toString()?.trim()
+def gnomadArText = params.gnomad_af_ar?.toString()?.trim()
+if (legacyGnomadText && (gnomadAdText || gnomadArText)) {
+	error "ERROR: --gnomad is deprecated and cannot be combined with --gnomad_af_ad or --gnomad_af_ar."
+}
+if (legacyGnomadText) {
+	log.warn "--gnomad is deprecated; applying '${legacyGnomadText}' to both AD and AR frequency ceilings."
+	gnomadAdText = legacyGnomadText
+	gnomadArText = legacyGnomadText
+}
+else {
+	gnomadAdText = gnomadAdText ?: '0.001'
+	gnomadArText = gnomadArText ?: '0.01'
+}
+
+def parseGnomadFrequency = { String name, String text ->
+	double value
+	try {
+		value = Double.parseDouble(text)
+	}
+	catch (NumberFormatException ignored) {
+		error "ERROR: --${name} must be a finite numeric value within [0,1] (received '${text}')."
+	}
+	if (!Double.isFinite(value) || value < 0.0d || value > 1.0d) {
+		error "ERROR: --${name} must be a finite numeric value within [0,1] (received '${text}')."
+	}
+	value
+}
+def resolvedGnomadAd = parseGnomadFrequency('gnomad_af_ad', gnomadAdText)
+def resolvedGnomadAr = parseGnomadFrequency('gnomad_af_ar', gnomadArText)
+if (resolvedGnomadAd > resolvedGnomadAr) {
+	error "ERROR: --gnomad_af_ad (${gnomadAdText}) must be less than or equal to --gnomad_af_ar (${gnomadArText})."
+}
+params.gnomad_af_ad = gnomadAdText
+params.gnomad_af_ar = gnomadArText
+// Existing subworkflow contracts consume params.gnomad as the upstream ceiling.
+params.gnomad = gnomadArText
+
+def legacyCommonSvText = params.common_sv_af?.toString()?.trim()
+def commonSvAdText = params.common_sv_af_ad?.toString()?.trim()
+def commonSvArText = params.common_sv_af_ar?.toString()?.trim()
+if (legacyCommonSvText && (commonSvAdText || commonSvArText)) {
+	error "ERROR: --common_sv_af is deprecated and cannot be combined with --common_sv_af_ad or --common_sv_af_ar."
+}
+if (legacyCommonSvText) {
+	log.warn "--common_sv_af is deprecated; applying '${legacyCommonSvText}' to both AD and AR common-SV ceilings."
+	commonSvAdText = legacyCommonSvText
+	commonSvArText = legacyCommonSvText
+}
+else {
+	commonSvAdText = commonSvAdText ?: '0.005'
+	commonSvArText = commonSvArText ?: '0.01'
+}
+def resolvedCommonSvAd = parseGnomadFrequency('common_sv_af_ad', commonSvAdText)
+def resolvedCommonSvAr = parseGnomadFrequency('common_sv_af_ar', commonSvArText)
+if (resolvedCommonSvAd > resolvedCommonSvAr) {
+	error "ERROR: --common_sv_af_ad (${commonSvAdText}) must be less than or equal to --common_sv_af_ar (${commonSvArText})."
+}
+params.common_sv_af_ad = commonSvAdText
+params.common_sv_af_ar = commonSvArText
 
 // ------------------------------------------------------------------
 // 1. INPUT VALIDATION (Catching Typos)
@@ -789,10 +855,6 @@ if (!(params.phenosv_score.toString() ==~ /([0-9]+([.][0-9]+)?|[.][0-9]+)/)) {
 def nanocallerDpText = params.nanocaller_dp?.toString()?.trim()
 if (!(nanocallerDpText ==~ /([0-9]+([.][0-9]+)?|[.][0-9]+)/)) {
     error "ERROR: Invalid --nanocaller_dp '${params.nanocaller_dp}'. Provide a finite, non-negative numeric threshold, for example 20."
-}
-
-if (!(params.common_sv_af.toString() ==~ /([0-9]+([.][0-9]+)?|[.][0-9]+)/)) {
-    error "ERROR: Invalid --common_sv_af '${params.common_sv_af}'. Provide a numeric threshold, for example 0.01."
 }
 
 if (!(params.common_sv_reciprocal_overlap.toString() ==~ /([0-9]+([.][0-9]+)?|[.][0-9]+)/)) {

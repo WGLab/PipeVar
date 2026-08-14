@@ -44,7 +44,7 @@ class RepairContractTests(unittest.TestCase):
 
         for relative in ("modules/rankscore_analysis/main.nf", "modules/multi_rankscore/main.nf"):
             source = (REPO / relative).read_text(encoding="utf-8")
-            self.assertIn("rankscore_0.2.22", source)
+            self.assertIn("rankscore_0.3.0", source)
             self.assertRegex(source, r"val ad[\s\S]+?\$gq \$ad \$rankscore_softwares")
 
     def test_reserved_image_pins_are_scoped_to_consumers(self):
@@ -55,7 +55,7 @@ class RepairContractTests(unittest.TestCase):
         pinned = {
             path.parent.name
             for path in (REPO / "modules").glob("*/main.nf")
-            if "longphase_0.2.35" in path.read_text(encoding="utf-8")
+            if "longphase_0.4.0" in path.read_text(encoding="utf-8")
         }
         self.assertEqual(prioritization, pinned)
         for merge_module in (
@@ -63,16 +63,16 @@ class RepairContractTests(unittest.TestCase):
             "merge_shortread_sv_callers", "multi_merge_shortread_sv_callers",
         ):
             self.assertNotIn(
-                "longphase_0.2.35",
+                "longphase_0.4.0",
                 (REPO / "modules" / merge_module / "main.nf").read_text(encoding="utf-8"),
             )
 
     def test_common_sv_filter_uses_canonical_duplication_image(self):
         for module in ("common_sv_filter", "multi_common_sv_filter"):
             source = (REPO / "modules" / module / "main.nf").read_text(encoding="utf-8")
-            self.assertIn("common_sv_filter_0.4", source)
+            self.assertIn("common_sv_filter_0.5", source)
         dockerfile = (DOCKER_WORK / "common_sv_filter/Dockerfile").read_text(encoding="utf-8")
-        self.assertIn("common_sv_filter_0.4", dockerfile)
+        self.assertIn("common_sv_filter_0.5", dockerfile)
 
     def test_rankscore_clinvar_filter_is_header_indexed(self):
         source = (DOCKER_WORK / "rankscore/clinvar.sh").read_text(encoding="utf-8")
@@ -80,7 +80,7 @@ class RepairContractTests(unittest.TestCase):
         self.assertIn("accepted_clnsig", source)
         self.assertNotIn("&& /Pathogenic/", source)
 
-    def test_preannotated_validator_requires_gt_but_not_ps(self):
+    def test_preannotated_validator_is_copy_free_and_requires_gt_but_not_ps(self):
         module = (REPO / "modules/validate_preannotated_annovar_pair/main.nf").read_text(encoding="utf-8")
         validator = (
             DOCKER_WORK
@@ -90,11 +90,21 @@ class RepairContractTests(unittest.TestCase):
             DOCKER_WORK / "validate_preannotated_annovar_pair/Dockerfile"
         ).read_text(encoding="utf-8")
 
-        self.assertIn("validate_preannotated_annovar_pair_0.3", module)
-        self.assertIn("validate_preannotated_annovar_pair_0.3", dockerfile)
+        self.assertIn("validate_preannotated_annovar_pair_0.4", module)
+        self.assertIn("validate_preannotated_annovar_pair_0.4", dockerfile)
         self.assertIn("procps", dockerfile)
         self.assertIn('if "GT" not in format_fields', validator)
         self.assertIn("PS is optional", validator)
+        self.assertNotIn("shutil", validator)
+        self.assertNotIn("copy_file", validator)
+        self.assertNotIn("--validated-txt", validator)
+        self.assertNotIn("--validated-vcf", validator)
+        self.assertIn("process validate_preannotated_annovar_pair_check", module)
+        self.assertIn("workflow validate_preannotated_annovar_pair", module)
+        self.assertIn("tuple val(out_prefix), val(true)", module)
+        self.assertIn(".join(validation_ok, failOnMismatch: true, failOnDuplicate: true)", module)
+        self.assertIn("tuple(out_prefix, annovar_txt, annovar_vcf)", module)
+        self.assertNotIn(".validated.hg38_multianno", module)
 
 if __name__ == "__main__":
     unittest.main()

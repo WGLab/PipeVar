@@ -167,7 +167,7 @@ workflow INPUT_CSV_ALIGNMENT_ALL_LONGPHASE {
 	multi_longphase(join_vcf_bam_rankvar_hpo,ref_fa,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
 
 	prio_report_input = multi_longphase.out
-		.map { prio_vcf, prio_gene_report, haplotag_bam ->
+		.map { prio_vcf, prio_gene_report, haplotag_bam, frequency_audit ->
 			def prefix = prio_vcf.name.replaceFirst(/\.prio\.vcf$/, "")
 			tuple(prefix, prio_vcf, prio_gene_report)
 		}

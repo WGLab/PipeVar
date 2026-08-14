@@ -117,9 +117,19 @@ class CompareGeneRankingsTests(unittest.TestCase):
         )
         rankings = BENCHMARK.read_exomiser_ranking(path)
         self.assertEqual(
-            [("GENEA", 1, 1), ("GENEB", 2, 3)],
+            [("GENEA", 1, 1), ("GENEB", 3, 3)],
             [(r.gene, r.rank, r.raw_rank) for r in rankings],
         )
+
+    def test_exomiser_topk_uses_native_rank_without_gene_rank_compression(self):
+        path = self.write(
+            self.root / "native_rank.genes.tsv",
+            "#RANK\tGENE_SYMBOL\n1\tOTHER\n21\tCAUSAL\n",
+        )
+        rankings = BENCHMARK.read_exomiser_ranking(path)
+        match = BENCHMARK.find_best_match(("CAUSAL",), rankings)
+        self.assertEqual(BENCHMARK.MatchResult("CAUSAL", 21, 21), match)
+        self.assertFalse(BENCHMARK.hit_at_cutoff(match, 20))
 
     def test_rankvar_converts_variant_ranks_to_unique_gene_ranks(self):
         path = self.write(
@@ -254,11 +264,19 @@ class CompareGeneRankingsTests(unittest.TestCase):
         with Path(f"{output_prefix}.not_found.tsv").open(newline="") as handle:
             not_found = list(csv.DictReader(handle, delimiter="\t"))
         self.assertEqual(["S2", "S3"], [row["sample_id"] for row in not_found])
-        self.assertEqual("pipevar", not_found[0]["not_found_in"])
-        self.assertEqual("0", not_found[0]["pipevar_truth_gene_found"])
-        self.assertEqual("1", not_found[0]["exomiser_truth_gene_found"])
+        self.assertEqual("pipevar", not_found[0]["not_in_top20"])
+        self.assertEqual("0", not_found[0]["pipevar_truth_gene_top20"])
+        self.assertEqual("1", not_found[0]["exomiser_truth_gene_top20"])
+        self.assertEqual(
+            "0", not_found[0]["pipevar_truth_gene_found_anywhere"]
+        )
+        self.assertEqual(
+            "1", not_found[0]["exomiser_truth_gene_found_anywhere"]
+        )
+        self.assertEqual("GENE2", not_found[0]["exomiser_matched_gene"])
+        self.assertEqual("1", not_found[0]["exomiser_best_rank"])
         self.assertEqual("1:GENE2", not_found[0]["exomiser_top20_genes"])
-        self.assertEqual("both", not_found[1]["not_found_in"])
+        self.assertEqual("both", not_found[1]["not_in_top20"])
         self.assertEqual("malformed", not_found[1]["pipevar_status"])
         self.assertEqual("missing", not_found[1]["exomiser_status"])
 
@@ -300,6 +318,36 @@ class CompareGeneRankingsTests(unittest.TestCase):
         self.assertEqual("exomiser", BENCHMARK.not_found_category(make(2, None)))
         self.assertEqual("both", BENCHMARK.not_found_category(make(None, None)))
         self.assertEqual("", BENCHMARK.not_found_category(make(2, 2)))
+
+    def test_not_found_report_treats_rank_21_as_a_top20_miss(self):
+        truth = BENCHMARK.TruthSample("S1", ("SETBP1",))
+        pipevar = BENCHMARK.RankingResult("ok", ())
+        exomiser_ranking = (BENCHMARK.RankedGene("SETBP1", 21, 21),)
+        exomiser = BENCHMARK.RankingResult("ok", exomiser_ranking)
+        result = BENCHMARK.SampleResult(
+            truth=truth,
+            pipevar_path=Path("pipevar"),
+            rankvar_path=Path("rankvar"),
+            exomiser_path=Path("exomiser"),
+            pipevar_result=pipevar,
+            rankvar_result=pipevar,
+            exomiser_result=exomiser,
+            pipevar_match=BENCHMARK.MatchResult(),
+            rankvar_match=BENCHMARK.MatchResult(),
+            exomiser_match=BENCHMARK.MatchResult("SETBP1", 21, 21),
+        )
+
+        self.assertEqual("both", BENCHMARK.not_found_category(result))
+        report = self.root / "rank21.not_found.tsv"
+        self.assertEqual(1, BENCHMARK.write_not_found_report(report, [result]))
+        with report.open(newline="") as handle:
+            row = next(csv.DictReader(handle, delimiter="\t"))
+        self.assertEqual("both", row["not_in_top20"])
+        self.assertEqual("0", row["exomiser_truth_gene_top20"])
+        self.assertEqual("1", row["exomiser_truth_gene_found_anywhere"])
+        self.assertEqual("SETBP1", row["exomiser_matched_gene"])
+        self.assertEqual("21", row["exomiser_best_rank"])
+        self.assertNotIn("SETBP1", row["exomiser_top20_genes"])
 
     def test_overridden_templates_resolve_nested_paths(self):
         sample = BENCHMARK.TruthSample("S1", ("GENE1",))

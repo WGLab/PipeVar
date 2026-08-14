@@ -1,6 +1,6 @@
 // Batch filter common structural variants from ANNOVAR SV VCFs.
 process multi_common_sv_filter {
-	container = 'beoungl/docker_test:common_sv_filter_0.4'
+	container = 'beoungl/docker_test:common_sv_filter_0.5'
 
 	input:
 	tuple val(out_prefix), path(vcf)
@@ -10,7 +10,8 @@ process multi_common_sv_filter {
 	tuple val(out_prefix), path("${out_prefix}.common_sv_removed.vcf"), path("${out_prefix}.common_sv_filter.summary.tsv"), emit: audit
 
 	script:
-	def common_af = params.common_sv_af ?: '0.01'
+	def common_af_ad = params.common_sv_af_ad ?: '0.005'
+	def common_af_ar = params.common_sv_af_ar ?: '0.01'
 	def reciprocal_overlap = params.common_sv_reciprocal_overlap ?: '0.5'
 	def distance = params.common_sv_distance ?: '1000'
 	def ins_distance = params.common_sv_ins_distance ?: '500'
@@ -21,7 +22,8 @@ process multi_common_sv_filter {
 	    --output-vcf ${out_prefix}.common_sv_filtered.vcf \\
 	    --removed-vcf ${out_prefix}.common_sv_removed.vcf \\
 	    --summary-tsv ${out_prefix}.common_sv_filter.summary.tsv \\
-	    --common-af "$common_af" \\
+	    --common-af-ad "$common_af_ad" \\
+	    --common-af-ar "$common_af_ar" \\
 	    --reciprocal-overlap "$reciprocal_overlap" \\
 	    --distance "$distance" \\
 	    --ins-distance "$ins_distance" \\

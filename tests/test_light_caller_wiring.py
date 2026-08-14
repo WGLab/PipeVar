@@ -289,7 +289,7 @@ class LightCallerWiringTests(unittest.TestCase):
 
         def prefilter(module):
             start = module.index("\t# Prefilter ANNOVAR table")
-            end = module.index("\n\n\tpython $rankvar_script", start)
+            end = module.index("\n\t# The shared normalizer is the AF authority", start)
             return module[start:end].rstrip()
 
         self.assertEqual(prefilter(single), prefilter(batch))

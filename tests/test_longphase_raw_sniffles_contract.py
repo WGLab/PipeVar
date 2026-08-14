@@ -37,7 +37,7 @@ class RawSnifflesLongPhaseContractTests(unittest.TestCase):
         actual = {
             path
             for path in (REPO / "modules").glob("*/main.nf")
-            if "longphase_0.2.35" in path.read_text(encoding="utf-8")
+            if "longphase_0.4.0" in path.read_text(encoding="utf-8")
         }
         self.assertEqual(expected, actual)
         for path in (REPO / "modules/longphase/main.nf", REPO / "modules/multi_longphase/main.nf"):

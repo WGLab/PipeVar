@@ -1,7 +1,7 @@
 
 // Merge SNV evidence sources into a final prioritized SNP VCF.
 process snp_prio {
-	container ='beoungl/docker_test:longphase_0.2.35'
+	container ='beoungl/docker_test:longphase_0.4.0'
 
 	input:
 	val(out_prefix)
@@ -18,6 +18,7 @@ process snp_prio {
 	output:
 	path "${out_prefix}.prio.vcf"
 	path "${out_prefix}.prio_gene.vcf"
+	path "${out_prefix}.frequency_audit.tsv"
 	
 	script:
 
@@ -36,8 +37,8 @@ process snp_prio {
 
 	python3 /assign_dom_or_rec_snp_only.py ${out_prefix}.clinvar.vcf ${out_prefix}.rankscore.vcf ${out_prefix}.rankvar.vcf $hpo_path $inheritance_mode ${out_prefix}.assigned.vcf
 
-	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio_gene.vcf gene --include-clinvar $include_clinvar_report --allow-unphased-comphet $allow_unphased_comphet
-	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio.vcf variant --include-clinvar $include_clinvar_report --allow-unphased-comphet $allow_unphased_comphet
+	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio_gene.vcf gene --include-clinvar $include_clinvar_report --allow-unphased-comphet $allow_unphased_comphet --gnomad-af-ad ${params.gnomad_af_ad} --gnomad-af-ar ${params.gnomad_af_ar} --common-sv-af-ad ${params.common_sv_af_ad} --common-sv-af-ar ${params.common_sv_af_ar} --common-sv-filter ${params.common_sv_filter} --de-novo ${params.denovo_filter} --frequency-audit ${out_prefix}.frequency_audit.tsv
+	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio.vcf variant --include-clinvar $include_clinvar_report --allow-unphased-comphet $allow_unphased_comphet --gnomad-af-ad ${params.gnomad_af_ad} --gnomad-af-ar ${params.gnomad_af_ar} --common-sv-af-ad ${params.common_sv_af_ad} --common-sv-af-ar ${params.common_sv_af_ar} --common-sv-filter ${params.common_sv_filter} --de-novo ${params.denovo_filter}
 	
 
 	#Potential homozygotes are ranked higher than single heterozygotes, but nothing conclusive.
