@@ -55,7 +55,7 @@ workflow INPUT_CSV_ALIGNMENT_NGS_SV {
 	if ( cnvnator_mode != "no" && xtea_mode == "yes" ) {
 		normalized_bam=multi_normalize_shortread_alignment(input_bam_with_bam,ref_fa)
 		multi_cnvnator(normalized_bam,ref_fa,params.cnvnator_bin_size)
-		merged_sv_input=manta_result.join(multi_cnvnator.out.vcf).join(xtea_vcf).map { out_prefix, manta_vcf, cnvnator_vcf, xtea_vcf ->
+		merged_sv_input=manta_result.join(multi_cnvnator.out.vcf, failOnMismatch: true, failOnDuplicate: true).join(xtea_vcf, failOnMismatch: true, failOnDuplicate: true).map { out_prefix, manta_vcf, cnvnator_vcf, xtea_vcf ->
 			tuple(out_prefix, [manta_vcf, cnvnator_vcf, xtea_vcf])
 		}
 		multi_truvari_shortread_sv_merge(merged_sv_input,ref_fa)
@@ -64,14 +64,14 @@ workflow INPUT_CSV_ALIGNMENT_NGS_SV {
 	else if ( cnvnator_mode != "no" ) {
 		normalized_bam=multi_normalize_shortread_alignment(input_bam_with_bam,ref_fa)
 		multi_cnvnator(normalized_bam,ref_fa,params.cnvnator_bin_size)
-		merged_sv_input=manta_result.join(multi_cnvnator.out.vcf).map { out_prefix, manta_vcf, cnvnator_vcf ->
+		merged_sv_input=manta_result.join(multi_cnvnator.out.vcf, failOnMismatch: true, failOnDuplicate: true).map { out_prefix, manta_vcf, cnvnator_vcf ->
 			tuple(out_prefix, [manta_vcf, cnvnator_vcf])
 		}
 		multi_truvari_shortread_sv_merge(merged_sv_input,ref_fa)
 		sv_result=multi_truvari_shortread_sv_merge.out.merged_vcf
 	}
 	else if ( xtea_mode == "yes" ) {
-		merged_sv_input=manta_result.join(xtea_vcf).map { out_prefix, manta_vcf, xtea_vcf ->
+		merged_sv_input=manta_result.join(xtea_vcf, failOnMismatch: true, failOnDuplicate: true).map { out_prefix, manta_vcf, xtea_vcf ->
 			tuple(out_prefix, [manta_vcf, xtea_vcf])
 		}
 		multi_truvari_shortread_sv_merge(merged_sv_input,ref_fa)
@@ -107,11 +107,11 @@ workflow INPUT_CSV_ALIGNMENT_NGS_SV {
 		annovar_sv_for_downstream = multi_common_sv_filter.out.filtered_vcf
 	}
 	survivor_result=multi_survivor(annovar_sv_for_downstream)
-        phenosv_input=survivor_result.join(input_bam_no_bam)
-        phenosv_result=multi_phenosv(phenosv_input)
-        sv_prio_input=phenosv_result.join(annovar_sv_for_downstream)
-        input_bam_hpo_age=input_bam_no_bam.join(input_meta, failOnMismatch: true, failOnDuplicate: true).map { out_prefix, hpo_path, age_of_onset, sex -> tuple(out_prefix, hpo_path, age_of_onset, sex) }
-        sv_prio_input_hpo=sv_prio_input.join(input_bam_hpo_age)
+	phenosv_input=survivor_result.join(input_bam_no_bam, failOnMismatch: true, failOnDuplicate: true)
+	        phenosv_result=multi_phenosv(phenosv_input)
+	sv_prio_input=phenosv_result.join(annovar_sv_for_downstream, failOnMismatch: true, failOnDuplicate: true)
+	        input_bam_hpo_age=input_bam_no_bam.join(input_meta, failOnMismatch: true, failOnDuplicate: true).map { out_prefix, hpo_path, age_of_onset, sex -> tuple(out_prefix, hpo_path, age_of_onset, sex) }
+	sv_prio_input_hpo=sv_prio_input.join(input_bam_hpo_age, failOnMismatch: true, failOnDuplicate: true)
         multi_sv_prio(sv_prio_input_hpo,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
 
 }	

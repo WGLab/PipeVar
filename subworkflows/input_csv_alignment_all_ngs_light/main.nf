@@ -66,15 +66,15 @@ workflow INPUT_CSV_ALIGNMENT_ALL_NGS_LIGHT {
         haplotypecaller_input=multi_prep_gatk_result.join(caller_regions, failOnMismatch: true, failOnDuplicate: true)
         haplotypecaller_result=multi_haplotypecaller(haplotypecaller_input,ref_fa)
         if ( target == "yes" ) {
-                annovar_input=haplotypecaller_result.join(phen2_gene_bed).map { out_prefix, vcf_file, bed_file -> tuple(out_prefix, vcf_file, bed_file) }
+	                annovar_input=haplotypecaller_result.join(phen2_gene_bed, failOnMismatch: true, failOnDuplicate: true).map { out_prefix, vcf_file, bed_file -> tuple(out_prefix, vcf_file, bed_file) }
         }
         else {
                 annovar_input=haplotypecaller_result.map { out_prefix, vcf_file -> tuple(out_prefix, vcf_file, target) }
         }
         annovar_result=multi_annovar(annovar_input)
 	annovar_result_txt=annovar_result.map { item -> tuple(item[0], item[1]) }
-        join_annovar_phen2gene=annovar_result_txt.join(phen2gene_result)
-        join_annovar_hpo=join_annovar_phen2gene.join(input_bam_no_bam)
+	join_annovar_phen2gene=annovar_result_txt.join(phen2gene_result, failOnMismatch: true, failOnDuplicate: true)
+	join_annovar_hpo=join_annovar_phen2gene.join(input_bam_no_bam, failOnMismatch: true, failOnDuplicate: true)
         rankscore_result=multi_rankscore(join_annovar_phen2gene,gnomad,rankscore_filter,rankscore_softwares,gq,ad,phen2gene_top_n)
         rankvar_result=multi_rankvar(join_annovar_hpo,gnomad,gq,ad,rankvar_filter)
         multi_eh_result=multi_expansionhunter(input_bam_with_bam,ref_fa_no_dict,eh_variant_catalog)
@@ -83,15 +83,15 @@ workflow INPUT_CSV_ALIGNMENT_ALL_NGS_LIGHT {
 	manta_result_annovar=manta_result.map { out_prefix, vcf_file -> tuple(out_prefix, vcf_file, "called") }
 	annovar_sv_result=multi_annovar_sv(manta_result_annovar)
         survivor_result=multi_survivor(annovar_sv_result)
-        phenosv_input=survivor_result.join(input_bam_no_bam)
+	phenosv_input=survivor_result.join(input_bam_no_bam, failOnMismatch: true, failOnDuplicate: true)
         phenosv_result=multi_phenosv(phenosv_input)
         annovar_result_vcf=annovar_result.map { item -> tuple(item[0], item[2]) }
-        phenosv_annovar_snv=phenosv_result.join(annovar_result_vcf)
-        sv_join=phenosv_annovar_snv.join(annovar_sv_result)
-        rankscore_join=sv_join.join(rankscore_result)
-	        rankvar_join=rankscore_join.join(rankvar_result)
-	        input_bam_hpo_age=input_bam_no_bam.join(input_meta).map { out_prefix, hpo_path, age_of_onset, sex -> tuple(out_prefix, hpo_path, age_of_onset, sex) }
-	        rankvar_join_hpo=rankvar_join.join(input_bam_hpo_age)
+	phenosv_annovar_snv=phenosv_result.join(annovar_result_vcf, failOnMismatch: true, failOnDuplicate: true)
+	sv_join=phenosv_annovar_snv.join(annovar_sv_result, failOnMismatch: true, failOnDuplicate: true)
+	rankscore_join=sv_join.join(rankscore_result, failOnMismatch: true, failOnDuplicate: true)
+	rankvar_join=rankscore_join.join(rankvar_result, failOnMismatch: true, failOnDuplicate: true)
+	input_bam_hpo_age=input_bam_no_bam.join(input_meta, failOnMismatch: true, failOnDuplicate: true).map { out_prefix, hpo_path, age_of_onset, sex -> tuple(out_prefix, hpo_path, age_of_onset, sex) }
+	rankvar_join_hpo=rankvar_join.join(input_bam_hpo_age, failOnMismatch: true, failOnDuplicate: true)
 	        rankvar_join_hpo_ordered=rankvar_join_hpo.map { out_prefix, sv_pathogenic, snv_vcf_path, sv_vcf_path, snv_rankscore, snv_pathogenic, snv_rankvar, hpo_path, age_of_onset, sex ->
 	            tuple(out_prefix, snv_rankvar, snv_rankscore, snv_pathogenic, sv_pathogenic, sv_vcf_path, snv_vcf_path, hpo_path, age_of_onset, sex)
 	        }

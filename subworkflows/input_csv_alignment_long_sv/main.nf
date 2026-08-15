@@ -60,12 +60,12 @@ workflow INPUT_CSV_ALIGNMENT_LONG_SV {
 		annovar_sv_for_downstream = multi_common_sv_filter.out.filtered_vcf
 	}
 	survivor_result=multi_survivor(annovar_sv_for_downstream)
-	phenosv_input=survivor_result.join(input_bam_no_bam)
+	phenosv_input=survivor_result.join(input_bam_no_bam, failOnMismatch: true, failOnDuplicate: true)
 	phenosv_result=multi_phenosv(phenosv_input)
 	multi_nanorepeat(bam_for_proband_tasks,ref_fa)
-        sv_prio_input=phenosv_result.join(annovar_sv_for_downstream)
+	sv_prio_input=phenosv_result.join(annovar_sv_for_downstream, failOnMismatch: true, failOnDuplicate: true)
         input_bam_hpo_age=input_bam_no_bam.join(input_meta, failOnMismatch: true, failOnDuplicate: true).map { out_prefix, hpo_path, age_of_onset, sex -> tuple(out_prefix, hpo_path, age_of_onset, sex) }
-        sv_prio_input_hpo=sv_prio_input.join(input_bam_hpo_age)
+	sv_prio_input_hpo=sv_prio_input.join(input_bam_hpo_age, failOnMismatch: true, failOnDuplicate: true)
         multi_sv_prio(sv_prio_input_hpo,inheritance_mode,include_clinvar_report,allow_unphased_comphet)
 
 }	

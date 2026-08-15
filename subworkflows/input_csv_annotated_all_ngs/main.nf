@@ -79,8 +79,8 @@ workflow INPUT_CSV_ANNOTATED_ALL_NGS {
 	phen2gene_result = multi_phen2gene(hpo_paths)
 
 	validated_annovar_txt = validated_for_downstream.map { out_prefix, annovar_txt, annovar_vcf -> tuple(out_prefix, annovar_txt) }
-	join_annovar_phen2gene = validated_annovar_txt.join(phen2gene_result)
-	join_annovar_hpo = join_annovar_phen2gene.join(hpo_paths)
+	join_annovar_phen2gene = validated_annovar_txt.join(phen2gene_result, failOnMismatch: true, failOnDuplicate: true)
+	join_annovar_hpo = join_annovar_phen2gene.join(hpo_paths, failOnMismatch: true, failOnDuplicate: true)
 	rankscore_result = multi_rankscore(join_annovar_phen2gene, gnomad, rankscore_filter, rankscore_softwares, gq, ad, phen2gene_top_n)
 	rankvar_result = multi_rankvar(join_annovar_hpo, gnomad, gq, ad, rankvar_filter)
 
@@ -108,16 +108,16 @@ workflow INPUT_CSV_ANNOTATED_ALL_NGS {
 		annovar_sv_for_downstream = multi_common_sv_filter.out.filtered_vcf
 	}
 	survivor_result = multi_survivor(annovar_sv_for_downstream)
-	phenosv_input = survivor_result.join(hpo_paths)
+	phenosv_input = survivor_result.join(hpo_paths, failOnMismatch: true, failOnDuplicate: true)
 	phenosv_result = multi_phenosv(phenosv_input)
 
 	validated_annovar_vcf = validated_for_downstream.map { out_prefix, annovar_txt, annovar_vcf -> tuple(out_prefix, annovar_vcf) }
-	phenosv_annovar_snv = phenosv_result.join(validated_annovar_vcf)
-	sv_join = phenosv_annovar_snv.join(annovar_sv_for_downstream)
-	rankscore_join = sv_join.join(rankscore_result)
-	rankvar_join = rankscore_join.join(rankvar_result)
+	phenosv_annovar_snv = phenosv_result.join(validated_annovar_vcf, failOnMismatch: true, failOnDuplicate: true)
+	sv_join = phenosv_annovar_snv.join(annovar_sv_for_downstream, failOnMismatch: true, failOnDuplicate: true)
+	rankscore_join = sv_join.join(rankscore_result, failOnMismatch: true, failOnDuplicate: true)
+	rankvar_join = rankscore_join.join(rankvar_result, failOnMismatch: true, failOnDuplicate: true)
 	hpo_with_age = hpo_paths.join(input_meta, failOnMismatch: true, failOnDuplicate: true).map { out_prefix, hpo_path, age_of_onset, sex -> tuple(out_prefix, hpo_path, age_of_onset, sex) }
-	rankvar_join_hpo = rankvar_join.join(hpo_with_age)
+	rankvar_join_hpo = rankvar_join.join(hpo_with_age, failOnMismatch: true, failOnDuplicate: true)
 	rankvar_join_hpo_ordered = rankvar_join_hpo.map { out_prefix, sv_pathogenic, snv_vcf_path, sv_vcf_path, snv_rankscore, snv_pathogenic, snv_rankvar, hpo_path, age_of_onset, sex ->
 		tuple(out_prefix, snv_rankvar, snv_rankscore, snv_pathogenic, sv_pathogenic, sv_vcf_path, snv_vcf_path, hpo_path, age_of_onset, sex)
 	}
