@@ -64,10 +64,14 @@ workflow INPUT_CSV_ANNOTATED_SNV_SV {
 	hpo_paths = phenotype_extractor_result.mix(hpo_input)
 	phen2gene_result = multi_phen2gene(hpo_paths)
 
-	join_annovar_phen2gene = annovar_for_downstream.join(phen2gene_result, failOnMismatch: true, failOnDuplicate: true)
-	rankvar_input = join_annovar_phen2gene.map { out_prefix, annovar_txt, annovar_vcf, phen2gene -> tuple(out_prefix, annovar_txt, phen2gene) }
-	join_annovar_hpo = rankvar_input.join(hpo_paths, failOnMismatch: true, failOnDuplicate: true)
-	rankscore_result = multi_rankscore_preannotated(join_annovar_phen2gene, gnomad, rankscore_filter, rankscore_softwares, gq, ad, phen2gene_top_n)
+	annovar_txt_for_rank = annovar_for_downstream.map { out_prefix, annovar_txt, annovar_vcf -> tuple(out_prefix, annovar_txt) }
+	join_annovar_phen2gene = annovar_txt_for_rank.join(phen2gene_result, failOnMismatch: true, failOnDuplicate: true)
+	join_annovar_hpo = join_annovar_phen2gene.join(hpo_paths, failOnMismatch: true, failOnDuplicate: true)
+	annovar_vcf_for_rankscore = annovar_for_downstream.map { out_prefix, annovar_txt, annovar_vcf -> tuple(out_prefix, annovar_vcf) }
+	rankscore_input = join_annovar_phen2gene
+		.join(annovar_vcf_for_rankscore, failOnMismatch: true, failOnDuplicate: true)
+		.map { out_prefix, annovar_txt, phen2gene, annovar_vcf -> tuple(out_prefix, annovar_txt, annovar_vcf, phen2gene) }
+	rankscore_result = multi_rankscore_preannotated(rankscore_input, gnomad, rankscore_filter, rankscore_softwares, gq, ad, phen2gene_top_n)
 	rankvar_result = multi_rankvar(join_annovar_hpo, gnomad, gq, ad, rankvar_filter)
 
 	annotated_sv_input = input_annotated_snv_sv.map { out_prefix, annovar_txt, annovar_vcf, annovar_sv_vcf, phenotype_path, phenotype_format ->

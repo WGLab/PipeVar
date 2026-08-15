@@ -115,5 +115,36 @@ class RepairContractTests(unittest.TestCase):
         self.assertNotIn("modules/validate_preannotated_annovar_pair", annotated_sources)
         self.assertNotIn("validate_preannotated_annovar_pair(", annotated_sources)
 
+    def test_annotated_batch_rankvar_uses_narrow_txt_phen2gene_join(self):
+        workflows = (
+            "subworkflows/annotated_snv_prio_core/main.nf",
+            "subworkflows/input_csv_annotated_snv_sv/main.nf",
+            "subworkflows/input_csv_annotated_all_ngs/main.nf",
+            "subworkflows/input_csv_annotated_snv_called_sv_ngs/main.nf",
+        )
+        for relative in workflows:
+            source = (REPO / relative).read_text(encoding="utf-8")
+            with self.subTest(workflow=relative):
+                self.assertIn(
+                    "annovar_txt_for_rank.join(phen2gene_result, failOnMismatch: true, failOnDuplicate: true)",
+                    source,
+                )
+                self.assertIn(
+                    "join_annovar_phen2gene.join(hpo_paths, failOnMismatch: true, failOnDuplicate: true)",
+                    source,
+                )
+                self.assertIn(
+                    ".join(annovar_vcf_for_rankscore, failOnMismatch: true, failOnDuplicate: true)",
+                    source,
+                )
+                self.assertIn(
+                    "tuple(out_prefix, annovar_txt, annovar_vcf, phen2gene)",
+                    source,
+                )
+                self.assertNotIn(
+                    "annovar_for_downstream.join(phen2gene_result",
+                    source,
+                )
+
 if __name__ == "__main__":
     unittest.main()

@@ -16,8 +16,9 @@ class FailFastFanInContractTests(unittest.TestCase):
     def test_required_batch_fan_ins_are_fail_fast(self):
         required_joins = {
             "subworkflows/input_csv_annotated_snv_sv/main.nf": (
-                "annovar_for_downstream.join(phen2gene_result, failOnMismatch: true, failOnDuplicate: true)",
-                "rankvar_input.join(hpo_paths, failOnMismatch: true, failOnDuplicate: true)",
+                "annovar_txt_for_rank.join(phen2gene_result, failOnMismatch: true, failOnDuplicate: true)",
+                "join_annovar_phen2gene.join(hpo_paths, failOnMismatch: true, failOnDuplicate: true)",
+                ".join(annovar_vcf_for_rankscore, failOnMismatch: true, failOnDuplicate: true)",
                 "survivor_result.join(hpo_paths, failOnMismatch: true, failOnDuplicate: true)",
                 "phenosv_result.join(annovar_vcf_for_prio, failOnMismatch: true, failOnDuplicate: true)",
                 "phenosv_annovar_snv.join(annovar_sv_for_downstream, failOnMismatch: true, failOnDuplicate: true)",
@@ -26,8 +27,9 @@ class FailFastFanInContractTests(unittest.TestCase):
                 "rankvar_join.join(hpo_with_age, failOnMismatch: true, failOnDuplicate: true)",
             ),
             "subworkflows/input_csv_annotated_all_ngs/main.nf": (
-                "annovar_for_downstream.join(phen2gene_result, failOnMismatch: true, failOnDuplicate: true)",
-                "rankvar_input.join(hpo_paths, failOnMismatch: true, failOnDuplicate: true)",
+                "annovar_txt_for_rank.join(phen2gene_result, failOnMismatch: true, failOnDuplicate: true)",
+                "join_annovar_phen2gene.join(hpo_paths, failOnMismatch: true, failOnDuplicate: true)",
+                ".join(annovar_vcf_for_rankscore, failOnMismatch: true, failOnDuplicate: true)",
                 "survivor_result.join(hpo_paths, failOnMismatch: true, failOnDuplicate: true)",
                 "phenosv_result.join(annovar_vcf_for_prio, failOnMismatch: true, failOnDuplicate: true)",
                 "phenosv_annovar_snv.join(annovar_sv_for_downstream, failOnMismatch: true, failOnDuplicate: true)",
@@ -36,8 +38,9 @@ class FailFastFanInContractTests(unittest.TestCase):
                 "rankvar_join.join(hpo_with_age, failOnMismatch: true, failOnDuplicate: true)",
             ),
             "subworkflows/input_csv_annotated_snv_called_sv_ngs/main.nf": (
-                "annovar_for_downstream.join(phen2gene_result, failOnMismatch: true, failOnDuplicate: true)",
-                "rankvar_input.join(hpo_paths, failOnMismatch: true, failOnDuplicate: true)",
+                "annovar_txt_for_rank.join(phen2gene_result, failOnMismatch: true, failOnDuplicate: true)",
+                "join_annovar_phen2gene.join(hpo_paths, failOnMismatch: true, failOnDuplicate: true)",
+                ".join(annovar_vcf_for_rankscore, failOnMismatch: true, failOnDuplicate: true)",
                 "survivor_result.join(hpo_paths, failOnMismatch: true, failOnDuplicate: true)",
                 "phenosv_result.join(annovar_vcf_for_prio, failOnMismatch: true, failOnDuplicate: true)",
                 "phenosv_annovar_snv.join(annovar_sv_for_downstream, failOnMismatch: true, failOnDuplicate: true)",
@@ -123,7 +126,7 @@ class NextflowRuntimeContractTests(unittest.TestCase):
             check=False,
         )
 
-    def test_preannotated_rankscore_accepts_two_tuples_independently(self):
+    def test_narrow_phen2gene_join_feeds_rankvar_and_rankscore_independently(self):
         with tempfile.TemporaryDirectory() as temp_name:
             temp_dir = Path(temp_name)
             results = temp_dir / "results"
@@ -147,18 +150,33 @@ class NextflowRuntimeContractTests(unittest.TestCase):
 
                 include { multi_rankscore_preannotated } from '__MULTI_RANKSCORE_MODULE__'
 
-                process validation_sentinel {
+                process rankscore_sentinel {
                     publishDir params.results_dir, mode: 'copy'
 
                     input:
                     tuple val(out_prefix), path(rankscore), path(clinvar)
 
                     output:
-                    path "${out_prefix}.seen"
+                    path "${out_prefix}.rankscore.seen"
 
                     stub:
                     """
-                    printf '%s\\n' '$out_prefix' > ${out_prefix}.seen
+                    printf '%s\\n' '$out_prefix' > ${out_prefix}.rankscore.seen
+                    """
+                }
+
+                process rankvar_sentinel {
+                    publishDir params.results_dir, mode: 'copy'
+
+                    input:
+                    tuple val(out_prefix), path(annovar_txt), path(phen2gene)
+
+                    output:
+                    path "${out_prefix}.rankvar.seen"
+
+                    stub:
+                    """
+                    printf '%s\\n' '$out_prefix' > ${out_prefix}.rankvar.seen
                     """
                 }
 
@@ -171,11 +189,21 @@ class NextflowRuntimeContractTests(unittest.TestCase):
                         tuple('case1', file(params.case1_phen2gene)),
                         tuple('case2', file(params.case2_phen2gene))
                     )
-                    rankscore_inputs = input_pairs.join(phen2gene)
+                    annovar_txt = input_pairs.map { out_prefix, txt, vcf -> tuple(out_prefix, txt) }
+                    joined_phen2gene = annovar_txt.join(
+                        phen2gene, failOnMismatch: true, failOnDuplicate: true
+                    )
+                    annovar_vcf = input_pairs.map { out_prefix, txt, vcf -> tuple(out_prefix, vcf) }
+                    rankscore_inputs = joined_phen2gene
+                        .join(annovar_vcf, failOnMismatch: true, failOnDuplicate: true)
+                        .map { out_prefix, txt, phen2gene_file, vcf ->
+                            tuple(out_prefix, txt, vcf, phen2gene_file)
+                        }
                     ranked_pairs = multi_rankscore_preannotated(
                         rankscore_inputs, 0.01, 10, 'all', 0, 0, 100
                     )
-                    validation_sentinel(ranked_pairs)
+                    rankscore_sentinel(ranked_pairs)
+                    rankvar_sentinel(joined_phen2gene)
                 }
             '''.replace("__MULTI_RANKSCORE_MODULE__", str(ROOT / "modules/multi_rankscore"))
             result = self.run_nextflow(
@@ -189,7 +217,12 @@ class NextflowRuntimeContractTests(unittest.TestCase):
 
             self.assertEqual(0, result.returncode, result.stdout + result.stderr)
             self.assertEqual(
-                {"case1.seen", "case2.seen"},
+                {
+                    "case1.rankscore.seen",
+                    "case2.rankscore.seen",
+                    "case1.rankvar.seen",
+                    "case2.rankvar.seen",
+                },
                 {path.name for path in results.glob("*.seen")},
             )
 
