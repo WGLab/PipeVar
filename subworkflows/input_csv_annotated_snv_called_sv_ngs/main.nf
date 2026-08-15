@@ -1,5 +1,5 @@
 include { multi_phen2gene } from '../../modules/multi_phen2gene/'
-include { multi_rankscore } from '../../modules/multi_rankscore/'
+include { multi_rankscore_preannotated } from '../../modules/multi_rankscore/'
 include { multi_rankvar } from '../../modules/multi_rankvar/'
 include { multi_expansionhunter } from '../../modules/multi_expansionhunter/'
 include { multi_eh_filter } from '../../modules/multi_eh_filter/'
@@ -15,7 +15,6 @@ include { multi_xtea } from '../../modules/multi_xtea/'
 include { multi_normalize_shortread_alignment } from '../../modules/multi_normalize_shortread_alignment/'
 include { multi_cnvnator } from '../../modules/multi_cnvnator/'
 include { multi_truvari_shortread_sv_merge } from '../../modules/multi_truvari_shortread_sv_merge/'
-include { validate_preannotated_annovar_pair } from '../../modules/validate_preannotated_annovar_pair/'
 include { multi_mito_prep_mutect2 } from '../../modules/multi_mito_prep_mutect2/'
 include { multi_mito_mutect2 } from '../../modules/multi_mito_mutect2/'
 include { multi_mito_annotation } from '../../modules/multi_mito_annotation/'
@@ -53,15 +52,13 @@ workflow INPUT_CSV_ANNOTATED_SNV_CALLED_SV_NGS {
 	denovo_sv_min_reciprocal_overlap
 
 	main:
-	validate_input = input_annotated_called_ngs.map { out_prefix, annovar_txt, annovar_vcf, bam_file, bai_file, phenotype_path, phenotype_format ->
+	annovar_for_downstream = input_annotated_called_ngs.map { out_prefix, annovar_txt, annovar_vcf, bam_file, bai_file, phenotype_path, phenotype_format ->
 		tuple(out_prefix, annovar_txt, annovar_vcf)
 	}
-	validated_annovar = validate_preannotated_annovar_pair(validate_input)
-	validated_for_downstream = validated_annovar
 	analysis_input = input_annotated_called_ngs
 	if ( denovo_filter == "yes" ) {
-		denovo_snv_result = DENOVO_SNV_FILTER_CORE(validated_annovar, denovo_pedigree, denovo_role_column, denovo_family_column, denovo_vcf_sample_column, denovo_exclude_contigs)
-		validated_for_downstream = denovo_snv_result.records
+		denovo_snv_result = DENOVO_SNV_FILTER_CORE(annovar_for_downstream, denovo_pedigree, denovo_role_column, denovo_family_column, denovo_vcf_sample_column, denovo_exclude_contigs)
+		annovar_for_downstream = denovo_snv_result.records
 		proband_keys = denovo_snv_result.records.map { out_prefix, txt_file, vcf_file -> tuple(out_prefix, true) }
 		analysis_input = input_annotated_called_ngs.join(proband_keys, failOnDuplicate: true).map { out_prefix, annovar_txt, annovar_vcf, bam_file, bai_file, phenotype_path, phenotype_format, marker ->
 			tuple(out_prefix, annovar_txt, annovar_vcf, bam_file, bai_file, phenotype_path, phenotype_format)
@@ -83,10 +80,10 @@ workflow INPUT_CSV_ANNOTATED_SNV_CALLED_SV_NGS {
 	hpo_paths = phenotype_extractor_result.mix(hpo_input)
 	phen2gene_result = multi_phen2gene(hpo_paths)
 
-	validated_annovar_txt = validated_for_downstream.map { out_prefix, annovar_txt, annovar_vcf -> tuple(out_prefix, annovar_txt) }
-	join_annovar_phen2gene = validated_annovar_txt.join(phen2gene_result, failOnMismatch: true, failOnDuplicate: true)
-	join_annovar_hpo = join_annovar_phen2gene.join(hpo_paths, failOnMismatch: true, failOnDuplicate: true)
-	rankscore_result = multi_rankscore(join_annovar_phen2gene, gnomad, rankscore_filter, rankscore_softwares, gq, ad, phen2gene_top_n)
+	join_annovar_phen2gene = annovar_for_downstream.join(phen2gene_result, failOnMismatch: true, failOnDuplicate: true)
+	rankvar_input = join_annovar_phen2gene.map { out_prefix, annovar_txt, annovar_vcf, phen2gene -> tuple(out_prefix, annovar_txt, phen2gene) }
+	join_annovar_hpo = rankvar_input.join(hpo_paths, failOnMismatch: true, failOnDuplicate: true)
+	rankscore_result = multi_rankscore_preannotated(join_annovar_phen2gene, gnomad, rankscore_filter, rankscore_softwares, gq, ad, phen2gene_top_n)
 	rankvar_result = multi_rankvar(join_annovar_hpo, gnomad, gq, ad, rankvar_filter)
 
 	input_bam_with_bam = analysis_input.map { out_prefix, annovar_txt, annovar_vcf, bam_file, bai_file, phenotype_path, phenotype_format ->
@@ -157,8 +154,8 @@ workflow INPUT_CSV_ANNOTATED_SNV_CALLED_SV_NGS {
 	phenosv_input = survivor_result.join(hpo_paths, failOnMismatch: true, failOnDuplicate: true)
 	phenosv_result = multi_phenosv(phenosv_input)
 
-	validated_annovar_vcf = validated_for_downstream.map { out_prefix, annovar_txt, annovar_vcf -> tuple(out_prefix, annovar_vcf) }
-	phenosv_annovar_snv = phenosv_result.join(validated_annovar_vcf, failOnMismatch: true, failOnDuplicate: true)
+	annovar_vcf_for_prio = annovar_for_downstream.map { out_prefix, annovar_txt, annovar_vcf -> tuple(out_prefix, annovar_vcf) }
+	phenosv_annovar_snv = phenosv_result.join(annovar_vcf_for_prio, failOnMismatch: true, failOnDuplicate: true)
 	sv_join = phenosv_annovar_snv.join(annovar_sv_for_downstream, failOnMismatch: true, failOnDuplicate: true)
 	rankscore_join = sv_join.join(rankscore_result, failOnMismatch: true, failOnDuplicate: true)
 	rankvar_join = rankscore_join.join(rankvar_result, failOnMismatch: true, failOnDuplicate: true)

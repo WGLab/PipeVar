@@ -8,7 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 VALIDATOR = (
     ROOT.parent
-    / "docker_work/validate_preannotated_annovar_pair/validate_preannotated_annovar_pair.py"
+    / "docker_work/rankscore/validate_preannotated_annovar_pair.py"
 )
 
 TXT_HEADER = (

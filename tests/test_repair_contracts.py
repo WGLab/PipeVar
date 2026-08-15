@@ -38,13 +38,14 @@ class RepairContractTests(unittest.TestCase):
         calls = []
         for path in (REPO / "subworkflows").glob("*/main.nf"):
             source = path.read_text(encoding="utf-8")
-            calls.extend(re.findall(r"(?:Rankscore_analysis|multi_rankscore)\([^\n]+\)", source))
+            calls.extend(re.findall(r"(?:Rankscore_analysis(?:_preannotated)?|multi_rankscore(?:_preannotated)?)\([^\n]+\)", source))
         self.assertEqual(25, len(calls))
         self.assertTrue(all(re.search(r",\s*ad\s*,\s*phen2gene_top_n\)$", call) for call in calls))
 
         for relative in ("modules/rankscore_analysis/main.nf", "modules/multi_rankscore/main.nf"):
             source = (REPO / relative).read_text(encoding="utf-8")
             self.assertIn("rankscore_0.3.0", source)
+            self.assertIn("rankscore_0.3.1", source)
             self.assertRegex(source, r"val ad[\s\S]+?\$gq \$ad \$rankscore_softwares")
 
     def test_reserved_image_pins_are_scoped_to_consumers(self):
@@ -80,35 +81,39 @@ class RepairContractTests(unittest.TestCase):
         self.assertIn("accepted_clnsig", source)
         self.assertNotIn("&& /Pathogenic/", source)
 
-    def test_preannotated_validator_is_copy_free_and_requires_gt_but_not_ps(self):
-        module = (REPO / "modules/validate_preannotated_annovar_pair/main.nf").read_text(encoding="utf-8")
-        validator = (
-            DOCKER_WORK
-            / "validate_preannotated_annovar_pair/validate_preannotated_annovar_pair.py"
-        ).read_text(encoding="utf-8")
-        dockerfile = (
-            DOCKER_WORK / "validate_preannotated_annovar_pair/Dockerfile"
-        ).read_text(encoding="utf-8")
+    def test_preannotated_validation_runs_inside_rankscore_without_copying(self):
+        single_module = (REPO / "modules/rankscore_analysis/main.nf").read_text(encoding="utf-8")
+        batch_module = (REPO / "modules/multi_rankscore/main.nf").read_text(encoding="utf-8")
+        validator = (DOCKER_WORK / "rankscore/validate_preannotated_annovar_pair.py").read_text(encoding="utf-8")
+        dockerfile = (DOCKER_WORK / "rankscore/Dockerfile").read_text(encoding="utf-8")
 
-        self.assertIn("validate_preannotated_annovar_pair_0.4", module)
-        self.assertIn("validate_preannotated_annovar_pair_0.4", dockerfile)
-        self.assertIn("procps", dockerfile)
+        self.assertIn("rankscore_0.3.1", dockerfile)
+        self.assertIn("COPY validate_preannotated_annovar_pair.py", dockerfile)
         self.assertIn('if "GT" not in format_fields', validator)
         self.assertIn("PS is optional", validator)
         self.assertNotIn("shutil", validator)
         self.assertNotIn("copy_file", validator)
         self.assertNotIn("--validated-txt", validator)
         self.assertNotIn("--validated-vcf", validator)
-        self.assertIn("process validate_preannotated_annovar_pair", module)
-        self.assertIn("tuple val(out_prefix), path(annovar_txt), path(annovar_vcf)", module)
-        self.assertNotIn("validate_preannotated_annovar_pair_check", module)
-        self.assertNotIn("validation_ok", module)
-        self.assertNotIn(".join(", module)
-        self.assertIn("stub:", module)
-        self.assertNotIn(".validated.hg38_multianno", module)
+        self.assertIn("process Rankscore_analysis_preannotated", single_module)
+        self.assertIn("process multi_rankscore_preannotated", batch_module)
+        self.assertIn("path annovar_vcf", single_module)
+        self.assertIn("path(annovar_vcf)", batch_module)
+        for module in (single_module, batch_module):
+            self.assertIn("python3 /rankscore/validate_preannotated_annovar_pair.py", module)
+            self.assertLess(module.index("validate_preannotated_annovar_pair.py"), module.index("bash /rankscore/clinvar.sh", module.index("validate_preannotated_annovar_pair.py")))
+            self.assertNotIn(".validated.hg38_multianno", module)
         config = (REPO / "nextflow.config").read_text(encoding="utf-8")
-        self.assertIn("withName: 'validate_preannotated_annovar_pair'", config)
-        self.assertNotIn("withName: 'validate_preannotated_annovar_pair_check'", config)
+        self.assertIn("Rankscore_analysis_preannotated", config)
+        self.assertIn("multi_rankscore_preannotated", config)
+        self.assertNotIn("withName: 'validate_preannotated_annovar_pair'", config)
+
+        annotated_sources = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in (REPO / "subworkflows").glob("*annotated*/main.nf")
+        )
+        self.assertNotIn("modules/validate_preannotated_annovar_pair", annotated_sources)
+        self.assertNotIn("validate_preannotated_annovar_pair(", annotated_sources)
 
 if __name__ == "__main__":
     unittest.main()

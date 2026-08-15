@@ -4,13 +4,12 @@ include { Phen2gene } from '../../modules/phen2gene/'
 include { RankVar } from '../../modules/rankvar/'
 include { ANNOVAR_SV } from '../../modules/annovar_sv/'
 include { ExpansionHunter } from '../../modules/expansion_hunter/'
-include { Rankscore_analysis } from '../../modules/rankscore_analysis/'
+include { Rankscore_analysis_preannotated } from '../../modules/rankscore_analysis/'
 include { phenotagger } from '../../modules/phenotagger/'
 include { phenogpt2 } from '../../modules/phenogpt2/'
 include { eh_filter } from '../../modules/eh_filter/'
 include { ngs_prio } from '../../modules/ngs_prio/'
 include { common_sv_filter } from '../../modules/common_sv_filter/'
-include { validate_preannotated_annovar_pair } from '../../modules/validate_preannotated_annovar_pair/'
 include { mito_prep_mutect2 } from '../../modules/mito_prep_mutect2/'
 include { mito_mutect2 } from '../../modules/mito_mutect2/'
 include { mito_annotation } from '../../modules/mito_annotation/'
@@ -44,14 +43,6 @@ workflow SINGLE_ANNOTATED_ALL_NGS {
 	mito_contig
 
 	main:
-	validated_annovar = validate_preannotated_annovar_pair(
-		out_prefix.combine(annovar_txt).combine(snv_vcf).map { prefix, annovar_txt_file, annovar_vcf_file ->
-			tuple(prefix, annovar_txt_file, annovar_vcf_file)
-		}
-	)
-	validated_annovar_txt = validated_annovar.map { prefix, validated_txt, validated_vcf -> validated_txt }
-	validated_annovar_vcf = validated_annovar.map { prefix, validated_txt, validated_vcf -> validated_vcf }
-
 	hpo = phenotype
 	if ( phenotype_format == 'clinical_note' || phenotype_format == 'yes' ) {
 		if ( params.phenotype_extractor.toString().trim().toLowerCase() == "phenogpt2" ) {
@@ -64,8 +55,8 @@ workflow SINGLE_ANNOTATED_ALL_NGS {
 		}
 	}
 	Phen2gene(hpo, out_prefix)
-	RankVar(validated_annovar_txt, Phen2gene.out, hpo, out_prefix, gnomad, gq, ad, rankvar_filter)
-	rankscore_result = Rankscore_analysis(validated_annovar_txt, Phen2gene.out, out_prefix, gnomad, rankscore_filter, rankscore_softwares, gq, ad, phen2gene_top_n)
+	RankVar(annovar_txt, Phen2gene.out, hpo, out_prefix, gnomad, gq, ad, rankvar_filter)
+	rankscore_result = Rankscore_analysis_preannotated(annovar_txt, snv_vcf, Phen2gene.out, out_prefix, gnomad, rankscore_filter, rankscore_softwares, gq, ad, phen2gene_top_n)
 
 	ANNOVAR_SV(annovar_sv_vcf, out_prefix, "preannotated")
 	annovar_sv_for_downstream = ANNOVAR_SV.out
@@ -77,7 +68,7 @@ workflow SINGLE_ANNOTATED_ALL_NGS {
 	PhenoSV(SURVIVOR.out.phenosv_inputs, out_prefix, hpo)
 	ExpansionHunter(bam, out_prefix, eh_ref_fa, eh_variant_catalog)
 	eh_filter(out_prefix, ExpansionHunter.out)
-	ngs_prio(out_prefix, RankVar.out, rankscore_result.out.rankscore, rankscore_result.out.clinvar, PhenoSV.out, annovar_sv_for_downstream, validated_annovar_vcf, hpo, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
+	ngs_prio(out_prefix, RankVar.out, rankscore_result.out.rankscore, rankscore_result.out.clinvar, PhenoSV.out, annovar_sv_for_downstream, snv_vcf, hpo, inheritance_mode, include_clinvar_report, allow_unphased_comphet)
 
 	if ( mito_ref_fa != null ) {
 		mutect2_ref_fa = mito_ref_fa.map { fa_file, fai_file, dict_file, bwa_amb, bwa_ann, bwa_bwt, bwa_pac, bwa_sa ->

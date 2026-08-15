@@ -46,7 +46,7 @@ class DenovoWiringTests(unittest.TestCase):
             with self.subTest(relative=relative):
                 text = self.read(relative)
                 self.assertIn("include { DENOVO_SNV_FILTER_CORE }", text)
-                self.assertIn("validated_for_downstream", text)
+                self.assertIn("annovar_for_downstream", text)
 
     def test_all_active_sv_workflows_filter_before_common_sv_filter(self):
         for relative in self.sv_workflows:
