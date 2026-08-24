@@ -122,21 +122,8 @@ def clean_mito = params.mito ? params.mito.toString().trim().toLowerCase() : 'no
 def clean_annotated_snv = params.annotated_snv ? params.annotated_snv.toString().trim().toLowerCase() : 'no'
 def clean_annotated_sv = params.annotated_sv ? params.annotated_sv.toString().trim().toLowerCase() : 'no'
 
-def legacyGnomadText = params.gnomad?.toString()?.trim()
 def gnomadAdText = params.gnomad_af_ad?.toString()?.trim()
 def gnomadArText = params.gnomad_af_ar?.toString()?.trim()
-if (legacyGnomadText && (gnomadAdText || gnomadArText)) {
-	error "ERROR: --gnomad is deprecated and cannot be combined with --gnomad_af_ad or --gnomad_af_ar."
-}
-if (legacyGnomadText) {
-	log.warn "--gnomad is deprecated; applying '${legacyGnomadText}' to both AD and AR frequency ceilings."
-	gnomadAdText = legacyGnomadText
-	gnomadArText = legacyGnomadText
-}
-else {
-	gnomadAdText = gnomadAdText ?: '0.001'
-	gnomadArText = gnomadArText ?: '0.01'
-}
 
 def parseGnomadFrequency = { String name, String text ->
 	double value
@@ -158,8 +145,6 @@ if (resolvedGnomadAd > resolvedGnomadAr) {
 }
 params.gnomad_af_ad = gnomadAdText
 params.gnomad_af_ar = gnomadArText
-// Existing subworkflow contracts consume params.gnomad as the upstream ceiling.
-params.gnomad = gnomadArText
 
 def legacyCommonSvText = params.common_sv_af?.toString()?.trim()
 def commonSvAdText = params.common_sv_af_ad?.toString()?.trim()
@@ -1590,7 +1575,7 @@ eh_variant_catalog = Channel
 	inheritance_mode=Channel.value(inheritance_mode_script)
 	include_clinvar_report=Channel.value(clean_include_clinvar_report)
 	allow_unphased_comphet=Channel.value(clean_allow_unphased_comphet)
-	gnomad=Channel.value(params.gnomad)
+	gnomad=Channel.value(gnomadArText)
         rankscore_filter=Channel.value(params.rankscore)
 	rankscore_softwares=Channel.value(clean_rankscore_softwares)
 	rankvar_filter=Channel.value(params.rankvar)
