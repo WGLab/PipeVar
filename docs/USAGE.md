@@ -28,16 +28,27 @@ Four choices determine the main route:
 structural/copy-number and repeat branch. Omitting `--mode` selects the supported
 combined route for aligned reads.
 
+Aligned-read users should always provide `--type short`, `--type ont`, or
+`--type pacbio`; the configured default is `ont`. “Omit `--mode`” means the
+option must not appear in the command—`--mode combined` is not valid.
+
+### Common routes
+
 | Input | Sequencing | Mode | Main result |
 | --- | --- | --- | --- |
 | Single BAM/CRAM | `short`, `ont`, `pacbio` | `snp`, `sv`, or omitted | Called and prioritized variants; combined routes add a report |
 | Basic sample sheet with BAM/CRAM | `short`, `ont`, `pacbio` | `snp`, `sv`, or omitted | Per-sample batch results |
-| Typed sheet with `bam_ngs`/`cram_ngs` | `short`, `ont`, `pacbio` | `snp`, `sv`, or omitted | Per-sample batch results; `--type` selects the route |
-| Single VCF | Not applicable | `snp` or `sv` required | Re-annotated and prioritized supplied calls |
-| Basic sample sheet with VCF | Not applicable | `snp` or `sv` required | Per-sample VCF analysis |
-| Typed sheet with `vcf_snv`/`vcf_sv` | Not applicable | Inferred | Per-sample VCF analysis |
-| Prepared ANNOVAR small variants | Not applicable | Small-variant-led | Re-prioritized supplied annotations |
-| Typed sheet with `annotated_snv` | Short read when alignment-backed | Small-variant-led or supported batch combination | Prepared evidence with optional structural/copy-number and repeat branches |
+| Single VCF | Omit `--type` | `--mode snp` or `--mode sv` required | Re-annotated and prioritized supplied calls |
+| Basic sample sheet with VCF | Omit `--type` | `--mode snp` or `--mode sv` required | Per-sample VCF analysis |
+
+### Advanced typed and prepared-input routes
+
+| Input | Sequencing | Mode | Main result |
+| --- | --- | --- | --- |
+| Typed sheet with `bam_ngs`/`cram_ngs` | `--type short`, `--type ont`, or `--type pacbio` | `snp`, `sv`, or omitted | Per-sample batch results |
+| Typed sheet with `vcf_snv`/`vcf_sv` | Omit `--type` | Do not supply; `input_kind` selects it | Per-sample VCF analysis |
+| Prepared ANNOVAR small variants | Omit `--type` | `--mode snp` or omit `--mode` | Re-prioritized supplied annotations |
+| Typed sheet with `annotated_snv` | `--type short` when alignment-backed | Inferred from populated path columns; follow the input guide | Prepared evidence with optional structural/copy-number and repeat branches |
 
 Detailed file requirements are in the [input guide](INPUTS.md).
 

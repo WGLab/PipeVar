@@ -1,128 +1,68 @@
-# PipeVar Nuclear Workflow Figures
+# PipeVar nuclear workflow figures
 
-This page provides focused figure source for the completed nuclear rare-disease
-analysis workflow. The diagrams emphasize analysis stages and tool handoffs,
-without command-line routing details.
+This visual guide separates route selection, nuclear analysis, and candidate
+prioritization into independently readable figures. The embedded SVG files are
+the canonical diagrams; there is no duplicate Mermaid source to keep in sync.
 
-Rendered SVG assets:
+## Terms used in the figures
 
-- `docs/pipevar_nuclear_workflow.svg`
-- `docs/pipevar_prioritization_workflow.svg`
+| Term | Plain-language meaning |
+| --- | --- |
+| HPO | Human Phenotype Ontology codes describing clinical findings |
+| VCF | A structured file containing variant calls |
+| Small variant | A single-letter DNA change or short insertion/deletion |
+| Structural variant | A larger rearrangement such as a deletion, duplication, inversion, or translocation |
+| CNV | Copy-number variant: a gain or loss of genomic material |
+| Caller | Software that identifies variants from sequencing reads |
+| Annotation | Information added to a variant, such as gene overlap or known evidence |
+| Phasing | Determining whether variants lie on the same or opposite chromosome copy |
+| Compound pair | Two different variants in the same gene considered together in a recessive scenario |
 
-## Figure 1. Nuclear Rare-Disease Workflow
+Names such as ANNOVAR, ClinVar, RankVar, PhenoSV, Truvari, and SURVIVOR are
+software tools or evidence resources, not types of variants.
 
-```mermaid
-flowchart LR
-    input["Input data\nBAM/CRAM or VCF"]
-    reference["Reference resources\nFASTA, annotation data, repeat catalog"]
-    phenotype["Phenotype input\nClinical note or HPO terms"]
+## Figure 1. Choose a route
 
-    subgraph phenotypeLane["Phenotype extraction"]
-        phenotagger["PhenoTagger"]
-        phen2gene["Phen2Gene"]
-    end
+This figure covers one sample at a time. Start with one row and read left to
+right. The boxes give the exact main routing choices; omitting `--mode` means
+leaving the option out of the command. Batch syntax is documented separately in
+the [input guide](INPUTS.md#choose-a-sample-sheet).
 
-    subgraph snvLane["SNV/indel calling"]
-        snvCall["DeepVariant or HaplotypeCaller\nClair3 or NanoCaller\nSupplied VCF"]
-        snvAnno["ANNOVAR"]
-        snvScore["RankVar\nRankScore\nClinVar"]
-    end
+![PipeVar route selection showing exact input, type, and mode parameters](pipevar_route_selection.svg)
 
-    subgraph svLane["SV calling"]
-        svCall["Manta\nSniffles\nSupplied VCF"]
-        svAnno["ANNOVAR_SV"]
-        svScore["SURVIVOR\nPhenoSV"]
-    end
+Takeaway: aligned-read users must select their sequencing technology. Existing
+VCFs require an explicit small- or structural-variant mode, while combined
+analysis is an aligned-read route selected by omitting `--mode`.
 
-    subgraph repeatLane["Repeat expansion analysis"]
-        repeatCall["ExpansionHunter\neh_filter\nNanoRepeat"]
-    end
+## Figure 2. Nuclear analysis overview
 
-    subgraph prioLane["Variant prioritization"]
-        fullPrio["ngs_prio\nlongphase"]
-        modePrio["snp_prio\nsv_prio"]
-    end
+Read the phenotype path across the top, then follow only the genomic branches
+selected by the input and analysis mode. Dashed connections indicate
+read-backed or route-conditional contributions.
 
-    output["Final outputs\nprioritized VCF\ngene-level prioritized VCF\nrepeat table\nHTML report"]
+![PipeVar nuclear analysis from selected inputs through parallel analysis branches to candidate outputs](pipevar_nuclear_workflow.svg)
 
-    phenotype --> phenotagger --> phen2gene
-    phenotype --> phen2gene
-    input --> snvCall
-    input --> svCall
-    input --> repeatCall
-    reference --> snvCall
-    reference --> svCall
-    reference --> repeatCall
-    reference --> snvAnno
-    reference --> svAnno
-    phen2gene --> snvAnno
-    phen2gene --> svAnno
-    phen2gene --> fullPrio
-    phen2gene --> modePrio
-    snvCall --> snvAnno --> snvScore --> fullPrio
-    snvScore --> modePrio
-    svCall --> svAnno --> svScore --> fullPrio
-    svScore --> modePrio
-    repeatCall --> fullPrio
-    fullPrio --> output
-    modePrio --> output
-```
+Takeaway: small variants, structural/copy-number variants, and repeats produce
+different evidence. PipeVar brings the selected evidence together with
+phenotype-ranked genes during prioritization; not every run produces every
+branch or output.
 
-## Figure 2. Variant Prioritization Detail
+## Figure 3. Evidence prioritization
 
-```mermaid
-flowchart TD
-    hpo["HPO terms"]
-    inheritance["--inheritance_mode\nml | omim | gnomad"]
+This figure begins after calling and annotation. It shows the functional rules
+used to reduce evidence to reviewable candidate files without exposing internal
+module names.
 
-    subgraph snvEvidence["SNV/indel evidence"]
-        annovar["ANNOVAR VCF/TXT"]
-        clinvar["ClinVar"]
-        rankscore["RankScore"]
-        rankvar["RankVar"]
-    end
+![PipeVar evidence filtering, inheritance assessment, and candidate ranking](pipevar_prioritization_workflow.svg)
 
-    subgraph svEvidence["SV evidence"]
-        annovarSv["ANNOVAR_SV VCF"]
-        survivor["SURVIVOR"]
-        phenosv["PhenoSV"]
-    end
+Takeaway: evidence classes retain different meanings. Quality, frequency,
+phenotype, inheritance, and phasing rules are applied before variants and genes
+are ranked. A dominant scenario considers whether one altered gene copy may
+contribute; a recessive scenario generally considers two contributing copies.
 
-    subgraph assign["Inheritance-aware assignment"]
-        snvAssign["assign_dom_or_rec_snp_only"]
-        svAssign["assign_dom_or_rec_sv_only"]
-        combinedAssign["assign_dom_or_rec"]
-    end
+These nuclear figures intentionally omit optional mitochondrial analysis. See
+the [workflow guide](WORKFLOW.md) for conceptual behavior, [running guide](USAGE.md)
+for exact route restrictions, and [output guide](OUTPUTS.md) for conditional
+published files.
 
-    subgraph workflows["Prioritization workflows"]
-        snpPrio["snp_prio\nSNV-only"]
-        svPrio["sv_prio\nSV-only"]
-        ngsPrio["ngs_prio\nshort-read full"]
-        longphase["longphase\nlong-read full"]
-    end
-
-    reports["Final reports\nvariant-level VCF\ngene-level VCF"]
-
-    annovar --> clinvar --> snvAssign
-    annovar --> rankscore --> snvAssign
-    annovar --> rankvar --> snvAssign
-    annovarSv --> survivor --> phenosv --> svAssign
-    clinvar --> combinedAssign
-    rankscore --> combinedAssign
-    rankvar --> combinedAssign
-    phenosv --> combinedAssign
-    hpo --> snvAssign
-    hpo --> svAssign
-    hpo --> combinedAssign
-    inheritance --> snvAssign
-    inheritance --> svAssign
-    inheritance --> combinedAssign
-    snvAssign --> snpPrio
-    svAssign --> svPrio
-    combinedAssign --> ngsPrio
-    combinedAssign --> longphase
-    snpPrio --> reports
-    svPrio --> reports
-    ngsPrio --> reports
-    longphase --> reports
-```
+Return to the [documentation map](../README.md#documentation).

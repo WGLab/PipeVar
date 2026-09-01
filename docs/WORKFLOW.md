@@ -201,6 +201,7 @@ allele fraction `0.5`, APOGEE2 `0.5`, and MitoTip `12.66`.
 
 For standalone nuclear figures, see
 [`PIPEVAR_NUCLEAR_FIGURES.md`](PIPEVAR_NUCLEAR_FIGURES.md),
+[`pipevar_route_selection.svg`](pipevar_route_selection.svg),
 [`pipevar_nuclear_workflow.svg`](pipevar_nuclear_workflow.svg), and
 [`pipevar_prioritization_workflow.svg`](pipevar_prioritization_workflow.svg).
 

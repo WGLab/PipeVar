@@ -18,38 +18,70 @@ PipeVar 0.5.0 supports:
 | I want to... | Read... |
 | --- | --- |
 | Install PipeVar or configure containers | [Installation and setup](docs/INSTALLATION.md) |
+| Plan compute capacity or review the 30× example | [Resources and benchmark](docs/BENCHMARKS.md) |
 | Prepare a reference, sample, phenotype file, or sample sheet | [Input guide](docs/INPUTS.md) |
 | Choose a workflow or find more run examples | [Running PipeVar](docs/USAGE.md) |
 | Look up an option and its default | [Parameter reference](docs/PARAMETERS.md) |
-| Understand the analysis stages | [Workflow guide](docs/WORKFLOW.md) |
+| Understand the analysis stages | [Workflow guide](docs/WORKFLOW.md) and [nuclear figures](docs/PIPEVAR_NUCLEAR_FIGURES.md) |
 | Find and interpret published files | [Output guide](docs/OUTPUTS.md) |
 
 ## Choose a workflow
 
 In this documentation, BAM and CRAM are aligned-read files, VCF contains
 existing variant calls, and ANNOVAR multianno files are annotation tables
-created by ANNOVAR. **Small variants** are DNA-letter changes and short
+created by ANNOVAR. **Small variants** are single-letter changes and short
 insertions/deletions; **structural/copy-number variants** are larger
-rearrangements, gains, or losses. **Combined** means analyzing both groups.
+rearrangements, gains, or losses.
 
-| Starting point | Sequencing | Available analysis | Execution |
-| --- | --- | --- | --- |
-| BAM/CRAM | Short read, Oxford Nanopore, or PacBio | Small variants, structural/copy-number variants, or combined | Single sample or sample sheet |
-| VCF | Existing small-variant or structural-variant calls | Re-annotation and prioritization | Single sample or sample sheet |
-| ANNOVAR multianno files | Prepared small-variant annotations | Re-prioritization, with supported batch combinations | Single sample or typed sample sheet |
+For aligned reads, make two explicit choices:
 
-See [Running PipeVar](docs/USAGE.md) for route restrictions and
-[Input guide](docs/INPUTS.md) for required files and indexes.
+1. Set the sequencing technology. Do not rely on the default.
+
+   | Your data | Type this |
+   | --- | --- |
+   | Illumina or other short reads, including whole-exome (WES) or whole-genome sequencing (WGS) | `--type short` |
+   | Oxford Nanopore | `--type ont` |
+   | PacBio | `--type pacbio` |
+
+2. Select the analysis.
+
+   | What you want | Type this |
+   | --- | --- |
+   | Small variants only | `--mode snp` |
+   | Structural/copy-number variants and repeats | `--mode sv` |
+   | Combined small and structural/copy-number analysis | Do not include `--mode` |
+
+3. Select one sample or a batch.
+
+   | Execution | Type this |
+   | --- | --- |
+   | One sample | Supply `--bam`, `--vcf`, or prepared inputs directly |
+   | Several samples | Use `--input_csv samples.csv` and follow the sample-sheet rules |
+
+For example, an Illumina WES BAM uses `--bam sample.bam --type short`. Add
+`--mode snp` for small variants only, add `--mode sv` for the structural and
+repeat route, or leave `--mode` out of the command for combined analysis. There
+is no `--mode combined` value.
+
+For an existing VCF, use `--vcf` with the required `--mode snp` or `--mode sv`
+and omit `--type`. For prepared ANNOVAR input and batch routing, use the
+[input guide](docs/INPUTS.md) and [running guide](docs/USAGE.md).
 
 ## Quick start
 
 ### 1. Provide the required software and data
 
-Install Nextflow with Java and either Docker or Singularity. Obtain ANNOVAR
-through its registration process, and prepare an hg38 reference for your data.
+PipeVar documentation targets Linux execution through Docker or Singularity.
+Install Nextflow with Java and a container runtime, obtain ANNOVAR through its
+registration process, and prepare an hg38 reference for your data.
 Aligned-read examples also require a discoverable BAM/CRAM index and
 `<reference>.fai`; see [reference files](docs/INPUTS.md#reference-files) and
 [alignment indexes](docs/INPUTS.md#alignment-indexes).
+
+The configured first-attempt tasks request as much as 16 CPUs and 64 GB of RAM;
+retries can request more. These are task allocations rather than a whole-run
+minimum. See [environments and resources](docs/INSTALLATION.md#execution-environments)
+and the [30× example benchmark](docs/BENCHMARKS.md).
 
 Clone PipeVar and enter the repository:
 

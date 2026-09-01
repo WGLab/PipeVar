@@ -8,6 +8,7 @@ reproducibility. Start with the shorter setup path in the
 ## On this page
 
 - [Prerequisites](#prerequisites)
+- [Execution environments](#execution-environments)
 - [What setup does](#what-setupsh-does)
 - [Setup examples](#setup-examples)
 - [Profiles and bind paths](#execution-profiles)
@@ -30,6 +31,28 @@ Provide the following before running PipeVar:
 
 ANNOVAR must be obtained through its
 [registration and download process](https://www.openbioinformatics.org/annovar/annovar_download_form.php).
+
+## Execution environments
+
+PipeVar documentation targets containerized Linux execution. The repository
+provides these configured environments:
+
+| Host environment | PipeVar profile | Repository status |
+| --- | --- | --- |
+| Linux workstation or server with Docker | `local_docker` | Configured and documented |
+| Linux workstation or server with Singularity | `local_singularity` | Configured and documented |
+| Linux SLURM cluster with Singularity | `standard` or `slurm_singularity` | Configured and documented |
+| macOS, Windows, or WSL | None | Not documented or verified |
+
+“Configured and documented” means the profile exists in `nextflow.config`; it
+is not a claim that every distribution or runtime version has been tested. The
+repository does not currently record a maintainer-verified matrix of Linux,
+Nextflow, Java, Docker, Singularity, SLURM, CPU architecture, or GPU versions.
+Operators should record these versions with every run. A future verified matrix
+should also identify the PipeVar revision and test date.
+
+Containers package most analysis tools, but Nextflow, Java, the container
+runtime, filesystem mounts, and any scheduler still operate on the host.
 
 ## What `setup.sh` does
 
@@ -189,6 +212,12 @@ PipeVar configures up to three retries. Many CPU and memory requests scale with
 the retry attempt, while time limits remain fixed. Local profiles retain these
 requests and do not automatically scale them down for a workstation.
 
+These are configured per-task allocations, not measured consumption or a
+whole-run minimum. Local capacity must cover the largest tasks that Nextflow
+runs concurrently. Disk requirements are not currently quantified; allow space
+for references, downloaded databases, container images, published results, and
+the Nextflow work directory.
+
 Representative first-attempt allocations are:
 
 | Workload | CPU | Memory | Time |
@@ -206,6 +235,11 @@ Representative first-attempt allocations are:
 
 Use `--deepvariant_max_forks` to cap concurrent DeepVariant tasks on shared or
 local systems. PhenoGPT2 defaults to one concurrent task.
+
+Observed values from a supplied 30× example are kept separate from these
+scheduler requests. See [Resources and 30× example benchmark](BENCHMARKS.md) for
+the measurements, their limitations, and the metadata still needed for a
+reproducible comparison.
 
 ## Troubleshooting
 
