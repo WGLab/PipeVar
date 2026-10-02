@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="650" viewBox="0 0 1000 650" role="img" aria-labelledby="title desc">
+  <title id="title">Choose a PipeVar nuclear workflow</title>
+  <desc id="desc">Three horizontal paths map aligned reads, existing VCF calls, or prepared ANNOVAR annotations to the PipeVar input, type, and mode parameters.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#47657a"/>
+    </marker>
+    <style>
+      .canvas { fill: #f8fafb; }
+      .input { fill: #fff8e7; stroke: #9a7834; }
+      .choice { fill: #eef6fb; stroke: #3f728f; }
+      .result { fill: #eef7ef; stroke: #4c7b57; }
+      .note { fill: #ffffff; stroke: #9aaab5; }
+      .box { stroke-width: 1.6; rx: 10; }
+      .title { font: 700 22px Arial, sans-serif; fill: #173245; }
+      .heading { font: 700 16px Arial, sans-serif; fill: #173245; }
+      .text { font: 15px Arial, sans-serif; fill: #263b48; }
+      .small { font: 13px Arial, sans-serif; fill: #465d69; }
+      .code { font: 700 14px monospace; fill: #19445a; }
+      .flow { fill: none; stroke: #47657a; stroke-width: 2; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect class="canvas" width="1000" height="650"/>
+  <text class="title" x="40" y="42">Choose a PipeVar nuclear workflow</text>
+  <text class="small" x="40" y="66">Single sample: follow one row from your starting data to the main route selectors.</text>
+
+  <text class="heading" x="52" y="105">Starting data</text>
+  <text class="heading" x="330" y="105">Technology</text>
+  <text class="heading" x="625" y="105">Analysis</text>
+
+  <rect class="box input" x="40" y="130" width="220" height="125"/>
+  <text class="heading" x="63" y="160">Aligned BAM/CRAM</text>
+  <text class="code" x="63" y="189">--bam FILE</text>
+  <text class="small" x="63" y="217">single-sample aligned reads</text>
+
+  <rect class="box choice" x="315" y="130" width="250" height="125"/>
+  <text class="code" x="338" y="162">--type short</text>
+  <text class="small" x="470" y="162">Illumina/short</text>
+  <text class="code" x="338" y="194">--type ont</text>
+  <text class="small" x="470" y="194">Nanopore</text>
+  <text class="code" x="338" y="226">--type pacbio</text>
+  <text class="small" x="470" y="226">PacBio</text>
+
+  <rect class="box result" x="620" y="120" width="335" height="145"/>
+  <text class="code" x="643" y="151">--mode snp</text>
+  <text class="small" x="770" y="151">small variants only</text>
+  <text class="code" x="643" y="187">--mode sv</text>
+  <text class="small" x="770" y="187">structural/CNV + repeats</text>
+  <text class="code" x="643" y="223">omit --mode</text>
+  <text class="small" x="770" y="223">combined analysis</text>
+  <text class="small" x="643" y="248">There is no --mode combined value.</text>
+
+  <path class="flow" d="M260,192 H315"/>
+  <path class="flow" d="M565,192 H620"/>
+
+  <rect class="box input" x="40" y="315" width="220" height="105"/>
+  <text class="heading" x="63" y="346">Existing VCF calls</text>
+  <text class="code" x="63" y="376">--vcf FILE</text>
+  <text class="small" x="63" y="401">small or structural calls</text>
+
+  <rect class="box choice" x="315" y="315" width="250" height="105"/>
+  <text class="heading" x="338" y="348">Omit --type</text>
+  <text class="small" x="338" y="378">The sequencing route is not used.</text>
+
+  <rect class="box result" x="620" y="315" width="335" height="105"/>
+  <text class="code" x="643" y="350">--mode snp</text>
+  <text class="small" x="770" y="350">small-variant VCF</text>
+  <text class="code" x="643" y="386">--mode sv</text>
+  <text class="small" x="770" y="386">structural-variant VCF</text>
+
+  <path class="flow" d="M260,367 H315"/>
+  <path class="flow" d="M565,367 H620"/>
+
+  <rect class="box input" x="40" y="470" width="220" height="125"/>
+  <text class="heading" x="63" y="500">Prepared annotations</text>
+  <text class="code" x="63" y="528">--annotated_snv yes</text>
+  <text class="code" x="63" y="552">--annovar_txt FILE</text>
+  <text class="code" x="63" y="576">--vcf FILE</text>
+
+  <rect class="box choice" x="315" y="480" width="250" height="105"/>
+  <text class="heading" x="338" y="513">Omit --type</text>
+  <text class="small" x="338" y="543">Use the prepared-input example.</text>
+
+  <rect class="box result" x="620" y="480" width="335" height="105"/>
+  <text class="heading" x="643" y="513">Small-variant prioritization</text>
+  <text class="small" x="643" y="543">Advanced combinations use a typed</text>
+  <text class="small" x="643" y="565">sample sheet and the input guide.</text>
+
+  <path class="flow" d="M260,532 H315"/>
+  <path class="flow" d="M565,532 H620"/>
+
+  <rect class="box note" x="315" y="608" width="640" height="30"/>
+  <text class="small" x="337" y="629">Batch: use --input_csv FILE and follow the input guide's sample-sheet rules.</text>
+</svg>

@@ -1,31 +1,23 @@
-
 // Call SNP/indel variants from long-read alignments using NanoCaller.
 process nanocaller {
-        container ='beoungl/docker_test:nanocaller'
+    container = 'beoungl/docker_test:nanocaller_0.2'
 
+    input:
+    tuple val(out_prefix), path(bam), path(index_file), path(bed_file)
+    tuple path(ref_fa), path(fa_index)
 
-        input:
-	tuple path(bam), path(index)
-        val out_prefix
-	tuple path(ref_fa), path(fa_index)
-	val bed_file
+    output:
+    tuple val(out_prefix), path("${out_prefix}.nanocaller.vcf.gz")
 
-	output:
-	path "${out_prefix}.nanocaller.vcf.gz"
-	
-	script:
-	def args   = task.ext.args ?: ''
-
+    script:
+    def args = task.ext.args ?: ''
+    def regions = bed_file ? "--bed ${bed_file}" : ""
 
 	"""
 	source /conda/etc/profile.d/conda.sh
         conda activate nanocaller
 
-	if [ $bed_file != "null" ]; then
-		NanoCaller --bam $bam --ref $ref_fa --cpu 4 --output $out_prefix $args --bed $bed_file
-	else
-		NanoCaller --bam $bam --ref $ref_fa --cpu 4 --output $out_prefix $args
-	fi
+	NanoCaller --bam $bam --ref $ref_fa --cpu ${task.cpus} --output $out_prefix $args $regions
 
 	mv $out_prefix/variant_calls.vcf.gz $out_prefix/${out_prefix}.nanocaller.vcf.gz
 
@@ -36,8 +28,4 @@ process nanocaller {
 
 	"""
 
-
 }
-
-
-

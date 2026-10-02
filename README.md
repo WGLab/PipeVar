@@ -1,377 +1,204 @@
 # PipeVar
 
-PipeVar is a Nextflow DSL2 workflow for rare-disease variant prioritization from short-read and long-read data.
-It supports SNP/indel, SV, and repeat expansion analysis, and integrates phenotype-aware ranking.
+PipeVar analyzes short- or long-read sequencing data and ranks DNA changes that
+may help explain a patient's symptoms. It accepts aligned reads, existing
+variant calls, or prepared annotations and produces prioritized candidates for
+review.
 
-## What PipeVar does
+PipeVar 0.5.0 supports:
 
-- Calls and prioritizes SNP/indel variants.
-- Calls and prioritizes structural variants (SV).
-- Runs repeat expansion analysis (short-read and long-read paths).
-- Uses phenotype inputs (`--hpo` or clinical note via `--note`) for phenotype-guided ranking.
-- Supports single-sample mode and CSV batch mode.
+- phenotype-guided rare-disease analysis;
+- BAM/CRAM, VCF, and prepared ANNOVAR inputs;
+- short- and long-read nuclear analysis, repeat analysis, and optional
+  mitochondrial analysis; and
+- single-sample or CSV batch execution with prioritized files and reports.
 
-## Runtime model
+## Documentation
 
-PipeVar is designed for containerized execution.
+| I want to... | Read... |
+| --- | --- |
+| Install PipeVar or configure containers | [Installation and setup](docs/INSTALLATION.md) |
+| Check verified Nextflow versions or reproduce compatibility tests | [Nextflow compatibility](docs/NEXTFLOW_COMPATIBILITY.md) |
+| Plan compute capacity or review the 30× example | [Resources and benchmark](docs/BENCHMARKS.md) |
+| Prepare a reference, sample, phenotype file, or sample sheet | [Input guide](docs/INPUTS.md) |
+| Choose a workflow or find more run examples | [Running PipeVar](docs/USAGE.md) |
+| Look up an option and its default | [Parameter reference](docs/PARAMETERS.md) |
+| Navigate the code and route boundaries | [Concise workflow map](workflow.md) |
+| Understand the biological analysis stages | [Workflow guide](docs/WORKFLOW.md) and [nuclear figures](docs/PIPEVAR_NUCLEAR_FIGURES.md) |
+| Understand module boundaries, channel contracts, or resume compatibility | [Architecture guide](docs/ARCHITECTURE.md) |
+| Review vendored nf-core revisions and caller compatibility | [nf-core module provenance](docs/NFCORE_MODULES.md) |
+| Audit PipeVar logic packaged inside custom images | [Container-resident scripts](docs/CONTAINER_SCRIPTS.md) |
+| Find and interpret published files | [Output guide](docs/OUTPUTS.md) |
 
-- Supported container backends:
-  - Singularity
-  - Docker
-- Tested/primary scheduler profile:
-  - SLURM (`standard` / `slurm_singularity`)
-- Also available:
-  - local executor with Singularity
-  - local executor with Docker
+## Choose a workflow
 
-## Execution profiles
+In this documentation, BAM and CRAM are aligned-read files, VCF contains
+existing variant calls, and ANNOVAR multianno files are annotation tables
+created by ANNOVAR. **Small variants** are single-letter changes and short
+insertions/deletions; **structural/copy-number variants** are larger
+rearrangements, gains, or losses.
 
-Defined in `nextflow.config`:
+For aligned reads, make two explicit choices:
 
-- `standard`
-  - SLURM + Singularity (default profile behavior)
-- `slurm_singularity`
-  - Explicit SLURM + Singularity
-- `local_singularity`
-  - Local executor + Singularity
-- `local_docker`
-  - Local executor + Docker
+1. Set the sequencing technology. Do not rely on the default.
 
-All Singularity/Docker profiles mount:
+   | Your data | Type this |
+   | --- | --- |
+   | Illumina or other short reads, including whole-exome (WES) or whole-genome sequencing (WGS) | `--type short` |
+   | Oxford Nanopore | `--type ont` |
+   | PacBio | `--type pacbio` |
 
-- `--annovar_host_path` -> `/annovar`
-- `--phenosv_host_path` -> `/PhenoSV/train_data`
+2. Select the analysis.
 
-## Setup
+   | What you want | Type this |
+   | --- | --- |
+   | Small variants only | `--mode snp` |
+   | Structural/copy-number variants and repeats | `--mode sv` |
+   | Combined small and structural/copy-number analysis | Do not include `--mode` |
 
-### 1) Clone repository
+3. Select one sample or a batch.
+
+   | Execution | Type this |
+   | --- | --- |
+   | One sample | Supply `--bam`, `--vcf`, or prepared inputs directly |
+   | Several samples | Use `--input_csv samples.csv` and follow the sample-sheet rules |
+
+CSV rows may include optional `age_of_onset` metadata. Single-sample runs pass a
+blank age value to the same age-capable prioritization processes.
+
+For example, an Illumina WES BAM uses `--bam sample.bam --type short`. Add
+`--mode snp` for small variants only, add `--mode sv` for the structural and
+repeat route, or leave `--mode` out of the command for combined analysis. There
+is no `--mode combined` value.
+
+For an existing VCF, use `--vcf` with the required `--mode snp` or `--mode sv`
+and omit `--type`. For prepared ANNOVAR input and batch routing, use the
+[input guide](docs/INPUTS.md) and [running guide](docs/USAGE.md).
+
+## Quick start
+
+### 1. Provide the required software and data
+
+PipeVar documentation targets Linux execution through Docker or Singularity.
+Install Nextflow 24.10.6 or newer with Java 17 or newer and a container runtime,
+obtain ANNOVAR through its registration process, and prepare an hg38 reference
+for your data. Nextflow 26.04 must currently run with
+`NXF_SYNTAX_PARSER=v1`; see the [compatibility matrix](docs/NEXTFLOW_COMPATIBILITY.md).
+Aligned-read examples also require a discoverable BAM/CRAM index and
+`<reference>.fai`; see [reference files](docs/INPUTS.md#reference-files) and
+[alignment indexes](docs/INPUTS.md#alignment-indexes).
+
+The configured first-attempt tasks request as much as 16 CPUs and 64 GB of RAM;
+retries can request more. These are task allocations rather than a whole-run
+minimum. See [environments and resources](docs/INSTALLATION.md#execution-environments)
+and the [30× example benchmark](docs/BENCHMARKS.md).
+
+Clone PipeVar and enter the repository:
 
 ```bash
-git clone https://github.com/WGLab/PipeVar.git
+git clone https://github.com/WGLab/PipeVar.git PipeVar
 cd PipeVar
 ```
 
-### 2) External data/software prerequisites
+### 2. Prepare PipeVar resources
 
-PipeVar expects ANNOVAR and PhenoSV resources to be available (mounted via profile runtime options).
+`setup.sh` is PipeVar's setup assistant. It validates an existing licensed
+ANNOVAR installation, downloads the hg38 ANNOVAR databases used by PipeVar,
+downloads PhenoSV resources and the Phen2Gene knowledge base, adjusts the
+resource paths, and configures `profiles.standard` for the selected container
+backend. Run it from the repository root.
 
-ANNOVAR registration/download:
+The script does not install Nextflow, Java, Docker, Singularity, or ANNOVAR
+itself. It also does not provide a reference FASTA and indexes, PhenoGPT2
+models, a custom repeat catalog, or optional HmtVar data.
 
-- https://www.openbioinformatics.org/annovar/annovar_download_form.php
-
-Then run setup script:
-
-```bash
-# Full setup
-./setup.sh
-
-# Light PhenoSV setup
-./setup.sh light
-```
-
-By default, setup expects:
-
-- ANNOVAR at `./annovar`
-- PhenoSV resources downloaded under `./PhenoSV_model`
-
-You can override both locations (recommended for HPC/shared filesystems):
+For guided setup:
 
 ```bash
-./setup.sh --annovar-dir=/shared/apps/annovar --phenosv-dir=/shared/data/PhenoSV_model
+bash setup.sh
 ```
 
-The setup script prepares required assets and writes host-path references used by runtime mounts.
-It now also writes a local override file, `.pipevar.user.config`, with:
-
-- a persisted default execution profile (`manifest.defaultProfile`)
-- persisted bind source paths:
-  - `params.annovar_host_path`
-  - `params.phenosv_host_path`
-
-So after setup, users can run without repeatedly passing `-profile` and bind-path params.
-
-Non-interactive setup example:
+For reproducible local Docker setup:
 
 ```bash
-./setup.sh --non-interactive --profile=local_docker \\
-  --annovar-dir=/data/annovar \\
-  --phenosv-dir=/data/PhenoSV_model \\
-  --annovar-bind=/data/annovar \\
-  --phenosv-bind=/data/PhenoSV_model
+bash setup.sh --non-interactive \
+  --profile=local_docker \
+  --annovar-dir=/absolute/path/to/annovar \
+  --phenosv-dir=/absolute/path/to/PhenoSV_model
 ```
 
-## Input modes
-
-## Single-sample BAM/CRAM mode
-
-Required:
-
-- `--bam <FILE>`
-- `--ref_fa <FILE>`
-- one phenotype source:
-  - `--note <FILE>` (clinical note; PipeVar runs PhenoTagger)
-  - `--hpo <FILE>` (HPO term file)
-
-Optional:
-
-- `--mode <snp|sv>` to run only one branch
-
-## Single-sample VCF mode
-
-Required:
-
-- `--vcf <FILE>`
-- `--ref_fa <FILE>`
-- `--mode <snp|sv>`
-- one phenotype source (`--note` or `--hpo`)
-
-## CSV batch mode (BAM/CRAM)
-
-Required:
-
-- `--input_csv <FILE>`
-- `--bam true`
-- `--ref_fa <FILE>`
-
-Expected CSV columns:
-
-- `sample,file_path,note_path`
-- Optional age column for CSV prioritization flows:
-  - `sample,file_path,note_path,age_of_onset`
-  - `sample,file_path,note_path,age`
-  - If both are present, `age_of_onset` is used.
-  - Age is interpreted per row (per sample), not globally.
-  - Empty age is allowed and treated as not provided.
-  - Non-empty age must be `xd`/`xm`/`xy` or integer years.
-  - Examples: `10d`, `9m`, `7y`, `7` (`7` is normalized to `7y`).
-
-Phenotype handling in CSV mode:
-
-- default: `note_path` is treated as clinical note (PhenoTagger ON)
-- if `--note no`: `note_path` is treated as HPO file (PhenoTagger OFF)
-
-## CSV batch mode (VCF)
-
-Required:
-
-- `--input_csv <FILE>`
-- `--vcf true`
-- `--ref_fa <FILE>`
-- `--mode <snp|sv>`
-
-Expected CSV columns:
-
-- `sample,file_path,note_path`
-- Optional age column for CSV prioritization flows:
-  - `sample,file_path,note_path,age_of_onset`
-  - `sample,file_path,note_path,age`
-  - If both are present, `age_of_onset` is used.
-  - Age is interpreted per row (per sample), not globally.
-  - Empty age is allowed and treated as not provided.
-  - Non-empty age must be `xd`/`xm`/`xy` or integer years.
-  - Examples: `10d`, `9m`, `7y`, `7` (`7` is normalized to `7y`).
-
-## Core parameters
-
-- `--bam <FILE>`: single BAM/CRAM input (mutually exclusive with `--vcf` in single-file mode)
-- `--vcf <FILE>`: single VCF input
-- `--input_csv <FILE>`: manifest for batch processing
-- `--ref_fa <FILE>`: reference FASTA
-- `--out_prefix <STRING>`: output prefix (single-sample mode)
-- `--output_directory <DIR>`: publish directory (default: launch directory)
-- `--mode <snp|sv>`: restrict to SNP or SV branch
-- `--type <ont|pacbio|short>`: sequencing type for BAM/CRAM flows
-- `--light <yes|no>`: enable lightweight models/callers where supported
-- `--genome <hg38|grch38>`: genome build for ExpansionHunter catalog selection
-- `--target <yes|no>`: restrict SNP calling to phenotype-derived gene BED
-- `--phen2gene_filter <INT>`: top-N genes retained for targeted mode (default: 500)
-- `--rankscore <FLOAT>`: RankScore threshold (default: 0.50)
-- `--gnomad <FLOAT>`: max AF threshold for SNP prioritization (default: 0.0001)
-- `--inheritance_mode <ml|omim|gnomad>`: inheritance assignment backend for prioritization (default: `ml`)
-- `--include_clinvar_report <yes|no>`: include ClinVar-only calls in final prioritized reports (default: `yes`)
-- `--allow_unphased_comphet <yes|no>`: allow unphased `0/1` or `1/0` AR pairs as compound het in final prioritization (default: `no`)
-- `--gq <INT>`: genotype quality threshold (default: 20)
-- `--ad <INT>`: allele depth threshold (default: 15)
-- `--note <FILE|no>`: phenotype note input, or `no` in CSV mode to interpret `note_path` as HPO file
-- `--hpo <FILE>`: phenotype HPO file
-- `--help`: print help
-
-## Important behavior updates
-
-### Unified light behavior for SNP/all workflows
-
-`--light yes` no longer requires separate SNP/all workflow selection in `main.nf`.
-The workflow now uses unified subworkflows and switches SNP caller internally by mode:
-
-- short-read SNP caller:
-  - default: `deepvariant`
-  - `--light yes`: `haplotypecaller`
-- long-read SNP caller:
-  - default: `clair3`
-  - `--light yes`: `nanocaller`
-
-`--light yes` also enables PhenoSV-light model through config (`ext.args`).
-
-### ExpansionHunter catalog selection
-
-Catalog path is selected from `--genome` for both single and batch modes:
-
-- `hg38` -> `/hg38/variant_catalog.json`
-- `grch38` -> `/EH_grch38/variant_catalog.json`
-
-## Example commands
-
-### Single-sample long-read full analysis
+For reproducible local Singularity setup:
 
 ```bash
-nextflow run main.nf \
-  -profile standard \
-  --bam /data/p1.bam \
-  --ref_fa /refs/hg38.fa \
-  --note /data/p1_note.txt \
-  --out_prefix p1 \
-  --type ont
+bash setup.sh --non-interactive \
+  --profile=local_singularity \
+  --annovar-dir=/absolute/path/to/annovar \
+  --phenosv-dir=/absolute/path/to/PhenoSV_model
 ```
 
-### Single-sample short-read full analysis (light)
+Setup rewrites resource paths and `profiles.standard`. Review the detailed
+[installation guide](docs/INSTALLATION.md) before rerunning it or configuring
+separate bind paths, GPU execution, or a cluster.
 
-```bash
-nextflow run main.nf \
-  -profile standard \
-  --bam /data/p2.bam \
-  --ref_fa /refs/hg38.fa \
-  --hpo /data/p2_hpo.txt \
-  --out_prefix p2 \
-  --type short \
-  --light yes
-```
+The setup `--profile=...` option chooses the backend written into
+`profiles.standard`, which is used when a run does not specify a Nextflow
+profile. The examples below deliberately use `-profile local_docker` or
+`-profile local_singularity` to select an existing named profile directly.
 
-### Single-sample VCF SNP re-annotation/prioritization
+### 3. Run one sample with Docker
+
+Replace `/data`, `/refs`, and `/results` with local absolute paths, and ensure
+the output location is writable.
 
 ```bash
 nextflow run main.nf \
   -profile local_docker \
-  --vcf /data/p3.vcf \
-  --mode snp \
+  --bam /data/sample.bam \
   --ref_fa /refs/hg38.fa \
-  --hpo /data/p3_hpo.txt \
-  --out_prefix p3
+  --hpo /data/sample.hpo.txt \
+  --type short \
+  --out_prefix sample \
+  --output_directory /results/sample
 ```
 
-### CSV batch BAM mode with HPO file in `note_path`
+| Argument | Meaning |
+| --- | --- |
+| `-profile local_docker` | Nextflow execution profile; run tasks locally in Docker containers |
+| `--bam` | PipeVar input parameter for the BAM or CRAM aligned-read file |
+| `--ref_fa` | Matching hg38 reference FASTA |
+| `--hpo` | File containing standardized Human Phenotype Ontology codes for the patient's clinical findings |
+| `--type short` | Select the short-read workflow |
+| Omitted `--mode` | Run the supported combined nuclear analysis |
+| `--out_prefix` | Prefix for this sample's output files |
+| `--output_directory` | Directory that receives published results |
 
-```bash
-nextflow run main.nf \
-  -profile slurm_singularity \
-  --input_csv /data/samples.csv \
-  --bam true \
-  --note no \
-  --ref_fa /refs/hg38.fa \
-  --type short
-```
+Nextflow options use one hyphen, such as `-profile`. PipeVar parameters use two
+hyphens, such as `--bam` and `--ref_fa`.
 
-### CSV batch VCF mode (SV only)
+### 4. Run the same sample with Singularity
 
-```bash
-nextflow run main.nf \
-  -profile local_singularity \
-  --input_csv /data/sv_samples.csv \
-  --vcf true \
-  --mode sv \
-  --ref_fa /refs/hg38.fa
-```
+Run the same command with `-profile local_singularity` in place of
+`-profile local_docker`. All PipeVar input parameters keep the same meaning.
+Large PhenoGPT2 and PhenoTagger images can be pre-staged as immutable SIF files;
+see [Singularity image staging](docs/INSTALLATION.md#pre-staging-large-phenotype-extraction-images).
 
-## Expected outputs (high-level)
+## Results and next steps
 
-Outputs are published to `--output_directory`.
-Exact files depend on `--mode`, `--type`, and input type.
+The example publishes ranked candidate variants and genes and, for supported
+combined routes, an HTML report. Open the HTML report first for a human-readable
+summary. These are candidates for expert review rather than a diagnosis. See
+the [output guide](docs/OUTPUTS.md) for exact filenames and conditional results.
 
-### SNP-related outputs
+For CSV batch runs, VCF input, long-read analysis, prepared annotations,
+mitochondrial analysis, and cluster examples, continue with
+[Running PipeVar](docs/USAGE.md).
 
-- caller output (depends on type/light):
-  - `*.deepvariant.vcf.gz` (short default)
-  - `*.recal.vcf.gz` (short light / HaplotypeCaller path)
-  - `*.clair3.vcf.gz` (long default)
-  - `*.nanocaller.vcf.gz` (long light)
-- annotation/prioritization:
-  - `*.clinvar.txt`
-  - `*.rank_var.tsv`
-  - `*.rankscore_filtered.tsv`
-  - ANNOVAR intermediate/final files (`*.hg38_multianno.*`)
+## Status and support
 
-### SV-related outputs
+PipeVar 0.5.0 is under active development. This README and the linked guides
+define the documented operator interface.
 
-- short-read SV:
-  - `*.manta.vcf.gz`
-- long-read SV:
-  - `*.sniffles.vcf.gz`
-- downstream SV prioritization:
-  - `*.exonic.vcf`
-  - `*.phenosv.filtered.tsv` (or corresponding filtered artifacts)
-
-### Repeat expansion outputs
-
-- short-read:
-  - `*.json` (ExpansionHunter raw output)
-  - `*.eh.tsv` (filtered disease-threshold loci)
-- long-read:
-  - NanoRepeat result files (`*_nanoRepeat_output.tsv`, related summary files)
-
-### Phenotype intermediate outputs
-
-- `*_phenotagger_patient_hpo.txt`
-- Phen2Gene ranking outputs (`*_phen2gene*`)
-
-## Resource/retry behavior
-
-Configured in `nextflow.config`:
-
-- global process retry strategy:
-  - `errorStrategy = 'retry'`
-  - `maxRetries = 3`
-- CPU/memory/time vary by process via `withName` blocks.
-
-## Notes and pitfalls
-
-- `--input_csv` requires either `--bam true` or `--vcf true`.
-- In single-file mode, at least one of `--note <FILE>` or `--hpo <FILE>` is required.
-- For single VCF mode, `--mode` must be provided.
-- Reference index (`.fai`) must exist.
-- BAM/CRAM index must exist (`.bai`/`.crai`) for alignment-driven paths.
-- If using Singularity/Docker profiles, ensure `--annovar_host_path` and `--phenosv_host_path` point to valid host locations.
-
-## Software/components used
-
-### SNP calling
-
-- DeepVariant
-- GATK HaplotypeCaller (+ VQSR flow in relevant path)
-- Clair3
-- NanoCaller
-
-### SV calling/prioritization
-
-- Sniffles
-- Manta
-- SURVIVOR
-- PhenoSV
-- ANNOVAR SV annotation module
-
-### Repeat expansion
-
-- ExpansionHunter
-- NanoRepeat
-
-### Annotation/ranking/phenotype
-
-- ANNOVAR
-- RankVar
-- RankScore filtering path
-- Phen2Gene
-- PhenoTagger
-- Longphase prioritization helpers
-
-## Status
-
-PipeVar is under active development. If behavior seems inconsistent with this README,
-`main.nf` help output and `nextflow.config` are the source of truth.
+Report reproducible problems through the
+[PipeVar GitHub issue tracker](https://github.com/WGLab/PipeVar/issues). Include
+the PipeVar revision, command, profile, Nextflow version, container backend,
+reference build, and relevant report or trace excerpts.

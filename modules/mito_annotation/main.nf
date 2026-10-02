@@ -1,0 +1,18 @@
+// Annotate mitochondrial variants and emit both tabular and indexed VCF representations.
+process mito_annotation {
+    container = 'beoungl/docker_test:mito_annotation_0.4.2'
+
+    input:
+    tuple val(out_prefix), path(mito_vcf), path(mito_tbi)
+
+    output:
+    tuple val(out_prefix), path("${out_prefix}.mito.annotated.tsv"), path("${out_prefix}.mito.annotated.vcf.gz"), path("${out_prefix}.mito.annotated.vcf.gz.tbi")
+
+    script:
+	"""
+	python3 /opt/mito/bin/annotate_mito_variants.py \
+	    --vcf "$mito_vcf" \
+	    --out-prefix "$out_prefix" \
+	    --hmtvar-status "${params.hmtvar_data ? 'bundled' : 'asset_missing'}"
+	"""
+}

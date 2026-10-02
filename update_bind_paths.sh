@@ -31,7 +31,7 @@ resolve_path() {
 }
 
 escape_groovy_single_quote() {
-    printf "%s" "$1" | sed "s/'/\\\\'/g"
+    printf "%s" "$1" | sed -e 's/\\/\\\\/g' -e "s/'/\\\\'/g"
 }
 
 make_tmpfile() {
@@ -56,8 +56,12 @@ update_nextflow_bind_paths() {
     phenosv_escaped="$(escape_groovy_single_quote "$phenosv_path")"
 
     tmp_file="$(make_tmpfile)"
-    if ! awk -v annovar="$annovar_escaped" -v phenosv="$phenosv_escaped" '
-        BEGIN { annovar_done=0; phenosv_done=0 }
+    # ENVIRON preserves literal backslashes; awk -v would interpret them again.
+    if ! ANNOVAR_GROOVY="$annovar_escaped" PHENOSV_GROOVY="$phenosv_escaped" awk '
+        BEGIN {
+            annovar=ENVIRON["ANNOVAR_GROOVY"]; phenosv=ENVIRON["PHENOSV_GROOVY"]
+            annovar_done=0; phenosv_done=0
+        }
         {
             if ($0 ~ /^[[:space:]]*annovar_host_path[[:space:]]*=/) {
                 match($0, /^[[:space:]]*/)
@@ -145,4 +149,4 @@ echo "Updated ${config_file}"
 echo "  annovar_host_path        = ${annovar_dir}"
 echo "  phenosv_host_path        = ${phenosv_dir}"
 echo
-echo "These paths will be used by Singularity/Docker bind options in PipeVar profiles."
+echo "These paths will be mounted only by the annotation processes that use them."

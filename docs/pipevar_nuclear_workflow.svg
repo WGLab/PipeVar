@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="700" viewBox="0 0 1100 700" role="img" aria-labelledby="title desc">
+  <title id="title">PipeVar nuclear analysis overview</title>
+  <desc id="desc">A left-to-right overview in which selected genomic inputs enter small-variant, structural and copy-number, or repeat branches; phenotype-ranked genes and genomic evidence meet at candidate prioritization.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#46657a"/>
+    </marker>
+    <style>
+      .canvas { fill: #f8fafb; }
+      .input { fill: #fff8e7; stroke: #9a7834; }
+      .stage { fill: #ffffff; stroke: #49687f; }
+      .evidence { fill: #eef6fb; stroke: #3f728f; }
+      .priority { fill: #eef7ef; stroke: #4c7b57; }
+      .output { fill: #f4eef9; stroke: #76548d; }
+      .box { stroke-width: 1.6; rx: 10; }
+      .title { font: 700 22px Arial, sans-serif; fill: #173245; }
+      .heading { font: 700 16px Arial, sans-serif; fill: #173245; }
+      .text { font: 15px Arial, sans-serif; fill: #263b48; }
+      .small { font: 13px Arial, sans-serif; fill: #465d69; }
+      .flow { fill: none; stroke: #46657a; stroke-width: 2; marker-end: url(#arrow); }
+      .conditional { fill: none; stroke: #738c9c; stroke-width: 2; stroke-dasharray: 6 5; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect class="canvas" width="1100" height="700"/>
+  <text class="title" x="35" y="40">PipeVar nuclear analysis overview</text>
+  <text class="small" x="35" y="64">Only branches selected by the input and --mode are executed.</text>
+
+  <rect class="box input" x="35" y="90" width="175" height="70"/>
+  <text class="heading" x="55" y="118">Clinical note</text>
+  <text class="small" x="55" y="142">or supplied HPO terms</text>
+
+  <rect class="box stage" x="260" y="90" width="175" height="70"/>
+  <text class="heading" x="281" y="118">Prepare phenotype</text>
+  <text class="small" x="281" y="142">extract HPO when needed</text>
+
+  <rect class="box evidence" x="485" y="90" width="175" height="70"/>
+  <text class="heading" x="508" y="118">Rank genes</text>
+  <text class="small" x="508" y="142">Phen2Gene evidence</text>
+
+  <path class="flow" d="M210,125 H260"/>
+  <path class="flow" d="M435,125 H485"/>
+
+  <rect class="box input" x="35" y="235" width="175" height="115"/>
+  <text class="heading" x="55" y="266">Selected evidence</text>
+  <text class="small" x="55" y="292">from the route figure</text>
+  <text class="small" x="55" y="315">only eligible branches run</text>
+
+  <rect class="box stage" x="260" y="205" width="225" height="125"/>
+  <text class="heading" x="280" y="235">Small variants</text>
+  <text class="text" x="280" y="263">Call or use supplied variants</text>
+  <text class="small" x="280" y="287">DeepVariant / HaplotypeCaller</text>
+  <text class="small" x="280" y="308">Clair3 / NanoCaller</text>
+
+  <rect class="box evidence" x="535" y="205" width="205" height="125"/>
+  <text class="heading" x="555" y="235">Annotate and score</text>
+  <text class="small" x="555" y="263">ANNOVAR</text>
+  <text class="small" x="555" y="286">RankVar · RankScore</text>
+  <text class="small" x="555" y="309">ClinVar evidence</text>
+
+  <rect class="box stage" x="260" y="375" width="225" height="125"/>
+  <text class="heading" x="280" y="405">Structural and CNV</text>
+  <text class="text" x="280" y="433">Call or use supplied variants</text>
+  <text class="small" x="280" y="457">Manta + CNVnator (short)</text>
+  <text class="small" x="280" y="478">Sniffles2 (long)</text>
+
+  <rect class="box evidence" x="535" y="375" width="205" height="125"/>
+  <text class="heading" x="555" y="405">Consolidate and score</text>
+  <text class="small" x="555" y="433">Truvari · ANNOVAR</text>
+  <text class="small" x="555" y="456">SURVIVOR · PhenoSV</text>
+  <text class="small" x="555" y="479">frequency evidence</text>
+
+  <rect class="box stage" x="260" y="545" width="225" height="105"/>
+  <text class="heading" x="280" y="575">Repeat analysis</text>
+  <text class="small" x="280" y="602">ExpansionHunter (short)</text>
+  <text class="small" x="280" y="625">NanoRepeat (long)</text>
+
+  <rect class="box evidence" x="535" y="545" width="205" height="105"/>
+  <text class="heading" x="555" y="575">Repeat results</text>
+  <text class="small" x="555" y="602">read-backed repeat table</text>
+  <text class="small" x="555" y="625">aligned-read routes only</text>
+
+  <path class="flow" d="M210,292 H235 V267 H260"/>
+  <path class="flow" d="M210,292 H235 V437 H260"/>
+  <path class="conditional" d="M210,315 H225 V597 H260"/>
+  <path class="flow" d="M485,267 H535"/>
+  <path class="flow" d="M485,437 H535"/>
+  <path class="flow" d="M485,597 H535"/>
+
+  <rect class="box priority" x="790" y="270" width="160" height="180"/>
+  <text class="heading" x="812" y="302">Integrate evidence</text>
+  <text class="small" x="812" y="333">phenotype relevance</text>
+  <text class="small" x="812" y="357">frequency thresholds</text>
+  <text class="small" x="812" y="381">inheritance model</text>
+  <text class="small" x="812" y="405">candidate ranking</text>
+  <text class="small" x="812" y="429">phasing when available</text>
+
+  <path class="flow" d="M660,125 H770 V305 H790"/>
+  <path class="flow" d="M740,267 H770 V332 H790"/>
+  <path class="flow" d="M740,437 H770 V388 H790"/>
+  <path class="conditional" d="M740,597 H770 V416 H790"/>
+
+  <rect class="box output" x="980" y="270" width="95" height="200"/>
+  <text class="heading" x="996" y="302">Outputs</text>
+  <text class="small" x="994" y="335">prioritized</text>
+  <text class="small" x="994" y="354">variants</text>
+  <text class="small" x="994" y="383">ranked</text>
+  <text class="small" x="994" y="402">genes</text>
+  <text class="small" x="994" y="431">HTML when</text>
+  <text class="small" x="994" y="451">supported</text>
+  <path class="flow" d="M950,360 H980"/>
+
+  <text class="small" x="35" y="681">Figure 1 determines branch eligibility. Dashed arrows mark read-backed or route-conditional contributions.</text>
+</svg>

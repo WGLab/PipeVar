@@ -1,0 +1,57 @@
+{
+    "name": "PipeVar_simplified",
+    "homePage": "https://github.com/WGLab/PipeVar",
+    "repos": {
+        "https://github.com/nf-core/modules.git": {
+            "modules": {
+                "nf-core": {
+                    "deepvariant/rundeepvariant": {
+                        "branch": "master",
+                        "git_sha": "94b413835288b0e80bd29256d0a95e4fce020a8b",
+                        "installed_by": ["modules"]
+                    },
+                    "expansionhunter": {
+                        "branch": "master",
+                        "git_sha": "94b413835288b0e80bd29256d0a95e4fce020a8b",
+                        "installed_by": ["modules"]
+                    },
+                    "gatk4/applyvqsr": {
+                        "branch": "master",
+                        "git_sha": "94b413835288b0e80bd29256d0a95e4fce020a8b",
+                        "installed_by": ["modules"]
+                    },
+                    "gatk4/haplotypecaller": {
+                        "branch": "master",
+                        "git_sha": "94b413835288b0e80bd29256d0a95e4fce020a8b",
+                        "installed_by": ["modules"]
+                    },
+                    "gatk4/variantrecalibrator": {
+                        "branch": "master",
+                        "git_sha": "94b413835288b0e80bd29256d0a95e4fce020a8b",
+                        "installed_by": ["modules"]
+                    },
+                    "longphase/haplotag": {
+                        "branch": "master",
+                        "git_sha": "94b413835288b0e80bd29256d0a95e4fce020a8b",
+                        "installed_by": ["modules"]
+                    },
+                    "longphase/phase": {
+                        "branch": "master",
+                        "git_sha": "94b413835288b0e80bd29256d0a95e4fce020a8b",
+                        "installed_by": ["modules"]
+                    },
+                    "manta/germline": {
+                        "branch": "master",
+                        "git_sha": "94b413835288b0e80bd29256d0a95e4fce020a8b",
+                        "installed_by": ["modules"]
+                    },
+                    "sniffles": {
+                        "branch": "master",
+                        "git_sha": "94b413835288b0e80bd29256d0a95e4fce020a8b",
+                        "installed_by": ["modules"]
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,20 +1,17 @@
-
 // Score and prioritize structural variants with phenotype-aware PhenoSV model.
-process PhenoSV {
-        container ='beoungl/docker_test:phenosv'
+process phenosv {
+    container = 'beoungl/docker_test:phenosv_0.3'
 
+    input:
+    tuple val(out_prefix), path(canonical_bed), path(phenosv_bed), path(phenosv_bedpe), path(members_tsv), path(hpo)
 
-	input:
-	path bed
-	val out_prefix
-	path hpo
+    output:
+    tuple val(out_prefix), path("${out_prefix}.phenosv.filtered.tsv")
 
-
-	output:
-	path "${out_prefix}.phenosv.filtered.tsv"
-
-	script:
-	def args   = task.ext.args ?: ''
+    script:
+    def args = task.ext.args ?: ''
+    def min_score = params.phenosv_score ?: '0.50'
+    def light_mode = args.contains('PhenoSV-light')
 
 	"""
 
@@ -29,35 +26,39 @@ process PhenoSV {
 
 	mkdir -p \$phenosv_dir
 
-	# If upstream SV filtering produced no records, emit an empty output and continue.
-	# Header/comment-only BED should be treated as empty input.
-	data_rows=\$(awk 'NF && \$0 !~ /^#/' $bed | wc -l)
-	if [[ ! -s $bed ]] || [[ \$data_rows -eq 0 ]]; then
-	    : > ${out_prefix}.phenosv.filtered.tsv
-	    exit 0
+	printf 'SV_ID\tPHENOSV_EVENT_ID\tCHROM\tSTART\tEND\tSVTYPE\tPATHOGENICITY\tPHEN2GENE\tPHENOSV_SCORE\tPHENOSV_TYPE\tPHENOSV_GENE\tPHENOSV_GENE_SCORE\n' > ${out_prefix}.phenosv.simple.tsv
+	printf 'SV_ID\tPHENOSV_EVENT_ID\tCHROM\tSTART\tEND\tSVTYPE\tPATHOGENICITY\tPHEN2GENE\tPHENOSV_SCORE\tPHENOSV_TYPE\tPHENOSV_GENE\tPHENOSV_GENE_SCORE\n' > ${out_prefix}.phenosv.bnd.tsv
+
+	simple_rows=\$(awk 'NF {count++} END {print count+0}' $phenosv_bed)
+	if [[ \$simple_rows -gt 0 ]]; then
+	    mkdir -p \$phenosv_dir/simple
+	    python3 /opt/PhenoSV/phenosv/model/phenosv.py --sv_file $phenosv_bed $args --target_folder \$phenosv_dir/simple --target_file_name \$phenosv_dir/simple/phenosv_out --HPO "\$HPO_STRING"
+	    python3 /normalize_phenosv_events.py \
+	        \$phenosv_dir/simple/phenosv_out.csv \
+	        $canonical_bed \
+	        ${out_prefix}.phenosv.simple.tsv \
+	        --members $members_tsv \
+	        --min-score "$min_score"
 	fi
 
-
-	python3 /opt/PhenoSV/phenosv/model/phenosv.py --sv_file $bed $args --target_folder ${out_prefix}_phenosv --target_file_name  \$phenosv_dir/phenosv_out --HPO "\$HPO_STRING"
-
-	awk -F',' '\$6 > 0.5' \$phenosv_dir/phenosv_out.csv | awk -F',' '\$2 == "SV" ' | awk -F',' '{print \$7"\t"\$0}' | sort -k1,1 > ${out_prefix}_phenosv_top.join.tsv || true
-
-	sort -k4,4 $bed > ${out_prefix}.sorted.bed
-
-	if [[ ! -s ${out_prefix}_phenosv_top.join.tsv ]]; then
-	    : > ${out_prefix}.phenosv.filtered.tsv
-	else
-
-	join -t\$'\t' -1 1 -2 4 ${out_prefix}_phenosv_top.join.tsv ${out_prefix}.sorted.bed | awk -F'\t' 'BEGIN{OFS="\t"} { id=\$1; \$1=""; sub(/^\t/, ""); print \$0, id}' | sed 's/,/\t/g' | awk -F'\t' 'BEGIN{OFS="\t"} {print \$8,\$9,\$10,\$12,\$3,\$4,\$5,\$6}' > ${out_prefix}.phenosv.filtered.tsv || true
-
-	# `join` returns non-zero when there are no overlaps; keep pipeline alive with empty output.
-	if [[ ! -s ${out_prefix}.phenosv.filtered.tsv ]]; then
-	    : > ${out_prefix}.phenosv.filtered.tsv
-	fi
+	bedpe_rows=\$(awk 'NF {count++} END {print count+0}' $phenosv_bedpe)
+	if [[ \$bedpe_rows -gt 0 ]]; then
+	    if [[ "${light_mode}" == "true" ]]; then
+	        echo "WARNING: PhenoSV-light has reduced accuracy for translocations; scoring BEDPE input as requested." >&2
+	    fi
+	    mkdir -p \$phenosv_dir/bnd
+	    python3 /opt/PhenoSV/phenosv/model/phenosv.py --sv_file $phenosv_bedpe $args --target_folder \$phenosv_dir/bnd --target_file_name \$phenosv_dir/bnd/phenosv_out --HPO "\$HPO_STRING"
+	    python3 /normalize_phenosv_events.py \
+	        \$phenosv_dir/bnd/phenosv_out.csv \
+	        $phenosv_bedpe \
+	        ${out_prefix}.phenosv.bnd.tsv \
+	        --members $members_tsv \
+	        --min-score "$min_score"
 	fi
 
-	rm -f ${out_prefix}_phenosv_top.join.tsv
-	rm -f ${out_prefix}.sorted.bed
+	head -n 1 ${out_prefix}.phenosv.simple.tsv > ${out_prefix}.phenosv.filtered.tsv
+	tail -n +2 ${out_prefix}.phenosv.simple.tsv >> ${out_prefix}.phenosv.filtered.tsv
+	tail -n +2 ${out_prefix}.phenosv.bnd.tsv >> ${out_prefix}.phenosv.filtered.tsv
 
 
 	
@@ -65,4 +66,4 @@ process PhenoSV {
 
 	"""
 
-}	
+}

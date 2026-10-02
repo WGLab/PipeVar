@@ -8,7 +8,6 @@ annovar_dir=""
 phenosv_dir=""
 annovar_bind_path=""
 phenosv_bind_path=""
-config_file=""
 
 usage() {
     cat <<'USAGE'
@@ -23,120 +22,6 @@ Options:
   --annovar-bind=<path>     Optional override bind source for /annovar
   --phenosv-bind=<path>     Optional override bind source for /PhenoSV/train_data
 USAGE
-}
-
-escape_groovy_single_quote() {
-    printf "%s" "$1" | sed "s/'/\\\\'/g"
-}
-
-make_tmpfile() {
-    local config_dir tmp_base
-    config_dir="$(cd "$(dirname "$config_file")" && pwd -P)"
-    tmp_base="${TMPDIR:-$config_dir}"
-    mkdir -p "$tmp_base"
-    mktemp "$tmp_base/pipevar-nextflow-config.XXXXXX"
-}
-
-update_nextflow_config() {
-    local profile="$1"
-    local annovar_path="$2"
-    local phenosv_path="$3"
-    local annovar_escaped phenosv_escaped tmp_file
-
-    config_file="${current_folder}/nextflow.config"
-    if [[ ! -f "$config_file" ]]; then
-        echo "Error: nextflow.config not found: $config_file" >&2
-        exit 1
-    fi
-
-    annovar_escaped="$(escape_groovy_single_quote "$annovar_path")"
-    phenosv_escaped="$(escape_groovy_single_quote "$phenosv_path")"
-
-    tmp_file="$(make_tmpfile)"
-    if ! awk -v annovar="$annovar_escaped" -v phenosv="$phenosv_escaped" '
-        BEGIN { annovar_done=0; phenosv_done=0 }
-        {
-            if ($0 ~ /^[[:space:]]*annovar_host_path[[:space:]]*=/) {
-                match($0, /^[[:space:]]*/)
-                indent = substr($0, RSTART, RLENGTH)
-                print indent "annovar_host_path = \047" annovar "\047"
-                annovar_done=1
-                next
-            }
-            if ($0 ~ /^[[:space:]]*phenosv_host_path[[:space:]]*=/) {
-                match($0, /^[[:space:]]*/)
-                indent = substr($0, RSTART, RLENGTH)
-                print indent "phenosv_host_path = \047" phenosv "\047"
-                phenosv_done=1
-                next
-            }
-            print
-        }
-        END {
-            if (!annovar_done || !phenosv_done) exit 2
-        }
-    ' "$config_file" > "$tmp_file"; then
-        rm -f "$tmp_file"
-        echo "Error: failed to update annovar_host_path/phenosv_host_path in nextflow.config" >&2
-        exit 1
-    fi
-    mv "$tmp_file" "$config_file"
-
-    tmp_file="$(make_tmpfile)"
-    if ! awk -v profile="$profile" '
-        function emit_standard(indent, inner) {
-            inner = indent "    "
-            print indent "standard {"
-            if (profile == "standard" || profile == "slurm_singularity") {
-                print inner "process.executor = \047slurm\047"
-                print inner "singularity.enabled = true"
-                print inner "singularity.autoMounts = true"
-                print inner "singularity.runOptions = \"--bind ${params.annovar_host_path}:/annovar,${params.phenosv_host_path}:/PhenoSV/train_data\""
-                print inner "docker.enabled = false"
-            } else if (profile == "local_singularity") {
-                print inner "process.executor = \047local\047"
-                print inner "singularity.enabled = true"
-                print inner "singularity.autoMounts = true"
-                print inner "singularity.runOptions = \"--bind ${params.annovar_host_path}:/annovar,${params.phenosv_host_path}:/PhenoSV/train_data\""
-                print inner "docker.enabled = false"
-            } else if (profile == "local_docker") {
-                print inner "process.executor = \047local\047"
-                print inner "docker.enabled = true"
-                print inner "docker.runOptions = \"-v ${params.annovar_host_path}:/annovar -v ${params.phenosv_host_path}:/PhenoSV/train_data\""
-                print inner "singularity.enabled = false"
-            } else {
-                return 1
-            }
-            print indent "}"
-            return 0
-        }
-        BEGIN { in_standard=0; replaced=0 }
-        {
-            if (!replaced && $0 ~ /^[[:space:]]*standard[[:space:]]*\{[[:space:]]*$/) {
-                match($0, /^[[:space:]]*/)
-                indent = substr($0, RSTART, RLENGTH)
-                if (emit_standard(indent) != 0) exit 3
-                in_standard=1
-                replaced=1
-                next
-            }
-            if (in_standard) {
-                if ($0 ~ /^[[:space:]]*\}[[:space:]]*$/) {
-                    in_standard=0
-                }
-                next
-            }
-            print
-        }
-        END {
-            if (!replaced) exit 4
-        }
-    ' "$config_file" > "$tmp_file"; then
-        rm -f "$tmp_file"
-        echo "Error: failed to update profiles.standard in nextflow.config" >&2
-        exit 1
-    fi
-    mv "$tmp_file" "$config_file"
 }
 
 for arg in "$@"; do
@@ -174,7 +59,8 @@ for arg in "$@"; do
     esac
 done
 
-current_folder="$(pwd)"
+current_folder="$(pwd -P)"
+helper_directory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
 if [[ -z "$annovar_dir" ]]; then
     annovar_dir="${current_folder}/annovar"
@@ -200,6 +86,9 @@ if [[ ! -f "${annovar_dir}/annotate_variation.pl" ]]; then
 fi
 
 mkdir -p "$phenosv_dir"
+# Store absolute paths so container mounts do not depend on the task directory.
+annovar_dir="$(cd "$annovar_dir" && pwd -P)"
+phenosv_dir="$(cd "$phenosv_dir" && pwd -P)"
 
 echo "Preparing ANNOVAR databases in: $annovar_dir"
 pushd "$annovar_dir" >/dev/null
@@ -296,12 +185,12 @@ case "$selected_profile" in
         ;;
 esac
 
-update_nextflow_config "$selected_profile" "$annovar_bind_path" "$phenosv_bind_path"
+# The standalone helpers own configuration updates for setup and later changes.
+bash "${helper_directory}/update_bind_paths.sh" "$annovar_bind_path" "$phenosv_bind_path"
+bash "${helper_directory}/update_profile.sh" "$selected_profile"
 
 echo
 echo "Updated config: ${current_folder}/nextflow.config"
 echo "  profiles.standard backend = ${selected_profile}"
-echo "  annovar_host_path= ${annovar_bind_path}"
-echo "  phenosv_host_path= ${phenosv_bind_path}"
 echo
 echo "PipeVar will now use these defaults directly from nextflow.config (via profiles.standard)."

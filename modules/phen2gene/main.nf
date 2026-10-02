@@ -1,17 +1,14 @@
-
 // Generate phenotype-ranked genes from HPO input using Phen2Gene.
-process Phen2gene {
-	container ='beoungl/docker_test:rankvar'
+process phen2gene {
+    container = 'beoungl/docker_test:rankvar'
 
+    input:
+    tuple val(out_prefix), path(hpo)
 
-        input:
-        path hpo
-        val out_prefix
+    output:
+    tuple val(out_prefix), path("${out_prefix}.phen2gene.txt")
 
-	output:
-	path "${out_prefix}.phen2gene.txt"
-
-	script:
+    script:
 
 	"""
 	source /conda/etc/profile.d/conda.sh
@@ -25,8 +22,4 @@ process Phen2gene {
 
 	"""
 
-
 }
-
-
-
