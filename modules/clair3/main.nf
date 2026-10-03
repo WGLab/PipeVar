@@ -1,6 +1,6 @@
 // Call SNP/indel variants from long-read alignments using Clair3.
 process clair3 {
-    container = 'hkubal/clair3:v1.2.0'
+    container 'hkubal/clair3:v1.2.0'
 
     input:
     tuple val(out_prefix), path(bam), path(index_file), path(bed_file)

@@ -1,6 +1,6 @@
 // Generate phenotype-ranked genes from HPO input using Phen2Gene.
 process phen2gene {
-    container = 'beoungl/docker_test:rankvar'
+    container 'beoungl/docker_test:rankvar'
 
     input:
     tuple val(out_prefix), path(hpo)

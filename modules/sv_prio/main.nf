@@ -1,6 +1,6 @@
 // Merge SV evidence sources into a final prioritized SV VCF.
 process sv_prio {
-    container = 'beoungl/docker_test:longphase_0.4.0'
+    container 'beoungl/docker_test:longphase_0.4.0'
 
     input:
     tuple val(out_prefix), path(sv_phenosv_evidence), path(annovar_sv_vcf), path(hpo_path), val(age_of_onset)

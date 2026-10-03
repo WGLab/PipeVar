@@ -1,6 +1,6 @@
 // Annotate mitochondrial variants and emit both tabular and indexed VCF representations.
 process mito_annotation {
-    container = 'beoungl/docker_test:mito_annotation_0.4.2'
+    container 'beoungl/docker_test:mito_annotation_0.4.2'
 
     input:
     tuple val(out_prefix), path(mito_vcf), path(mito_tbi)

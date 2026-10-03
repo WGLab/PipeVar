@@ -1,6 +1,6 @@
 // Split and adapt Clair3 mitochondrial calls before bgzip compression and indexing.
 process mito_clair3_postprocess {
-    container = 'beoungl/docker_test:mito_clair3_postprocess_0.1'
+    container 'beoungl/docker_test:mito_clair3_postprocess_0.1'
 
     input:
     tuple val(out_prefix), path(raw_vcf)

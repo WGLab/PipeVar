@@ -1,6 +1,6 @@
 // Convert top phenotype-ranked genes into BED regions for targeted calling.
 process reduce_region_phen2gene {
-    container = 'beoungl/docker_test:phen2gene_filter_0.1.1'
+    container 'beoungl/docker_test:phen2gene_filter_0.1.1'
 
     input:
     tuple val(out_prefix), path(phen2gene)

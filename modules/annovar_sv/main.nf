@@ -1,6 +1,6 @@
 // Annotate SV VCF with ANNOVAR and retain exonic records.
 process annovar_sv {
-    container = 'beoungl/docker_test:truvari_0.5'
+    container 'beoungl/docker_test:truvari_0.5'
 
     input:
     tuple val(out_prefix), path(vcf), val(sv_annotation_mode)

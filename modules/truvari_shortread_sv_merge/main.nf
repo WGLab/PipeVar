@@ -1,6 +1,6 @@
 // Merge and deduplicate short-read SV/MEI caller VCFs with Truvari collapse.
 process truvari_shortread_sv_merge {
-    container = 'beoungl/docker_test:truvari_0.5'
+    container 'beoungl/docker_test:truvari_0.5'
 
     input:
     tuple val(out_prefix), path(sv_vcfs)

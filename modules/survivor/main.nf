@@ -1,6 +1,6 @@
 // Convert/normalize SV calls into BED representation with SURVIVOR.
 process survivor {
-    container = 'beoungl/docker_test:survivor_0.2'
+    container 'beoungl/docker_test:survivor_0.2'
 
     input:
     tuple val(out_prefix), path(vcf)

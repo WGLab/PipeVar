@@ -1,6 +1,6 @@
 // Merge SNV/indel evidence sources into final prioritized small-variant VCFs.
 process small_variant_prio {
-    container = 'beoungl/docker_test:longphase_0.4.0'
+    container 'beoungl/docker_test:longphase_0.4.0'
 
     input:
     tuple val(out_prefix), path(snv_rankscore), path(snv_clinvar_evidence), path(snv_rankvar), path(annovar_vcf), path(hpo_path), val(age_of_onset)

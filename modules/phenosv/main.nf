@@ -1,6 +1,6 @@
 // Score and prioritize structural variants with phenotype-aware PhenoSV model.
 process phenosv {
-    container = 'beoungl/docker_test:phenosv_0.3'
+    container 'beoungl/docker_test:phenosv_0.3'
 
     input:
     tuple val(out_prefix), path(canonical_bed), path(phenosv_bed), path(phenosv_bedpe), path(members_tsv), path(hpo)

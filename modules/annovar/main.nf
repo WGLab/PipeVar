@@ -1,6 +1,6 @@
 // Annotate small variants with ANNOVAR databases and emit annotated TXT/VCF.
 process annovar {
-    container = 'beoungl/docker_test:annovar'
+    container 'beoungl/docker_test:annovar'
 
     input:
     tuple val(out_prefix), path(vcf), path(bed_file)

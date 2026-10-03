@@ -1,7 +1,7 @@
 // Extract HPO terms from unstructured clinical notes using PhenoTagger.
 process phenotagger {
 
-    container = 'beoungl/docker_test:phenotagger'
+    container 'beoungl/docker_test:phenotagger'
 
     input:
     tuple val(output_prefix), path(phenotagger_input)
@@ -9,6 +9,7 @@ process phenotagger {
     output:
     tuple val(output_prefix), path("${output_prefix}_phenotagger_patient_hpo.txt")
 
+	script:
 	"""
 	# Keep TensorFlow and PhenoTagger cache/config files inside the writable task directory.
 	export HOME=\$PWD

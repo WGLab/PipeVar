@@ -1,6 +1,6 @@
 // Normalize BAM/CRAM input to BAM for callers that require BAM input.
 process normalize_shortread_alignment {
-    container = 'community.wave.seqera.io/library/htslib_samtools:1.23.1--5b6bb4ede7e612e5'
+    container 'community.wave.seqera.io/library/htslib_samtools:1.23.1--5b6bb4ede7e612e5'
 
     input:
     tuple val(out_prefix), path(bam), path(index)

@@ -1,6 +1,6 @@
 // Call mitochondrial variants with Mutect2, split multiallelic records, and emit an indexed VCF.
 process mito_mutect2 {
-    container = 'beoungl/docker_test:mito_mutect2_0.1'
+    container 'beoungl/docker_test:mito_mutect2_0.1'
 
     input:
     tuple val(out_prefix), path(bam), path(index_file), path(metrics_file)

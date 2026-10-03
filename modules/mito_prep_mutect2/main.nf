@@ -1,7 +1,7 @@
 // Extract reads already mapped to the mitochondrial contig, then realign and
 // mark duplicates before Mutect2. This input subset excludes unmapped reads.
 process mito_prep_mutect2 {
-    container = 'beoungl/docker_test:mito_mutect2_0.1'
+    container 'beoungl/docker_test:mito_mutect2_0.1'
 
     input:
     tuple val(out_prefix), path(bam), path(index_file)

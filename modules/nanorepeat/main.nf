@@ -1,6 +1,6 @@
 // Call repeat expansions from long-read BAM inputs with NanoRepeat.
 process nanorepeat {
-    container = 'beoungl/docker_test:nanorepeat_0.1'
+    container 'beoungl/docker_test:nanorepeat_0.1'
 
     input:
     tuple val(out_prefix), path(bam), path(index_file)

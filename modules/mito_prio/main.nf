@@ -1,6 +1,6 @@
 // Prioritize mitochondrial variants using configurable VAF, depth, read, and evidence thresholds.
 process mito_prio {
-    container = 'beoungl/docker_test:mito_annotation_0.4.2'
+    container 'beoungl/docker_test:mito_annotation_0.4.2'
 
     input:
     tuple val(out_prefix), path(annotated_tsv), path(annotated_vcf), path(annotated_tbi)

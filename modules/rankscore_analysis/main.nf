@@ -1,6 +1,6 @@
 // Filter annotated variants by RankScore and emit ClinVar/RankScore subsets.
 process rankscore {
-    container = 'beoungl/docker_test:rankscore_0.3.0'
+    container 'beoungl/docker_test:rankscore_0.3.0'
 
     input:
     tuple val(out_prefix), path(annovar_output), path(phen2_gene)
@@ -25,7 +25,7 @@ process rankscore {
 // Validate imported ANNOVAR TXT/VCF inputs in the same task that runs RankScore.
 // Keeping validation here avoids copying large VCFs through a standalone gate.
 process rankscore_preannotated {
-    container = 'beoungl/docker_test:rankscore_0.3.1'
+    container 'beoungl/docker_test:rankscore_0.3.1'
 
     input:
     tuple val(out_prefix), path(annovar_output), path(annovar_vcf), path(phen2_gene)

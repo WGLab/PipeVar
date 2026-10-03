@@ -1,6 +1,6 @@
 // Call short-read copy-number variants with CNVnator and emit VCF for PipeVar SV prioritization.
 process cnvnator {
-    container = 'community.wave.seqera.io/library/cnvnator:0.4.1--5a467cfadbbc668d'
+    container 'community.wave.seqera.io/library/cnvnator:0.4.1--5a467cfadbbc668d'
 
     input:
     tuple val(out_prefix), path(bam), path(index)

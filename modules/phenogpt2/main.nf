@@ -8,6 +8,7 @@ process phenogpt2 {
     output:
     tuple val(out_prefix), path("${out_prefix}_phenogpt2_patient_hpo.txt")
 
+	script:
 	"""
 	export PHENOGPT2_BATCH_SIZE="${params.phenogpt2_batch_size}"
 	export PHENOGPT2_CHUNK_BATCH_SIZE="${params.phenogpt2_chunk_batch_size}"

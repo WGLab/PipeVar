@@ -1,6 +1,6 @@
 // Integrate NGS SNV/SV evidence and produce a prioritized VCF.
 process ngs_prio {
-    container = 'beoungl/docker_test:longphase_0.4.0'
+    container 'beoungl/docker_test:longphase_0.4.0'
 
     input:
     tuple val(out_prefix), path(snv_rankvar), path(snv_rankscore), path(snv_clinvar_evidence), path(sv_phenosv_evidence), path(sv_vcf_path), path(snv_vcf_path), path(hpo_path), val(age_of_onset)

@@ -1,7 +1,7 @@
 // Render self-contained final variant HTML reports from sample-keyed records.
 // Small-variant/SV evidence only.
 process variant_html_report_no_repeat {
-    container = 'beoungl/docker_test:html_report'
+    container 'beoungl/docker_test:html_report'
 
     input:
     tuple val(out_prefix), path(prio_vcf), path(prio_gene_report)
@@ -25,7 +25,7 @@ process variant_html_report_no_repeat {
 
 // Add repeat-expansion evidence to the core report.
 process variant_html_report_with_repeat {
-    container = 'beoungl/docker_test:html_report'
+    container 'beoungl/docker_test:html_report'
 
     input:
     tuple val(out_prefix), path(prio_vcf), path(prio_gene_report), path(repeat_tsv)
@@ -50,7 +50,7 @@ process variant_html_report_with_repeat {
 
 // Add repeat-expansion and mitochondrial evidence to the core report.
 process variant_html_report_with_repeat_and_mito {
-    container = 'beoungl/docker_test:html_report'
+    container 'beoungl/docker_test:html_report'
 
     input:
     tuple val(out_prefix), path(prio_vcf), path(prio_gene_report), path(repeat_tsv), path(mito_tsv)
