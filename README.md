@@ -106,7 +106,9 @@ cd PipeVar
 ANNOVAR installation, downloads the hg38 ANNOVAR databases used by PipeVar,
 downloads PhenoSV resources and the Phen2Gene knowledge base, adjusts the
 resource paths, and configures `profiles.standard` for the selected container
-backend. Run it from the repository root.
+backend. It also pulls the PhenoGPT2 and PhenoTagger images for that backend;
+Singularity setups store validated SIFs under `./containers` by default. Run it
+from the repository root.
 
 The script does not install Nextflow, Java, Docker, Singularity, or ANNOVAR
 itself. It also does not provide a reference FASTA and indexes, PhenoGPT2

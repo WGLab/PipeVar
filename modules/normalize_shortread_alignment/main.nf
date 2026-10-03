@@ -16,7 +16,7 @@ process normalize_shortread_alignment {
 		samtools view -@ ${task.cpus} -b -T $ref_fa -o ${out_prefix}_cnvnator.unsorted.bam $bam
 		samtools sort -@ ${task.cpus} -o ${out_prefix}_cnvnator.bam ${out_prefix}_cnvnator.unsorted.bam
 		samtools index -@ ${task.cpus} ${out_prefix}_cnvnator.bam
-		rm ${out_prefix}_cnvnator.unsorted.bam
+		rm -f -- "${out_prefix}_cnvnator.unsorted.bam"
 	else
 		ln -s $bam ${out_prefix}_cnvnator.bam
 		if [[ "$index" == *.bai ]]; then

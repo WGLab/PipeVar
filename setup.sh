@@ -8,6 +8,8 @@ annovar_dir=""
 phenosv_dir=""
 annovar_bind_path=""
 phenosv_bind_path=""
+phenotype_image_dir=""
+pull_phenotype_images="yes"
 
 usage() {
     cat <<'USAGE'
@@ -21,6 +23,9 @@ Options:
   --phenosv-dir=<path>      Directory to download/extract PhenoSV resources
   --annovar-bind=<path>     Optional override bind source for /annovar
   --phenosv-bind=<path>     Optional override bind source for /PhenoSV/train_data
+  --phenotype-image-dir=<path>
+                            SIF destination for Singularity profiles
+  --skip-phenotype-images   Do not pull PhenoGPT2 or PhenoTagger images
 USAGE
 }
 
@@ -46,6 +51,12 @@ for arg in "$@"; do
             ;;
         --phenosv-bind=*)
             phenosv_bind_path="${arg#*=}"
+            ;;
+        --phenotype-image-dir=*)
+            phenotype_image_dir="${arg#*=}"
+            ;;
+        --skip-phenotype-images)
+            pull_phenotype_images="no"
             ;;
         -h|--help)
             usage
@@ -170,11 +181,19 @@ if [[ -z "$selected_profile" ]]; then
     selected_profile="standard"
 fi
 
+if [[ "$selected_profile" != "local_docker" && -z "$phenotype_image_dir" ]]; then
+    phenotype_image_dir="${current_folder}/containers"
+fi
+
 if [[ "$non_interactive" == "no" ]]; then
     read -r -p "ANNOVAR bind host path [${annovar_bind_path}]: " user_annovar_bind
     read -r -p "PhenoSV bind host path [${phenosv_bind_path}]: " user_phenosv_bind
     annovar_bind_path="${user_annovar_bind:-$annovar_bind_path}"
     phenosv_bind_path="${user_phenosv_bind:-$phenosv_bind_path}"
+    if [[ "$selected_profile" != "local_docker" && "$pull_phenotype_images" == "yes" ]]; then
+        read -r -p "Phenotype SIF directory [${phenotype_image_dir}]: " user_phenotype_image_dir
+        phenotype_image_dir="${user_phenotype_image_dir:-$phenotype_image_dir}"
+    fi
 fi
 
 case "$selected_profile" in
@@ -189,8 +208,24 @@ esac
 bash "${helper_directory}/update_bind_paths.sh" "$annovar_bind_path" "$phenosv_bind_path"
 bash "${helper_directory}/update_profile.sh" "$selected_profile"
 
+if [[ "$pull_phenotype_images" == "yes" ]]; then
+    phenotype_image_args=(
+        "--profile=${selected_profile}"
+        "--config=${current_folder}/nextflow.config"
+    )
+    if [[ "$selected_profile" != "local_docker" ]]; then
+        phenotype_image_args+=("--image-dir=${phenotype_image_dir}")
+    fi
+    bash "${helper_directory}/scripts/prepare_phenotype_images.sh" "${phenotype_image_args[@]}"
+else
+    echo "Skipping PhenoGPT2 and PhenoTagger image pulls."
+fi
+
 echo
 echo "Updated config: ${current_folder}/nextflow.config"
 echo "  profiles.standard backend = ${selected_profile}"
+if [[ "$pull_phenotype_images" == "yes" && "$selected_profile" != "local_docker" ]]; then
+    echo "  phenotype SIF directory   = ${phenotype_image_dir}"
+fi
 echo
 echo "PipeVar will now use these defaults directly from nextflow.config (via profiles.standard)."

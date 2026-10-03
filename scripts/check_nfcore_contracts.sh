@@ -39,9 +39,10 @@ require_text nextflow.config "pattern: '*.{json,vcf}'"
 require_text nextflow.config "withName: 'GATK4_HAPLOTYPECALLER'"
 require_text nextflow.config "withName: 'GATK4_VARIANTRECALIBRATOR'"
 require_text nextflow.config "withName: 'GATK4_APPLYVQSR'"
-require_text nextflow.config "withName: 'LONGPHASE_PHASE'"
-require_text nextflow.config "withName: 'LONGPHASE_HAPLOTAG'"
-require_text nextflow.config "quay.io/biocontainers/longphase:1.7.3--hf5e1c6e_0"
+require_text nextflow.config "withName:'LONGPHASE_CALL'"
+require_text nextflow.config "type == 'ont' ? '--ont' : type == 'pacbio' ? '--pb' : ''"
+require_text modules/local/longphase_support/main.nf 'process LONGPHASE_CALL'
+require_text modules/local/longphase_support/main.nf "container 'beoungl/docker_test:longphase_0.4.0'"
 
 require_text modules/local/legacy_artifact_compat/main.nf 'bgzip --decompress --stdout'
 require_text subworkflows/ngs/main.nf 'DEEPVARIANT_RUNDEEPVARIANT.out.vcf.map'
@@ -51,7 +52,7 @@ require_text subworkflows/long/main.nf '"${meta.id}.sniffles.vcf"'
 require_text subworkflows/gatk_snp_calling/main.nf "modules/nf-core/gatk4/haplotypecaller"
 require_text subworkflows/gatk_snp_calling/main.nf "modules/nf-core/gatk4/variantrecalibrator"
 require_text subworkflows/gatk_snp_calling/main.nf "modules/nf-core/gatk4/applyvqsr"
-require_text subworkflows/longphase_processing/main.nf "modules/nf-core/longphase/phase"
-require_text subworkflows/longphase_processing/main.nf "modules/nf-core/longphase/haplotag"
+require_text subworkflows/longphase_processing/main.nf "include { LONGPHASE_CALL; LONGPHASE_PRIORITIZE } from '../../modules/local/longphase_support'"
+require_text subworkflows/longphase_processing/main.nf 'LONGPHASE_CALL.out.calls'
 
-printf 'nf-core contracts OK: nine-module revision, vendored integrity, integrations, selectors, and public compatibility artifacts.\n'
+printf 'Module contracts OK: nine-module vendored snapshot integrity, active integrations, local LongPhase adapter, and public compatibility artifacts.\n'

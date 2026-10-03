@@ -1,18 +1,21 @@
-// Reheader and validate the SNV VCF before handing it to the vendored LongPhase module.
-process LONGPHASE_PREPARE_INPUT {
+// Run the verified historical LongPhase 1.7.3 command contract behind the
+// simplified metadata-keyed interface. Phasing and haplotagging intentionally
+// stay in one image so their binary and utility requirements cannot drift.
+process LONGPHASE_CALL {
     tag "${meta.id}"
-    label 'process_low'
+    label 'process_high'
 
-    container 'community.wave.seqera.io/library/htslib_samtools:1.23.1--5b6bb4ede7e612e5'
+    container 'beoungl/docker_test:longphase_0.4.0'
 
     input:
-    tuple val(meta), path(snv_vcf)
-    path fai
+    tuple val(meta), path(bam), path(bai), path(snv_vcf), path(sv_vcf)
+    tuple val(reference_meta), path(fasta), path(fai)
 
     output:
-    tuple val(meta), path("${meta.id}.longphase_input.vcf"), emit: vcf
+    tuple val(meta), path("${meta.id}_phased.vcf"), path("${meta.id}_phased_SV.vcf"), path("${meta.id}_haplotag.bam"), emit: calls
 
     script:
+    def platform_args = task.ext.args != null ? task.ext.args : '--ont'
     """
     bcftools reheader \\
         --fai ${fai} \\
@@ -58,11 +61,30 @@ process LONGPHASE_PREPARE_INPUT {
         }
         exit errors
     }' ${fai} ${meta.id}.longphase_input.vcf
+
+    /longphase_linux-x64 phase \\
+        -s ${meta.id}.longphase_input.vcf \\
+        --sv-file=${sv_vcf} \\
+        -t ${task.cpus} \\
+        -o ${meta.id}_phased \\
+        ${platform_args} \\
+        -b ${bam} \\
+        -r ${fasta}
+
+    /longphase_linux-x64 haplotag \\
+        -r ${fasta} \\
+        -s ${meta.id}_phased.vcf \\
+        --sv-file ${meta.id}_phased_SV.vcf \\
+        -b ${bam} \\
+        -t ${task.cpus} \\
+        -o ${meta.id}_haplotag
     """
 
     stub:
     """
-    touch ${meta.id}.longphase_input.vcf
+    touch ${meta.id}_phased.vcf
+    touch ${meta.id}_phased_SV.vcf
+    touch ${meta.id}_haplotag.bam
     """
 }
 

@@ -1,9 +1,7 @@
-include { LONGPHASE_PREPARE_INPUT; LONGPHASE_PRIORITIZE } from '../../modules/local/longphase_support'
-include { LONGPHASE_PHASE } from '../../modules/nf-core/longphase/phase'
-include { LONGPHASE_HAPLOTAG } from '../../modules/nf-core/longphase/haplotag'
+include { LONGPHASE_CALL; LONGPHASE_PRIORITIZE } from '../../modules/local/longphase_support'
 
-// Shared keyed LongPhase route. Generic phase/haplotag operations use pinned
-// nf-core modules; PipeVar-specific evidence aggregation remains local.
+// Shared keyed LongPhase route. The caller uses the verified historical 1.7.3
+// command contract; PipeVar-specific evidence aggregation remains separate.
 workflow LONGPHASE_PROCESSING {
     take:
     records
@@ -15,8 +13,7 @@ workflow LONGPHASE_PROCESSING {
 
     main:
     reference = reference_bundle
-    reference_fasta = reference.map { fasta, fai -> tuple([id: 'reference'], fasta) }
-    reference_fai = reference.map { fasta, fai -> tuple([id: 'reference'], fai) }
+    reference_for_longphase = reference.map { fasta, fai -> tuple([id: 'reference'], fasta, fai) }
 
     // The incoming evidence record is wide to preserve the established process tuple contract.
     // Convert it once to a named context so later joins remain reviewable.
@@ -52,53 +49,20 @@ workflow LONGPHASE_PROCESSING {
         )
     }
 
-    prepare_input = context_by_sample.map { sample_id, context ->
-        tuple(context.meta, context.snv_vcf)
+    call_input = context_by_sample.map { sample_id, context ->
+        tuple(context.meta, context.bam, context.bai, context.snv_vcf, context.sv_phase_vcf)
     }
-    LONGPHASE_PREPARE_INPUT(
-        prepare_input,
-        reference.map { fasta, fai -> fai }
-    )
+    LONGPHASE_CALL(call_input, reference_for_longphase)
 
-    prepared_by_id = LONGPHASE_PREPARE_INPUT.out.vcf.map { meta, prepared_vcf ->
-        tuple(meta.id, prepared_vcf)
+    phased = LONGPHASE_CALL.out.calls.map { meta, phased_snv, phased_sv, haplotag_bam ->
+        tuple(meta.id, meta, phased_snv, phased_sv, haplotag_bam)
     }
-    // (meta, BAM, BAI, small-variant VCF, SV VCF, regions); [] phases the whole reference.
-    phase_input = context_by_sample
-        .join(prepared_by_id, failOnMismatch: true, failOnDuplicate: true)
-        .map { sample_id, context, prepared_vcf ->
-            tuple(context.meta, context.bam, context.bai, prepared_vcf, context.sv_phase_vcf, [])
-        }
-
-    LONGPHASE_PHASE(phase_input, reference_fasta, reference_fai)
-
-    // The nf-core phase process emits phased SNV and SV files separately. Match
-    // them by sample once, then reuse the paired result for haplotagging and ranking.
-    phased = LONGPHASE_PHASE.out.snv_vcf
-        .map { meta, phased_snv -> tuple(meta.id, meta, phased_snv) }
-        .join(
-            LONGPHASE_PHASE.out.sv_vcf.map { meta, phased_sv -> tuple(meta.id, phased_sv) },
-            failOnMismatch: true,
-            failOnDuplicate: true
-        )
-
-    // Haplotagging and prioritization require different projections of the same
-    // independently phased result, so both join back to the retained sample context.
-    haplotag_input = context_by_sample
-        .map { sample_id, context ->
-            tuple(sample_id, context.meta, context.bam, context.bai)
-        }
-        .join(phased, failOnMismatch: true, failOnDuplicate: true)
-        .map { sample_id, meta, bam, bai, _phase_meta, phased_snv, phased_sv ->
-            tuple(meta, bam, bai, phased_snv, phased_sv, [])
-        }
-    LONGPHASE_HAPLOTAG(haplotag_input, reference_fasta, reference_fai)
 
     priority_input = context_by_sample
         .join(phased, failOnMismatch: true, failOnDuplicate: true)
 
     unified_priority_input = priority_input.map {
-        _sample_id, context, _phase_meta, phased_snv, phased_sv ->
+        _sample_id, context, _call_meta, phased_snv, phased_sv, _haplotag_bam ->
         tuple(
             context.meta,
             phased_snv,
@@ -122,7 +86,7 @@ workflow LONGPHASE_PROCESSING {
     prio_gene = LONGPHASE_PRIORITIZE.out.prio_gene_vcf.map { meta, path -> tuple(meta.id, path) }
     frequency_audit = LONGPHASE_PRIORITIZE.out.frequency_audit.map { meta, path -> tuple(meta.id, path) }
 
-    haplotag = LONGPHASE_HAPLOTAG.out.bam.map { meta, bam -> tuple(meta.id, bam) }
+    haplotag = LONGPHASE_CALL.out.calls.map { meta, _phased_snv, _phased_sv, bam -> tuple(meta.id, bam) }
 
     emit:
     prio_vcf

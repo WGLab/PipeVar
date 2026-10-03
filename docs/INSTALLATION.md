@@ -81,6 +81,10 @@ resources.
 The script does not install Nextflow, Java, Docker, Singularity, SLURM, or
 ANNOVAR itself. It also does not install a reference FASTA/index bundle, custom
 ExpansionHunter catalog, optional HmtVar data, or PhenoGPT2 models and caches.
+It does pull the PhenoGPT2 and PhenoTagger containers for the selected runtime.
+For Singularity profiles, it validates checksum-named SIFs, stores them in the
+configured image directory, and writes their absolute paths to
+`nextflow.config`.
 
 ## Setup examples
 
@@ -108,7 +112,8 @@ bash setup.sh --non-interactive \
 bash setup.sh --non-interactive \
   --profile=local_singularity \
   --annovar-dir=/data/annovar \
-  --phenosv-dir=/data/PhenoSV_model
+  --phenosv-dir=/data/PhenoSV_model \
+  --phenotype-image-dir=/data/pipevar-containers
 ```
 
 ### SLURM with Singularity
@@ -117,7 +122,8 @@ bash setup.sh --non-interactive \
 bash setup.sh --non-interactive \
   --profile=slurm_singularity \
   --annovar-dir=/shared/annovar \
-  --phenosv-dir=/shared/PhenoSV_model
+  --phenosv-dir=/shared/PhenoSV_model \
+  --phenotype-image-dir=/shared/pipevar-containers
 ```
 
 ### Light PhenoSV resources
@@ -147,9 +153,20 @@ is described in [Running PipeVar](USAGE.md#light-mode).
 | `--phenosv-dir=<DIR>` | PhenoSV resource destination |
 | `--annovar-bind=<DIR>` | Host bind source when it differs from the ANNOVAR install path |
 | `--phenosv-bind=<DIR>` | Host bind source when it differs from the PhenoSV resource path |
+| `--phenotype-image-dir=<DIR>` | Destination for validated PhenoGPT2 and PhenoTagger SIFs; defaults to `./containers` for Singularity |
+| `--skip-phenotype-images` | Skip both phenotype-container pulls and leave existing SIF settings unchanged |
 
 When bind options are omitted, their sources default to the corresponding
 resource directories.
+
+For `local_docker`, setup runs `docker pull` for both phenotype images and
+clears any configured SIF paths. For Singularity profiles, configure
+`SINGULARITY_TMPDIR` and `SINGULARITY_CACHEDIR` before setup when the runtime
+defaults do not have enough local space. Existing validated `*.current.sif`
+pointers in the image directory are reused, so routine setup reruns do not
+download the large images again. Automatically staged filenames contain the
+final SIF SHA-256; the manual digest-pinned procedure below remains available
+when the source registry digest must also appear in the filename.
 
 ## Configuration changes and reruns
 

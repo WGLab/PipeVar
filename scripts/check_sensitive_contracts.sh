@@ -93,7 +93,12 @@ if ! rg -F -q -- '"${age_of_onset}"' <<< "$longphase_prioritizer_block" && \
     printf 'ERROR: LongPhase must pass quoted age_of_onset to its prioritizer\n' >&2
     exit 1
 fi
-require_text subworkflows/longphase_processing/main.nf 'LONGPHASE_HAPLOTAG('
+require_text subworkflows/longphase_processing/main.nf 'LONGPHASE_CALL('
+require_text subworkflows/longphase_processing/main.nf 'LONGPHASE_CALL.out.calls'
+require_text subworkflows/longphase_processing/main.nf 'haplotag = LONGPHASE_CALL.out.calls.map'
+require_text modules/local/longphase_support/main.nf 'path("${meta.id}_phased.vcf")'
+require_text modules/local/longphase_support/main.nf 'path("${meta.id}_phased_SV.vcf")'
+require_text modules/local/longphase_support/main.nf 'path("${meta.id}_haplotag.bam")'
 require_text nextflow.config 'enabled: { meta.batch_input }'
 require_text nextflow.config "type == 'ont' ? '--ont' : type == 'pacbio' ? '--pb' : ''"
 
@@ -107,6 +112,15 @@ require_text nextflow.config "pullTimeout = '2h'"
 require_text main.nf 'validateStagedSifEngine(workflow.containerEngine'
 require_text subworkflows/input_preparation/main.nf "params.phenogpt2_sif = validateStagedSif"
 require_text subworkflows/input_preparation/main.nf "params.phenotagger_sif = validateStagedSif"
+require_text setup.sh 'scripts/prepare_phenotype_images.sh'
+require_text setup.sh '--phenotype-image-dir=<path>'
+require_text scripts/prepare_phenotype_images.sh 'docker pull "$phenogpt2_image"'
+require_text scripts/prepare_phenotype_images.sh 'docker pull "$phenotagger_image"'
+require_text scripts/prepare_phenotype_images.sh '"$container_runtime" pull "$partial" "docker://${source_image}"'
+require_text scripts/prepare_phenotype_images.sh '"$container_runtime" sif list "$sif_path"'
+require_text scripts/prepare_phenotype_images.sh 'update_sif_paths "$phenogpt2_sif" "$phenotagger_sif"'
+require_text .gitignore 'containers/'
+require_text .gitignore '*.sif'
 
 # Compatibility-sensitive filenames and audit artifacts are unchanged.
 for artifact in root tab vcf; do
