@@ -111,7 +111,7 @@ workflow PREANNOTATED_ALL_NGS {
     emit:
     prio_vcf = prio_vcf_result.map { sample_id, vcf -> vcf }
     prio_gene_vcf = prio_gene_result.map { sample_id, vcf -> vcf }
-    mito_vcf = mito_mode == "yes" ? ALIGNMENT_NGS_MITO.out.mito_vcf : Channel.empty()
-    mito_annotated_tsv = mito_mode == "yes" ? ALIGNMENT_NGS_MITO.out.annotated_tsv : Channel.empty()
-    mito_prioritized_tsv = mito_mode == "yes" ? ALIGNMENT_NGS_MITO.out.prioritized_tsv : Channel.empty()
+    mito_vcf = mito_mode == "yes" ? ALIGNMENT_NGS_MITO.out.mito_vcf : channel.empty()
+    mito_annotated_tsv = mito_mode == "yes" ? ALIGNMENT_NGS_MITO.out.annotated_tsv : channel.empty()
+    mito_prioritized_tsv = mito_mode == "yes" ? ALIGNMENT_NGS_MITO.out.prioritized_tsv : channel.empty()
 }

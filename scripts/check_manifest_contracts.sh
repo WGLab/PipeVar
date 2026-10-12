@@ -182,14 +182,15 @@ expect_preparation valid_staged_sif \
     --hpo "$fixture_dir/sample.hpo" --mode snp --out_prefix staged_sif \
     --phenotagger_sif "$fixture_dir/phenotagger.sif"
 
-# Valid yes/no parameters are canonicalized before downstream modules inspect params.
+# Strict-parser parameter scopes are isolated, so each consumer normalizes
+# whitespace and case at its own boundary after eager input validation.
 cat > "$fixture_dir/common-sv-normalization.nf" <<EOF
 nextflow.enable.dsl = 2
 include { INPUT_PREPARATION } from '$repo_root/subworkflows/input_preparation/main'
 
 workflow {
     prepared = INPUT_PREPARATION()
-    prepared.route_settings.view { 'COMMON_SV_FILTER|' + params.common_sv_filter }
+    prepared.route_settings.view { 'COMMON_SV_FILTER|' + params.common_sv_filter.toString().trim().toLowerCase() }
 }
 EOF
 normalization_log="$fixture_dir/common-sv-normalization.log"

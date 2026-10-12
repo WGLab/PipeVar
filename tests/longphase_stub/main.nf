@@ -5,7 +5,7 @@ include { LONGPHASE_PROCESSING } from '../../subworkflows/longphase_processing'
 workflow {
     fixture_root = file("${projectDir}/fixtures")
 
-    records = Channel.of(tuple(
+    records = channel.of(tuple(
         'sample1',
         file("${fixture_root}/sample.rankvar.tsv"),
         file("${fixture_root}/sample.rankscore.tsv"),
@@ -20,7 +20,7 @@ workflow {
         'adult'
     ))
 
-    reference_bundle = Channel.value(tuple(
+    reference_bundle = channel.value(tuple(
         file("${fixture_root}/reference.fa"),
         file("${fixture_root}/reference.fa.fai")
     ))
@@ -28,10 +28,10 @@ workflow {
     result = LONGPHASE_PROCESSING(
         records,
         reference_bundle,
-        Channel.value(false),
-        Channel.value('unknown'),
-        Channel.value('yes'),
-        Channel.value(false)
+        channel.value(false),
+        channel.value('unknown'),
+        channel.value('yes'),
+        channel.value(false)
     )
 
     checked_prio = result.prio_vcf.map { sample_id, output ->

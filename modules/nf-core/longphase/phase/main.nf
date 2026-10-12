@@ -14,9 +14,9 @@ process LONGPHASE_PHASE {
 
 
     output:
-    tuple val(meta), path("${prefix}.vcf.gz")    , emit: snv_vcf
-    tuple val(meta), path("${prefix}_SV.vcf.gz") , emit: sv_vcf , optional: true
-    tuple val(meta), path("${prefix}_mod.vcf.gz"), emit: mod_vcf, optional: true
+    tuple val(meta), path("${task.ext.prefix ?: meta.id}.vcf.gz")    , emit: snv_vcf
+    tuple val(meta), path("${task.ext.prefix ?: meta.id}_SV.vcf.gz") , emit: sv_vcf , optional: true
+    tuple val(meta), path("${task.ext.prefix ?: meta.id}_mod.vcf.gz"), emit: mod_vcf, optional: true
     tuple val("${task.process}"), val("longphase"), eval("longphase --version | head -n 1 | sed 's/Version: //'"), emit: versions_longphase, topic: versions
 
     when:
@@ -25,7 +25,7 @@ process LONGPHASE_PHASE {
     script:
     def args = task.ext.args ?: ''
     def args2 = task.ext.args2 ?: ''
-    prefix = task.ext.prefix ?: "${meta.id}"
+    def prefix = task.ext.prefix ?: "${meta.id}"
     def sv_file = svs ? "--sv-file ${svs}" : ""
     def mod_file = mods ? "--mod-file ${mods}" : ""
     def bams = bam.collectMany { file -> ["-b", file] }.join(" ")
@@ -54,7 +54,7 @@ process LONGPHASE_PHASE {
 
     stub:
     def args = task.ext.args ?: ''
-    prefix = task.ext.prefix ?: "${meta.id}"
+    def prefix = task.ext.prefix ?: "${meta.id}"
     def sv_command = svs ? "echo '' | bgzip -c > ${prefix}_SV.vcf.gz" : ""
     def mod_command = mods ? "echo '' | bgzip -c > ${prefix}_mod.vcf.gz" : ""
     """

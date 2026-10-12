@@ -16,11 +16,11 @@ process DEEPVARIANT_RUNDEEPVARIANT {
     tuple val(meta5), path(par_bed)
 
     output:
-    tuple val(meta), path("${prefix}.vcf.gz")            , emit: vcf
-    tuple val(meta), path("${prefix}.vcf.gz.{tbi,csi}")  , emit: vcf_index
-    tuple val(meta), path("${prefix}.g.vcf.gz")          , emit: gvcf
-    tuple val(meta), path("${prefix}.g.vcf.gz.{tbi,csi}"), emit: gvcf_index
-    tuple val(meta), path("${prefix}.visual_report.html"), emit: report, optional: true
+    tuple val(meta), path("${task.ext.prefix ?: meta.id}.vcf.gz")            , emit: vcf
+    tuple val(meta), path("${task.ext.prefix ?: meta.id}.vcf.gz.{tbi,csi}")  , emit: vcf_index
+    tuple val(meta), path("${task.ext.prefix ?: meta.id}.g.vcf.gz")          , emit: gvcf
+    tuple val(meta), path("${task.ext.prefix ?: meta.id}.g.vcf.gz.{tbi,csi}"), emit: gvcf_index
+    tuple val(meta), path("${task.ext.prefix ?: meta.id}.visual_report.html"), emit: report, optional: true
     tuple val("${task.process}"), val('deepvariant'), eval("/opt/deepvariant/bin/run_deepvariant --version | sed 's/^.*version //'"), topic: versions, emit: versions_deepvariant
 
     when:
@@ -32,7 +32,7 @@ process DEEPVARIANT_RUNDEEPVARIANT {
         error("DEEPVARIANT module does not support Conda. Please use Docker / Singularity / Podman instead.")
     }
     def args = task.ext.args ?: ''
-    prefix = task.ext.prefix ?: "${meta.id}"
+    def prefix = task.ext.prefix ?: "${meta.id}"
     def regions = intervals ? "--regions=${intervals}" : ""
     def par_regions = par_bed ? "--par_regions_bed=${par_bed}" : ""
 
@@ -57,7 +57,7 @@ process DEEPVARIANT_RUNDEEPVARIANT {
     if (workflow.profile.tokenize(',').intersect(['conda', 'mamba']).size() >= 1) {
         error("DEEPVARIANT module does not support Conda. Please use Docker / Singularity / Podman instead.")
     }
-    prefix = task.ext.prefix ?: "${meta.id}"
+    def prefix = task.ext.prefix ?: "${meta.id}"
     """
     echo "stub" | gzip > ${prefix}.vcf.gz
     echo "stub" | gzip > ${prefix}.vcf.gz.tbi

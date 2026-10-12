@@ -20,8 +20,8 @@ workflow GATK_SMALL_VARIANT_CALLING {
     haplotypecaller_input = input_bam_regions.map { sample_id, bam, bai, regions ->
         tuple([id: sample_id, single_end: false], bam, bai, regions, [])
     }
-    empty_dbsnp = Channel.value(tuple([id: 'reference'], []))
-    empty_dbsnp_tbi = Channel.value(tuple([id: 'reference'], []))
+    empty_dbsnp = channel.value(tuple([id: 'reference'], []))
+    empty_dbsnp_tbi = channel.value(tuple([id: 'reference'], []))
 
     GATK4_HAPLOTYPECALLER(
         haplotypecaller_input,
@@ -41,7 +41,7 @@ workflow GATK_SMALL_VARIANT_CALLING {
     resource_tbis = resource_bundle.map { omni, omni_tbi, phase, phase_tbi, dbsnp, dbsnp_tbi, hapmap, hapmap_tbi ->
         [hapmap_tbi, omni_tbi, phase_tbi, dbsnp_tbi]
     }
-    resource_labels = Channel.value([
+    resource_labels = channel.value([
             '--resource:hapmap,known=false,training=true,truth=true,prior=15.0 hapmap_3.3.hg38.vcf.gz',
             '--resource:omni,known=false,training=true,truth=false,prior=12.0 1000G_omni2.5.hg38.vcf.gz',
             '--resource:1000G,known=false,training=true,truth=false,prior=10.0 1000G_phase1.snps.high_confidence.hg38.vcf.gz',

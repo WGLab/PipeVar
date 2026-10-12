@@ -88,7 +88,7 @@ workflow PREANNOTATED_SNV_CALLED_SV_NGS {
     manta_public_artifact_input = MANTA_GERMLINE.out.diploid_sv_vcf.map { meta, vcf_file -> tuple(meta, vcf_file, 'manta', "${meta.id}_manta.vcf") }
     manta_result = MANTA_PUBLIC_ARTIFACT(manta_public_artifact_input).map { meta, vcf_file, source_tool -> tuple(meta.id, vcf_file) }
     xtea_mode = params.xtea ? params.xtea.toString().trim().toLowerCase() : "no"
-    xtea_vcf = Channel.empty()
+    xtea_vcf = channel.empty()
     if ( xtea_mode == "yes" ) {
         xtea_input = all_alignments_by_sample.map { sample_id, bam_file, index_file ->
             tuple([id: sample_id], bam_file, index_file)
@@ -103,8 +103,8 @@ workflow PREANNOTATED_SNV_CALLED_SV_NGS {
     if ( cnvnator_mode != "no" && xtea_mode == "yes" ) {
         normalized_bam = normalize_shortread_alignment(all_alignments_by_sample, reference_bundle)
         cnvnator(normalized_bam, reference_bundle, params.cnvnator_bin_size)
-        merged_sv_input = manta_result.join(cnvnator.out.vcf, failOnMismatch: true, failOnDuplicate: true).join(xtea_vcf, failOnMismatch: true, failOnDuplicate: true).map { sample_id, manta_vcf, cnvnator_vcf, xtea_vcf ->
-            tuple(sample_id, [manta_vcf, cnvnator_vcf, xtea_vcf])
+        merged_sv_input = manta_result.join(cnvnator.out.vcf, failOnMismatch: true, failOnDuplicate: true).join(xtea_vcf, failOnMismatch: true, failOnDuplicate: true).map { sample_id, manta_vcf, cnvnator_vcf, xtea_called_vcf ->
+            tuple(sample_id, [manta_vcf, cnvnator_vcf, xtea_called_vcf])
         }
         truvari_shortread_sv_merge(merged_sv_input, reference_bundle)
         sv_result = truvari_shortread_sv_merge.out.merged_vcf
@@ -119,8 +119,8 @@ workflow PREANNOTATED_SNV_CALLED_SV_NGS {
         sv_result = truvari_shortread_sv_merge.out.merged_vcf
     }
     else if ( xtea_mode == "yes" ) {
-        merged_sv_input = manta_result.join(xtea_vcf, failOnMismatch: true, failOnDuplicate: true).map { sample_id, manta_vcf, xtea_vcf ->
-            tuple(sample_id, [manta_vcf, xtea_vcf])
+        merged_sv_input = manta_result.join(xtea_vcf, failOnMismatch: true, failOnDuplicate: true).map { sample_id, manta_vcf, xtea_called_vcf ->
+            tuple(sample_id, [manta_vcf, xtea_called_vcf])
         }
         truvari_shortread_sv_merge(merged_sv_input, reference_bundle)
         sv_result = truvari_shortread_sv_merge.out.merged_vcf
@@ -181,7 +181,7 @@ workflow PREANNOTATED_SNV_CALLED_SV_NGS {
     emit:
     prio_vcf = prio_vcf_result.map { sample_id, vcf -> vcf }
     prio_gene_vcf = prio_gene_result.map { sample_id, vcf -> vcf }
-    mito_vcf = mito_mode == "yes" ? ALIGNMENT_NGS_MITO.out.mito_vcf : Channel.empty()
-    mito_annotated_tsv = mito_mode == "yes" ? ALIGNMENT_NGS_MITO.out.annotated_tsv : Channel.empty()
-    mito_prioritized_tsv = mito_mode == "yes" ? ALIGNMENT_NGS_MITO.out.prioritized_tsv : Channel.empty()
+    mito_vcf = mito_mode == "yes" ? ALIGNMENT_NGS_MITO.out.mito_vcf : channel.empty()
+    mito_annotated_tsv = mito_mode == "yes" ? ALIGNMENT_NGS_MITO.out.annotated_tsv : channel.empty()
+    mito_prioritized_tsv = mito_mode == "yes" ? ALIGNMENT_NGS_MITO.out.prioritized_tsv : channel.empty()
 }

@@ -31,8 +31,8 @@ workflow INPUT_PREPARATION {
         if (gene_filter_file.exists()) {
             params.gene = gene_filter_file
             .readLines()
-            .collect { it.trim() }
-            .findAll { it && !it.startsWith('#') }
+            .collect { gene -> gene.trim() }
+            .findAll { gene -> gene && !gene.startsWith('#') }
             .join(',')
         }
     }
@@ -45,8 +45,8 @@ workflow INPUT_PREPARATION {
     def gnomadAdCeilingText = params.gnomad_af_ad?.toString()?.trim()
     def gnomadArCeilingText = params.gnomad_af_ar?.toString()?.trim()
 
-    def parseFrequencyThreshold = { String name, String text ->
-        double value
+    def parseFrequencyThreshold = { name, text ->
+        def value
         try {
             value = Double.parseDouble(text)
         }
@@ -58,8 +58,8 @@ workflow INPUT_PREPARATION {
         }
         value
     }
-    def validatedGnomadAdCeiling = parseFrequencyThreshold('gnomad_af_ad', gnomadAdCeilingText)
-    def validatedGnomadArCeiling = parseFrequencyThreshold('gnomad_af_ar', gnomadArCeilingText)
+    def validatedGnomadAdCeiling = parseFrequencyThreshold.call('gnomad_af_ad', gnomadAdCeilingText)
+    def validatedGnomadArCeiling = parseFrequencyThreshold.call('gnomad_af_ar', gnomadArCeilingText)
     if (validatedGnomadAdCeiling > validatedGnomadArCeiling) {
         error "ERROR: --gnomad_af_ad (${gnomadAdCeilingText}) must be less than or equal to --gnomad_af_ar (${gnomadArCeilingText})."
     }
@@ -81,8 +81,8 @@ workflow INPUT_PREPARATION {
         commonSvAdCeilingText = commonSvAdCeilingText ?: '0.005'
         commonSvArCeilingText = commonSvArCeilingText ?: '0.01'
     }
-    def validatedCommonSvAdCeiling = parseFrequencyThreshold('common_sv_af_ad', commonSvAdCeilingText)
-    def validatedCommonSvArCeiling = parseFrequencyThreshold('common_sv_af_ar', commonSvArCeilingText)
+    def validatedCommonSvAdCeiling = parseFrequencyThreshold.call('common_sv_af_ad', commonSvAdCeilingText)
+    def validatedCommonSvArCeiling = parseFrequencyThreshold.call('common_sv_af_ar', commonSvArCeilingText)
     if (validatedCommonSvAdCeiling > validatedCommonSvArCeiling) {
         error "ERROR: --common_sv_af_ad (${commonSvAdCeilingText}) must be less than or equal to --common_sv_af_ar (${commonSvArCeilingText})."
     }
@@ -108,7 +108,7 @@ workflow INPUT_PREPARATION {
         error "ERROR: Invalid --gpu_backend '${params.gpu_backend}'. Use 'singularity' or 'docker'."
     }
 
-    def validateStagedSif = { rawValue, String option ->
+    def validateStagedSif = { rawValue, option ->
         if (rawValue == null || !rawValue.toString().trim()) {
             return null
         }
@@ -133,8 +133,8 @@ workflow INPUT_PREPARATION {
         canonical.absolutePath
     }
 
-    params.phenogpt2_sif = validateStagedSif(params.phenogpt2_sif, 'phenogpt2_sif')
-    params.phenotagger_sif = validateStagedSif(params.phenotagger_sif, 'phenotagger_sif')
+    params.phenogpt2_sif = validateStagedSif.call(params.phenogpt2_sif, 'phenogpt2_sif')
+    params.phenotagger_sif = validateStagedSif.call(params.phenotagger_sif, 'phenotagger_sif')
 
     if (!params.input_csv) {
         def singlePrefix = params.out_prefix?.toString()?.trim()
@@ -145,7 +145,7 @@ workflow INPUT_PREPARATION {
 
     // Parse once into normalized, trimmed row maps. Validation and runtime channel
     // construction intentionally consume the same records.
-    def parseCsvRecord = { String line ->
+    def parseCsvRecord = { line ->
         def values = []
         def current = new StringBuilder()
         def quoted = false
@@ -198,12 +198,12 @@ workflow INPUT_PREPARATION {
         if (manifestLines.isEmpty()) {
             error "ERROR: input CSV is empty: ${params.input_csv}"
         }
-        def manifestDataLines = manifestLines.drop(1).findAll { it.trim() }
+        def manifestDataLines = manifestLines.drop(1).findAll { line -> line.trim() }
         if (manifestDataLines.isEmpty()) {
             error "ERROR: Input CSV must contain at least one sample row."
         }
 
-        manifestHeaderColumns = parseCsvRecord(manifestLines[0])
+        manifestHeaderColumns = parseCsvRecord.call(manifestLines[0])
         if (manifestHeaderColumns && manifestHeaderColumns[0].startsWith('\uFEFF')) {
             manifestHeaderColumns[0] = manifestHeaderColumns[0].substring(1)
         }
@@ -215,7 +215,7 @@ workflow INPUT_PREPARATION {
             error "ERROR: Input CSV contains blank header name(s) at column(s): ${blankHeaderColumns.join(', ')}"
         }
         def duplicateHeaders = manifestHeaderColumns
-        .groupBy { it }
+        .groupBy { header -> header }
         .findAll { header, occurrences -> header && occurrences.size() > 1 }
         .keySet()
         if (!duplicateHeaders.isEmpty()) {
@@ -227,7 +227,7 @@ workflow INPUT_PREPARATION {
             error "ERROR: Input CSV is missing required header: sample"
         }
         if (!manifestUsesUnifiedSchema) {
-            def missingLegacyCsvHeaders = ['file_path', 'note_path'].findAll { !manifestHeaderColumns.contains(it) }
+            def missingLegacyCsvHeaders = ['file_path', 'note_path'].findAll { header -> !manifestHeaderColumns.contains(header) }
             if (!missingLegacyCsvHeaders.isEmpty()) {
                 error "ERROR: Legacy input CSV is missing required header(s): ${missingLegacyCsvHeaders.join(', ')}"
             }
@@ -236,7 +236,7 @@ workflow INPUT_PREPARATION {
         // and unique before either the unified or legacy manifest is materialized.
         def seenManifestSamples = [] as Set
         manifestDataLines.eachWithIndex { line, rowIdx ->
-            def values = parseCsvRecord(line)
+            def values = parseCsvRecord.call(line)
             if (values.size() != manifestHeaderColumns.size()) {
                 error "ERROR: Input CSV row ${rowIdx + 2} has ${values.size()} column(s); expected ${manifestHeaderColumns.size()}."
             }
@@ -258,7 +258,7 @@ workflow INPUT_PREPARATION {
 
         if (manifestUsesUnifiedSchema) {
             def requiredHeaders = ['sample', 'input_kind', 'phenotype_path', 'phenotype_format']
-            def missingHeaders = requiredHeaders.findAll { !manifestHeaderColumns.contains(it) }
+            def missingHeaders = requiredHeaders.findAll { header -> !manifestHeaderColumns.contains(header) }
             if (!missingHeaders.isEmpty()) {
                 error "ERROR: Unified input CSV is missing required header(s): ${missingHeaders.join(', ')}"
             }
@@ -346,7 +346,7 @@ workflow INPUT_PREPARATION {
             ['cram_ngs'] as Set,
             ['bam_ngs', 'cram_ngs'] as Set
             ]
-            if (!supportedKindSets.any { it == manifestInputKinds }) {
+            if (!supportedKindSets.any { kindSet -> kindSet == manifestInputKinds }) {
                 error "ERROR: Mixed unified manifests are not supported in v1. Found input kinds: ${manifestInputKinds.join(', ')}"
             }
             if (manifestAnnotatedRowsWithAlignment > 0 && manifestAnnotatedRowsWithoutAlignment > 0) {
@@ -374,7 +374,7 @@ workflow INPUT_PREPARATION {
     def legacyCsvClinicalNote = params.input_csv && !manifestUsesUnifiedSchema && !(params.note != null && clean_note == 'no')
     def phenogpt2WillRun = clean_phenotype_extractor == 'phenogpt2' && (singleClinicalNote || unifiedClinicalNote || legacyCsvClinicalNote)
 
-    def parsePositiveInteger = { value, String option ->
+    def parsePositiveInteger = { value, option ->
         try {
             def text = value?.toString()?.trim()
             if (!text || !(text ==~ /[0-9]+/)) {
@@ -391,7 +391,7 @@ workflow INPUT_PREPARATION {
         }
     }
 
-    def parseNonnegativeInteger = { value, String option ->
+    def parseNonnegativeInteger = { value, option ->
         try {
             def text = value?.toString()?.trim()
             if (!text || !(text ==~ /[0-9]+/)) {
@@ -404,9 +404,9 @@ workflow INPUT_PREPARATION {
         }
     }
 
-    params.gpu_cpus = parsePositiveInteger(params.gpu_cpus, 'gpu_cpus')
+    params.gpu_cpus = parsePositiveInteger.call(params.gpu_cpus, 'gpu_cpus')
     if (params.deepvariant_max_forks != null && params.deepvariant_max_forks.toString().trim()) {
-        params.deepvariant_max_forks = parsePositiveInteger(
+        params.deepvariant_max_forks = parsePositiveInteger.call(
             params.deepvariant_max_forks,
             'deepvariant_max_forks'
         )
@@ -420,21 +420,21 @@ workflow INPUT_PREPARATION {
             error "ERROR: --phenogpt2_negation must be yes or no; received '${params.phenogpt2_negation}'."
         }
 
-        def phenogpt2BatchSize = parsePositiveInteger(params.phenogpt2_batch_size, 'phenogpt2_batch_size')
-        def phenogpt2ChunkBatchSize = parsePositiveInteger(params.phenogpt2_chunk_batch_size, 'phenogpt2_chunk_batch_size')
-        def phenogpt2MaxForks = parsePositiveInteger(params.phenogpt2_max_forks, 'phenogpt2_max_forks')
+        def phenogpt2BatchSize = parsePositiveInteger.call(params.phenogpt2_batch_size, 'phenogpt2_batch_size')
+        def phenogpt2ChunkBatchSize = parsePositiveInteger.call(params.phenogpt2_chunk_batch_size, 'phenogpt2_chunk_batch_size')
+        def phenogpt2MaxForks = parsePositiveInteger.call(params.phenogpt2_max_forks, 'phenogpt2_max_forks')
         if (phenogpt2BatchSize != 1 || phenogpt2ChunkBatchSize != 1) {
             error "ERROR: PhenoGPT2 currently requires --phenogpt2_batch_size 1 and --phenogpt2_chunk_batch_size 1."
         }
         if (phenogpt2MaxForks != 1) {
             error "ERROR: PhenoGPT2 currently requires --phenogpt2_max_forks 1."
         }
-        def phenogpt2Wc = parseNonnegativeInteger(params.phenogpt2_wc, 'phenogpt2_wc')
+        def phenogpt2Wc = parseNonnegativeInteger.call(params.phenogpt2_wc, 'phenogpt2_wc')
         if (phenogpt2Wc > 0) {
             error "ERROR: --phenogpt2_wc > 0 is not supported until the BERT filtering model is provisioned."
         }
 
-        def validateHostDirectory = { rawValue, String option, boolean writable ->
+        def validateHostDirectory = { rawValue, option, writable ->
             if (rawValue == null || !rawValue.toString().trim()) {
                 error "ERROR: --${option} is required when PhenoGPT2 processes clinical notes."
             }
@@ -462,7 +462,7 @@ workflow INPUT_PREPARATION {
             canonical
         }
 
-        def mainCheckpointRoot = validateHostDirectory(
+        def mainCheckpointRoot = validateHostDirectory.call(
             params.phenogpt2_model_host_path,
             'phenogpt2_model_host_path',
             false
@@ -470,19 +470,19 @@ workflow INPUT_PREPARATION {
         def negationCheckpointRoot = null
         def embeddingCheckpointRoot = null
         if (clean_phenogpt2_negation == 'yes') {
-            negationCheckpointRoot = validateHostDirectory(
+            negationCheckpointRoot = validateHostDirectory.call(
                 params.phenogpt2_negation_model_host_path,
                 'phenogpt2_negation_model_host_path',
                 false
             )
-            embeddingCheckpointRoot = validateHostDirectory(
+            embeddingCheckpointRoot = validateHostDirectory.call(
                 params.phenogpt2_embedding_model_host_path,
                 'phenogpt2_embedding_model_host_path',
                 false
             )
         }
         def cacheRoot = params.phenogpt2_cache_host_path ?
-            validateHostDirectory(params.phenogpt2_cache_host_path, 'phenogpt2_cache_host_path', true) :
+            validateHostDirectory.call(params.phenogpt2_cache_host_path, 'phenogpt2_cache_host_path', true) :
             null
 
         params.phenogpt2_model_host_path = mainCheckpointRoot.absolutePath
@@ -536,8 +536,8 @@ workflow INPUT_PREPARATION {
     }
 
     if (clean_mito == 'yes') {
-        def unifiedVcfInput = manifestUsesUnifiedSchema && manifestInputKinds.any {
-            it in ['vcf_snv', 'vcf_sv']
+        def unifiedVcfInput = manifestUsesUnifiedSchema && manifestInputKinds.any { inputKind ->
+            inputKind in ['vcf_snv', 'vcf_sv']
         }
         def singleRawVcfInput = params.vcf && clean_annotated_snv != 'yes'
         def singleAnnotatedWithoutAlignment = !params.input_csv &&
@@ -600,7 +600,7 @@ workflow INPUT_PREPARATION {
         error "ERROR: Invalid --nanocaller_dp '${params.nanocaller_dp}'. Provide a finite, non-negative numeric threshold, for example 20."
     }
 
-    parseFrequencyThreshold('common_sv_reciprocal_overlap', params.common_sv_reciprocal_overlap.toString())
+    parseFrequencyThreshold.call('common_sv_reciprocal_overlap', params.common_sv_reciprocal_overlap.toString())
 
     if (!(params.common_sv_distance.toString() ==~ /[0-9]+/)) {
         error "ERROR: Invalid --common_sv_distance '${params.common_sv_distance}'. Provide an integer distance, for example 1000."
@@ -610,9 +610,9 @@ workflow INPUT_PREPARATION {
         error "ERROR: Invalid --common_sv_ins_distance '${params.common_sv_ins_distance}'. Provide an integer distance, for example 500."
     }
 
-    parseFrequencyThreshold('common_sv_ins_identity', params.common_sv_ins_identity.toString())
+    parseFrequencyThreshold.call('common_sv_ins_identity', params.common_sv_ins_identity.toString())
 
-    if (clean_rankscore_softwares && clean_rankscore_softwares.split(",").every { it.trim().isEmpty() }) {
+    if (clean_rankscore_softwares && clean_rankscore_softwares.split(",").every { software -> software.trim().isEmpty() }) {
         error "ERROR: Invalid --rankscore_softwares '${params.rankscore_softwares}'. Provide a comma-separated list."
     }
 
@@ -703,7 +703,7 @@ workflow INPUT_PREPARATION {
         (row.input_kind ?: '').toString().trim().toLowerCase() == 'annotated_snv' && row.containsKey('alignment_path') && row.alignment_path
     }
     def unifiedManifestNeedsExpansionHunter = manifestUsesUnifiedSchema && (
-        manifestInputKinds.any { it in ['bam_ngs', 'cram_ngs'] } || annotatedManifestNeedsReference
+        manifestInputKinds.any { inputKind -> inputKind in ['bam_ngs', 'cram_ngs'] } || annotatedManifestNeedsReference
     )
     def rawVcfNeedsReference = params.vcf && clean_annotated_snv != 'yes'
     def needsReference = params.bam || rawVcfNeedsReference || unifiedManifestNeedsReference || annotatedManifestNeedsReference
@@ -776,7 +776,7 @@ workflow INPUT_PREPARATION {
 
     // Build phenotype, alignment, and annotation records.
 
-    reference_bundle = Channel.value([])
+    reference_bundle = channel.value([])
     clinical_metadata_by_sample = null
     input_bam = null
     def bam = null
@@ -826,7 +826,7 @@ workflow INPUT_PREPARATION {
         error "Index file not found for ${alignmentFile} (${sourceLabel}). Looked for: ${candidatePaths.unique().join(', ')}"
     }
     if ( params.input_csv ) {
-        clinical_metadata_by_sample = Channel.fromList(manifestRowsForValidation)
+        clinical_metadata_by_sample = channel.fromList(manifestRowsForValidation)
         .map { row ->
             def out_prefix = row.sample
             def has_age_of_onset = row.containsKey('age_of_onset')
@@ -857,10 +857,10 @@ workflow INPUT_PREPARATION {
         if ( manifestUsesUnifiedSchema ) {
             if ( manifestInputKinds == (['annotated_snv'] as Set) ) {
                 if (manifestAnnotatedRowsWithPreannotatedSv > 0 && manifestAnnotatedRowsWithAlignment > 0) {
-                    input_annotated_ngs = Channel.fromList(manifestRowsForValidation)
+                    input_annotated_ngs = channel.fromList(manifestRowsForValidation)
                     .map { row ->
                         def bam_file = file(row.alignment_path, checkIfExists: true)
-                        def bai = resolveAlignmentIndex(bam_file, row.alignment_index_path, "unified CSV sample '${row.sample}'")
+                        def bai = resolveAlignmentIndex.call(bam_file, row.alignment_index_path, "unified CSV sample '${row.sample}'")
                         return tuple(
                         row.sample,
                         file(row.snv_txt_path, checkIfExists: true),
@@ -868,7 +868,7 @@ workflow INPUT_PREPARATION {
                         file(row.sv_vcf_path, checkIfExists: true),
                         bam_file,
                         bai,
-                        phenotypeFileForRow(row, 'phenotype_path'),
+                        phenotypeFileForRow.call(row, 'phenotype_path'),
                         (row.phenotype_format ?: '').toString().trim().toLowerCase()
                         )
                     }
@@ -876,14 +876,14 @@ workflow INPUT_PREPARATION {
                     csv_manifest_mode = 'annotated_all_ngs'
                 }
                 else if (manifestAnnotatedRowsWithPreannotatedSv > 0) {
-                    input_annotated_snv_sv = Channel.fromList(manifestRowsForValidation)
+                    input_annotated_snv_sv = channel.fromList(manifestRowsForValidation)
                     .map { row ->
                         return tuple(
                         row.sample,
                         file(row.snv_txt_path, checkIfExists: true),
                         file(row.snv_vcf_path, checkIfExists: true),
                         file(row.sv_vcf_path, checkIfExists: true),
-                        phenotypeFileForRow(row, 'phenotype_path'),
+                        phenotypeFileForRow.call(row, 'phenotype_path'),
                         (row.phenotype_format ?: '').toString().trim().toLowerCase()
                         )
                     }
@@ -891,17 +891,17 @@ workflow INPUT_PREPARATION {
                     csv_manifest_mode = 'annotated_snv_sv'
                 }
                 else if (manifestAnnotatedRowsWithAlignment > 0) {
-                    input_annotated_called_ngs = Channel.fromList(manifestRowsForValidation)
+                    input_annotated_called_ngs = channel.fromList(manifestRowsForValidation)
                     .map { row ->
                         def bam_file = file(row.alignment_path, checkIfExists: true)
-                        def bai = resolveAlignmentIndex(bam_file, row.alignment_index_path, "unified CSV sample '${row.sample}'")
+                        def bai = resolveAlignmentIndex.call(bam_file, row.alignment_index_path, "unified CSV sample '${row.sample}'")
                         return tuple(
                         row.sample,
                         file(row.snv_txt_path, checkIfExists: true),
                         file(row.snv_vcf_path, checkIfExists: true),
                         bam_file,
                         bai,
-                        phenotypeFileForRow(row, 'phenotype_path'),
+                        phenotypeFileForRow.call(row, 'phenotype_path'),
                         (row.phenotype_format ?: '').toString().trim().toLowerCase()
                         )
                     }
@@ -909,13 +909,13 @@ workflow INPUT_PREPARATION {
                     csv_manifest_mode = 'annotated_snv_called_sv_ngs'
                 }
                 else {
-                    input_annotated_snv = Channel.fromList(manifestRowsForValidation)
+                    input_annotated_snv = channel.fromList(manifestRowsForValidation)
                     .map { row ->
                         return tuple(
                         row.sample,
                         file(row.snv_txt_path, checkIfExists: true),
                         file(row.snv_vcf_path, checkIfExists: true),
-                        phenotypeFileForRow(row, 'phenotype_path'),
+                        phenotypeFileForRow.call(row, 'phenotype_path'),
                         (row.phenotype_format ?: '').toString().trim().toLowerCase()
                         )
                     }
@@ -924,12 +924,12 @@ workflow INPUT_PREPARATION {
                 }
             }
             else if ( manifestInputKinds == (['vcf_snv'] as Set) || manifestInputKinds == (['vcf_sv'] as Set) ) {
-                input_vcf = Channel.fromList(manifestRowsForValidation)
+                input_vcf = channel.fromList(manifestRowsForValidation)
                 .map { row ->
                     return tuple(
                     row.sample,
                     file(row.vcf_path, checkIfExists: true),
-                    phenotypeFileForRow(row, 'phenotype_path'),
+                    phenotypeFileForRow.call(row, 'phenotype_path'),
                     )
                 }
 
@@ -940,15 +940,15 @@ workflow INPUT_PREPARATION {
                 csv_manifest_is_note = manifestPhenotypeFormats.contains('clinical_note') ? "yes" : "no"
             }
             else {
-                input_bam = Channel.fromList(manifestRowsForValidation)
+                input_bam = channel.fromList(manifestRowsForValidation)
                 .map { row ->
                     def bam_file = file(row.alignment_path, checkIfExists: true)
-                    def bai = resolveAlignmentIndex(bam_file, row.alignment_index_path, "unified CSV sample '${row.sample}'")
+                    def bai = resolveAlignmentIndex.call(bam_file, row.alignment_index_path, "unified CSV sample '${row.sample}'")
                     return tuple(
                     row.sample,
                     bam_file,
                     bai,
-                    phenotypeFileForRow(row, 'phenotype_path'),
+                    phenotypeFileForRow.call(row, 'phenotype_path'),
                     )
                 }
 
@@ -959,10 +959,10 @@ workflow INPUT_PREPARATION {
             }
         }
         else if ( params.vcf ) {
-            input_vcf = Channel.fromList(manifestRowsForValidation)
+            input_vcf = channel.fromList(manifestRowsForValidation)
             .map { row ->
                 def vcf_file = file(row.file_path, checkIfExists: true)
-                def note_file = phenotypeFileForRow(row, 'note_path')
+                def note_file = phenotypeFileForRow.call(row, 'note_path')
 
                 // Preserve the sample key beside its VCF and phenotype source.
                 return tuple(
@@ -974,13 +974,13 @@ workflow INPUT_PREPARATION {
 
         }
         else if ( params.bam ) {
-            input_bam = Channel.fromList(manifestRowsForValidation)
+            input_bam = channel.fromList(manifestRowsForValidation)
             .map { row ->
                 def bam_file = file(row.file_path, checkIfExists: true)
 
-                def bai = resolveAlignmentIndex(bam_file, null, "legacy CSV sample '${row.sample}'")
+                def bai = resolveAlignmentIndex.call(bam_file, null, "legacy CSV sample '${row.sample}'")
 
-                def note_file = phenotypeFileForRow(row, 'note_path')
+                def note_file = phenotypeFileForRow.call(row, 'note_path')
                 def out_prefix = row.sample
 
                 // Alignment record: sample, aligned reads, index, phenotype source.
@@ -995,29 +995,29 @@ workflow INPUT_PREPARATION {
         }
     }
     else if ( params.bam != null ) {
-        bam = Channel
+        bam = channel
         .fromPath(params.bam, checkIfExists: true)
         .map { file ->
 
-            def index = resolveAlignmentIndex(file, null, "single-sample input")
+            def index = resolveAlignmentIndex.call(file, null, "single-sample input")
 
             return [ file, index ]
         }
-        single_out_prefix=Channel.value(params.out_prefix)
+        single_out_prefix=channel.value(params.out_prefix)
     }
     else if ( params.vcf != null ) {
-        vcf=Channel.value(file(params.vcf, checkIfExists: true))
-        single_out_prefix=Channel.value(params.out_prefix)
+        vcf=channel.value(file(params.vcf, checkIfExists: true))
+        single_out_prefix=channel.value(params.out_prefix)
     }
     if (clean_annotated_snv == 'yes' && !params.input_csv) {
-        annovar_txt = Channel.value(file(params.annovar_txt, checkIfExists: true))
-        vcf = Channel.value(file(params.vcf, checkIfExists: true))
+        annovar_txt = channel.value(file(params.annovar_txt, checkIfExists: true))
+        vcf = channel.value(file(params.vcf, checkIfExists: true))
         if (clean_annotated_sv == 'yes') {
-            annovar_sv_vcf = Channel.value(file(params.annovar_sv_vcf, checkIfExists: true))
+            annovar_sv_vcf = channel.value(file(params.annovar_sv_vcf, checkIfExists: true))
         }
     }
     if (params.ref_fa != null) {
-        reference_bundle = Channel
+        reference_bundle = channel
         .fromPath(params.ref_fa, checkIfExists: true)
         .map { fa_file ->
             def fai_file = file("${fa_file}.fai")
@@ -1026,7 +1026,7 @@ workflow INPUT_PREPARATION {
         .first()
     }
     if (params.ref_fa != null && clean_type == 'short') {
-        gatk_reference_bundle = Channel
+        gatk_reference_bundle = channel
         .fromPath(params.ref_fa, checkIfExists: true)
         .map { fa_file ->
             def fai_file = file("${fa_file}.fai")
@@ -1036,7 +1036,7 @@ workflow INPUT_PREPARATION {
         .first()
     }
     if (params.ref_fa != null && clean_mito == 'yes' && clean_type == 'short') {
-        mitochondrial_reference_bundle = Channel
+        mitochondrial_reference_bundle = channel
         .fromPath(params.ref_fa, checkIfExists: true)
         .map { fa_file ->
             def fai_file = file("${fa_file}.fai")
@@ -1051,7 +1051,7 @@ workflow INPUT_PREPARATION {
         .first()
     }
     if (is_expansionhunter_mode) {
-        eh_variant_catalog = Channel
+        eh_variant_catalog = channel
         .fromPath(selected_eh_catalog)
         .first()
     }
@@ -1064,11 +1064,11 @@ workflow INPUT_PREPARATION {
     else {
         // Single-file mode: `note` must be a file path; `hpo` is used directly as HPO input.
         if ( params.note != null && clean_note != 'yes' && clean_note != 'no' ) {
-            note=Channel.value(file(params.note, checkIfExists: true))
+            note=channel.value(file(params.note, checkIfExists: true))
             phenotype_is_clinical_note = "yes"
         }
         else if ( params.hpo != null ) {
-            note=Channel.value(file(params.hpo, checkIfExists: true))
+            note=channel.value(file(params.hpo, checkIfExists: true))
             phenotype_is_clinical_note = "no"
         }
         else {
@@ -1080,20 +1080,20 @@ workflow INPUT_PREPARATION {
             """
         }
     }
-    mito_contig = Channel.value(params.mito_contig)
+    mito_contig = channel.value(params.mito_contig)
     // Single-sample scripts use OMIM for ml/omim and LOEUF for gnomad.
     def inheritance_mode_script = (clean_inheritance_mode == 'gnomad') ? 'LOEUF' : 'OMIM'
-    inheritance_mode = Channel.value(inheritance_mode_script)
-    include_clinvar_report = Channel.value(clean_include_clinvar_report)
-    allow_unphased_comphet = Channel.value(clean_allow_unphased_comphet)
+    inheritance_mode = channel.value(inheritance_mode_script)
+    include_clinvar_report = channel.value(clean_include_clinvar_report)
+    allow_unphased_comphet = channel.value(clean_allow_unphased_comphet)
     // Use the broader AR ceiling upstream; final ranking applies AD/AR-specific ceilings.
-    gnomad_af_ceiling = Channel.value(gnomadArCeilingText)
-    rankscore_filter = Channel.value(params.rankscore)
-    rankscore_softwares = Channel.value(clean_rankscore_softwares)
-    rankvar_filter = Channel.value(params.rankvar)
-    phen2gene_top_n = Channel.value(params.phen2gene_filter)
-    minimum_genotype_quality = Channel.value(params.gq)
-    minimum_allele_depth = Channel.value(params.ad)
+    gnomad_af_ceiling = channel.value(gnomadArCeilingText)
+    rankscore_filter = channel.value(params.rankscore)
+    rankscore_softwares = channel.value(clean_rankscore_softwares)
+    rankvar_filter = channel.value(params.rankvar)
+    phen2gene_top_n = channel.value(params.phen2gene_filter)
+    minimum_genotype_quality = channel.value(params.gq)
+    minimum_allele_depth = channel.value(params.ad)
     def short_read_small_variant_caller = clean_light == 'yes' ? 'haplotypecaller' : 'deepvariant'
     def long_read_small_variant_caller = clean_light == 'yes' ? 'nanocaller' : 'clair3'
     def phenotype_targeting_enabled = clean_target
@@ -1172,17 +1172,17 @@ workflow INPUT_PREPARATION {
     short_read_small_variant_caller: short_read_small_variant_caller,
     long_read_small_variant_caller: long_read_small_variant_caller,
     ]
-    clinical_metadata_by_sample = clinical_metadata_by_sample != null ? clinical_metadata_by_sample : Channel.empty()
-    input_bam = input_bam != null ? input_bam : Channel.empty()
-    input_vcf = input_vcf != null ? input_vcf : Channel.empty()
-    input_annotated_snv = input_annotated_snv != null ? input_annotated_snv : Channel.empty()
-    input_annotated_snv_sv = input_annotated_snv_sv != null ? input_annotated_snv_sv : Channel.empty()
-    input_annotated_ngs = input_annotated_ngs != null ? input_annotated_ngs : Channel.empty()
-    input_annotated_called_ngs = input_annotated_called_ngs != null ? input_annotated_called_ngs : Channel.empty()
-    mito_input_bam = mito_input_bam != null ? mito_input_bam : Channel.empty()
-    gatk_reference_bundle = gatk_reference_bundle != null ? gatk_reference_bundle : Channel.value([])
-    mitochondrial_reference_bundle = mitochondrial_reference_bundle != null ? mitochondrial_reference_bundle : Channel.value([])
-    eh_variant_catalog = eh_variant_catalog != null ? eh_variant_catalog : Channel.value([])
+    clinical_metadata_by_sample = clinical_metadata_by_sample != null ? clinical_metadata_by_sample : channel.empty()
+    input_bam = input_bam != null ? input_bam : channel.empty()
+    input_vcf = input_vcf != null ? input_vcf : channel.empty()
+    input_annotated_snv = input_annotated_snv != null ? input_annotated_snv : channel.empty()
+    input_annotated_snv_sv = input_annotated_snv_sv != null ? input_annotated_snv_sv : channel.empty()
+    input_annotated_ngs = input_annotated_ngs != null ? input_annotated_ngs : channel.empty()
+    input_annotated_called_ngs = input_annotated_called_ngs != null ? input_annotated_called_ngs : channel.empty()
+    mito_input_bam = mito_input_bam != null ? mito_input_bam : channel.empty()
+    gatk_reference_bundle = gatk_reference_bundle != null ? gatk_reference_bundle : channel.value([])
+    mitochondrial_reference_bundle = mitochondrial_reference_bundle != null ? mitochondrial_reference_bundle : channel.value([])
+    eh_variant_catalog = eh_variant_catalog != null ? eh_variant_catalog : channel.value([])
 
     emit:
     route_settings

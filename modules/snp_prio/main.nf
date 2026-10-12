@@ -15,6 +15,11 @@ process small_variant_prio {
     tuple val(out_prefix), path("${out_prefix}.frequency_audit.tsv"), emit: frequency_audit
 
     script:
+    def gnomad_af_ad = params.gnomad_af_ad.toString().trim()
+    def gnomad_af_ar = params.gnomad_af_ar.toString().trim()
+    def common_sv_af_ad = params.common_sv_af_ad.toString().trim()
+    def common_sv_af_ar = params.common_sv_af_ar.toString().trim()
+    def common_sv_filter_mode = params.common_sv_filter.toString().trim().toLowerCase()
 
 	"""
 	# Combine ClinVar, RankScore, and RankVar evidence before inheritance-aware prioritization.
@@ -28,8 +33,8 @@ process small_variant_prio {
 
 	python3 /assign_dom_or_rec_snp_only.py ${out_prefix}.clinvar.vcf ${out_prefix}.rankscore.vcf ${out_prefix}.rankvar.vcf "$hpo_path" "$age_of_onset" "$inheritance_mode" ${out_prefix}.assigned.vcf
 
-	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio_gene.vcf gene --include-clinvar $include_clinvar_report --allow-unphased-comphet $allow_unphased_comphet --gnomad-af-ad ${params.gnomad_af_ad} --gnomad-af-ar ${params.gnomad_af_ar} --common-sv-af-ad ${params.common_sv_af_ad} --common-sv-af-ar ${params.common_sv_af_ar} --common-sv-filter ${params.common_sv_filter} --frequency-audit ${out_prefix}.frequency_audit.tsv
-	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio.vcf variant --include-clinvar $include_clinvar_report --allow-unphased-comphet $allow_unphased_comphet --gnomad-af-ad ${params.gnomad_af_ad} --gnomad-af-ar ${params.gnomad_af_ar} --common-sv-af-ad ${params.common_sv_af_ad} --common-sv-af-ar ${params.common_sv_af_ar} --common-sv-filter ${params.common_sv_filter}
+	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio_gene.vcf gene --include-clinvar $include_clinvar_report --allow-unphased-comphet $allow_unphased_comphet --gnomad-af-ad ${gnomad_af_ad} --gnomad-af-ar ${gnomad_af_ar} --common-sv-af-ad ${common_sv_af_ad} --common-sv-af-ar ${common_sv_af_ar} --common-sv-filter ${common_sv_filter_mode} --frequency-audit ${out_prefix}.frequency_audit.tsv
+	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio.vcf variant --include-clinvar $include_clinvar_report --allow-unphased-comphet $allow_unphased_comphet --gnomad-af-ad ${gnomad_af_ad} --gnomad-af-ar ${gnomad_af_ar} --common-sv-af-ad ${common_sv_af_ad} --common-sv-af-ar ${common_sv_af_ar} --common-sv-filter ${common_sv_filter_mode}
 	"""
 
 }

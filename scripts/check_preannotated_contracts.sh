@@ -55,7 +55,7 @@ require_text "$repo_root/subworkflows/preannotated_sv/main.nf" 'variant_html_rep
 require_text "$repo_root/subworkflows/preannotated_combined/main.nf" 'EXPANSIONHUNTER('
 reject_text "$repo_root/subworkflows/preannotated_combined/main.nf" 'MANTA_GERMLINE('
 require_text "$repo_root/subworkflows/preannotated_combined/called_sv.nf" 'MANTA_GERMLINE('
-require_text "$repo_root/subworkflows/preannotated_combined/called_sv.nf" 'Channel.empty()'
+require_text "$repo_root/subworkflows/preannotated_combined/called_sv.nf" 'channel.empty()'
 require_text "$repo_root/subworkflows/preannotated_combined/called_sv.nf" 'tuple(sample_id, vcf_file, "called")'
 reject_text "$repo_root/subworkflows/preannotated_combined/called_sv.nf" 'xtea_vcf = null'
 

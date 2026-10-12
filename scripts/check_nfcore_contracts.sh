@@ -16,17 +16,30 @@ require_text() {
         fail "missing nf-core contract in $file: $text"
 }
 
+reject_text() {
+    local file="$1"
+    local text="$2"
+    if rg --no-ignore -F -q -- "$text" "$repo_root/$file"; then
+        fail "retired nf-core contract remains in $file: $text"
+    fi
+}
+
 expected_revision='94b413835288b0e80bd29256d0a95e4fce020a8b'
 revision_count="$({ rg --no-ignore -o -- "$expected_revision" "$repo_root/modules.json" || true; } | wc -l | tr -d '[:space:]')"
 [[ "$revision_count" == '9' ]] || fail "modules.json must pin all nine modules to $expected_revision"
 
-expected_nfcore_hash='815af35af5dc79359b62cdfdfea3fb2d22f2a7c56247f846ac0b5a2a7fd76c82'
+expected_nfcore_hash='2c899ec052d814f8b4eabddcf073586c7aacee3b4d2ceca33f1c0216358bdf88'
 actual_nfcore_hash="$({
     cd "$repo_root/modules/nf-core"
     find . -type f -printf '%P\0' | sort -z | xargs -0 sha256sum | sha256sum
 } | awk '{print $1}')"
 [[ "$actual_nfcore_hash" == "$expected_nfcore_hash" ]] ||
-    fail 'vendored nf-core files differ from the locked upstream snapshot'
+    fail 'vendored nf-core files differ from the locked upstream snapshot plus documented parser patch'
+
+require_text modules/nf-core/deepvariant/rundeepvariant/main.nf 'def prefix = task.ext.prefix'
+require_text modules/nf-core/longphase/phase/main.nf 'def prefix = task.ext.prefix'
+require_text modules/nf-core/gatk4/applyvqsr/main.nf 'def prefix = task.ext.prefix'
+require_text modules/nf-core/gatk4/variantrecalibrator/main.nf 'def prefix = task.ext.prefix'
 
 require_text nextflow.config "withName: 'DEEPVARIANT_RUNDEEPVARIANT'"
 require_text nextflow.config "ext.args = '--model_type=WGS'"
@@ -41,8 +54,20 @@ require_text nextflow.config "withName: 'GATK4_VARIANTRECALIBRATOR'"
 require_text nextflow.config "withName: 'GATK4_APPLYVQSR'"
 require_text nextflow.config "withName:'LONGPHASE_CALL'"
 require_text nextflow.config "type == 'ont' ? '--ont' : type == 'pacbio' ? '--pb' : ''"
+require_text nextflow.config "withName: 'LONGPHASE_CALL'"
+require_text nextflow.config 'cpus   = 8'
+require_text nextflow.config 'memory = { task.attempt == 1 ? 64.GB : task.attempt == 2 ? 128.GB : 256.GB }'
+require_text nextflow.config 'ext.phase_threads = 8'
+require_text nextflow.config 'ext.haplotag_threads = 4'
+require_text nextflow.config "fields='task_id,hash,native_id,process,tag,name,status,exit,attempt,cpus,memory,submit,start,complete,duration,realtime,%cpu,rss,peak_rss,%mem,read_bytes,write_bytes,workdir'"
+reject_text nextflow.config 'LONGPHASE_PHASE'
+reject_text nextflow.config 'LONGPHASE_HAPLOTAG'
 require_text modules/local/longphase_support/main.nf 'process LONGPHASE_CALL'
 require_text modules/local/longphase_support/main.nf "container 'beoungl/docker_test:longphase_0.4.0'"
+require_text modules/local/longphase_support/main.nf 'PIPEVAR_LONGPHASE_RESOURCES'
+require_text modules/local/longphase_support/main.nf 'PIPEVAR_LONGPHASE_CGROUP'
+require_text modules/local/longphase_support/main.nf '-t ${phase_threads}'
+require_text modules/local/longphase_support/main.nf '-t ${haplotag_threads}'
 
 require_text modules/local/legacy_artifact_compat/main.nf 'bgzip --decompress --stdout'
 require_text subworkflows/ngs/main.nf 'DEEPVARIANT_RUNDEEPVARIANT.out.vcf.map'
@@ -55,4 +80,4 @@ require_text subworkflows/gatk_snp_calling/main.nf "modules/nf-core/gatk4/applyv
 require_text subworkflows/longphase_processing/main.nf "include { LONGPHASE_CALL; LONGPHASE_PRIORITIZE } from '../../modules/local/longphase_support'"
 require_text subworkflows/longphase_processing/main.nf 'LONGPHASE_CALL.out.calls'
 
-printf 'Module contracts OK: nine-module vendored snapshot integrity, active integrations, local LongPhase adapter, and public compatibility artifacts.\n'
+printf 'Module contracts OK: nine-module vendored snapshot plus parser patch integrity, active integrations, local LongPhase adapter, and public compatibility artifacts.\n'

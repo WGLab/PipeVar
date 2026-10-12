@@ -1,27 +1,32 @@
 # Nextflow compatibility
 
-PipeVar requires Java 17 or newer and Nextflow 24.10.6 or newer. The workflow
-currently uses the v1 DSL2 syntax parser. Set `NXF_SYNTAX_PARSER=v1` explicitly,
-especially with Nextflow 26.04, where the v2 parser is the default.
+PipeVar requires Java 17 or newer and Nextflow 24.10.6 or newer. It supports
+the legacy parser used by Nextflow 24.10/25.x and the native v2 parser used by
+Nextflow 26.04. No parser environment variable is required for supported
+default configurations.
 
 ## Verified matrix
 
-The following matrix was verified on 2026-09-30 with Eclipse Temurin
-17.0.16+8. Each release passed all 13 harness checks.
+The following matrix was verified on 2026-10-07 with Eclipse Temurin
+17.0.20.1+1. Legacy lanes passed 22 harness checks and strict-parser lanes
+passed the same checks plus recursive `nextflow lint` (23 checks).
 
-| Nextflow | Build | Profile configuration | Graph preview | Contract suites | Local smoke | Result |
+| Nextflow | Build | Parser selection | Profiles | Lint | Contracts/smoke | Result |
 | --- | ---: | --- | --- | --- | --- | --- |
-| 24.10.6 | 5937 | All four pass | Pass | Pass | Pass | Supported |
-| 25.04.8 | 5956 | All four pass | Pass | Pass | Pass | Supported |
-| 25.10.7 | 12755 | All four pass | Pass | Pass | Pass | Supported |
-| 26.04.6 | 12646 | All four pass | Pass | Pass | Pass | Supported with `NXF_SYNTAX_PARSER=v1` |
+| 24.10.6 | 5937 | Default (v1) | All four pass | Not available | Pass | Supported |
+| 25.04.8 | 5956 | Default (v1) | All four pass | Not available | Pass | Supported |
+| 25.10.7 | 12755 | Explicit v1 | All four pass | Not run | Pass | Supported |
+| 25.10.7 | 12755 | Explicit v2 | All four pass | Pass | Pass | Supported |
+| 26.04.6 | 12646 | Default/native v2 | All four pass | Pass | Pass | Supported |
+| 26.04.6 | 12646 | Explicit v1 fallback | All four pass | Not run | Pass | Temporary fallback only |
 
 The four profiles are `standard`, `slurm_singularity`, `local_singularity`,
 and `local_docker`. The contract result covers structure, vendored nf-core
-integrity, compatibility-sensitive behavior, channel joins, and valid and
-invalid manifest boundaries. The smoke process imports `INPUT_PREPARATION`,
-selects the single-sample VCF/SNP route, executes one host-local task, and
-asserts `SMOKE|vcf|single|snp` without pulling a container.
+integrity, strict-syntax rules, compatibility-sensitive behavior, help
+semantics, channel joins, and valid and invalid manifest boundaries. The smoke
+process imports `INPUT_PREPARATION`, selects the single-sample VCF/SNP route,
+executes one host-local task, and asserts `SMOKE|vcf|false|snp` without pulling
+a container.
 
 Verified one-JAR SHA-256 values:
 
@@ -43,14 +48,14 @@ bash scripts/check_nextflow_compatibility.sh
 ```
 
 The harness uses separate `NXF_HOME`, launch, work, and log directories for
-each release. By default it writes a retained result tree below `/tmp` and
-records commands, exit codes, Java metadata, the selected syntax parser, and
-runtime hashes. Override the result location or matrix when needed:
+each lane. By default it writes a retained result tree below `/tmp` and records
+the PipeVar revision and source status, commands, exit codes, Java metadata,
+Nextflow build, parser selection, runtime hashes, logs, and results. Override
+the result location or lane matrix when needed:
 
 ```bash
 COMPAT_ROOT=/absolute/writable/path \
-NEXTFLOW_VERSIONS='24.10.6 25.04.8 25.10.7 26.04.6' \
-NEXTFLOW_SYNTAX_PARSER=v1 \
+NEXTFLOW_COMPATIBILITY_LANES='25.10.7@v2 26.04.6@default' \
 NEXTFLOW_BIN=/absolute/path/to/nextflow \
 JAVA_HOME=/absolute/path/to/jdk-17 \
 bash scripts/check_nextflow_compatibility.sh
@@ -71,8 +76,8 @@ environment is offline. For an offline run, populate each isolated
 | ANNOVAR or PhenoSV mount directory is missing | Resource readiness | Run setup or correct the configured host path. |
 | A local task requests more memory than the host provides | Host capacity | Use suitable compute or a test-only fixture override; do not lower production requests to satisfy compatibility tests. |
 | An invalid manifest, phenotype combination, VCF mode, or mitochondrial route is rejected | Expected validation | Confirm the documented diagnostic; this is a passing negative test. |
-| Nextflow 26.04 reports v2 parser syntax errors | Parser mismatch | Export `NXF_SYNTAX_PARSER=v1`; native v2 migration is not part of the verified interface. |
-| A DSL2/module/config error remains with Java 17 and parser v1 | Workflow compatibility | Treat it as a code defect and preserve the harness log for investigation. |
+| Nextflow 26.04 reports v2 parser syntax errors | Workflow compatibility | Treat it as a code defect and preserve the harness log. As a temporary diagnostic fallback, compare with `NXF_SYNTAX_PARSER=v1`; do not make v1 the normal v26 configuration. |
+| A DSL2/module/config error remains with Java 17 | Workflow compatibility | Treat it as a code defect and preserve the harness log for investigation. |
 
 This matrix does not run complete clinical routes, pull analysis containers,
 compare biological results, or validate site-specific Docker, Singularity, or

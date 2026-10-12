@@ -119,6 +119,10 @@ require_text scripts/prepare_phenotype_images.sh 'docker pull "$phenotagger_imag
 require_text scripts/prepare_phenotype_images.sh '"$container_runtime" pull "$partial" "docker://${source_image}"'
 require_text scripts/prepare_phenotype_images.sh '"$container_runtime" sif list "$sif_path"'
 require_text scripts/prepare_phenotype_images.sh 'update_sif_paths "$phenogpt2_sif" "$phenotagger_sif"'
+require_text modules/phenogpt2/main.nf 'export FLASHINFER_WORKSPACE_BASE="\$PHENOGPT2_CACHE_DIR"'
+require_text modules/phenogpt2/main.nf 'export PHENOGPT2_CACHE_DIR="\$PWD/\$PHENOGPT2_CACHE_DIR"'
+require_text nextflow.config 'maxForks = 1'
+require_text nextflow.config 'maxForks = (params.deepvariant_max_forks?.toString()?.trim() ==~ /[1-9][0-9]*/) ? params.deepvariant_max_forks.toString().toInteger() : 1000000'
 require_text .gitignore 'containers/'
 require_text .gitignore '*.sif'
 

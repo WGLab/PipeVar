@@ -55,8 +55,10 @@ values are unwrapped only at the final output boundary.
 
 ## nf-core caller boundary
 
-DeepVariant, ExpansionHunter, Manta germline, Sniffles, three GATK stages, and
-two LongPhase stages are unmodified nf-core modules pinned by `modules.json`.
+DeepVariant, ExpansionHunter, Manta germline, Sniffles, and three GATK stages
+are nf-core modules pinned by `modules.json`. LongPhase preparation, phase, and
+haplotag execution use the local `LONGPHASE_CALL` adapter so the verified 1.7.3
+command contract and independent phase/haplotag thread limits stay together.
 Routes translate
 `(sample_id, ...)` records to nf-core `([id: sample_id], ...)` records only at
 the caller boundary, then immediately restore the PipeVar sample-keyed shape.
@@ -90,8 +92,8 @@ single-sample and CSV inputs; single-sample mode passes a blank age value.
 
 GATK now acquires and validates one hg38 VQSR bundle per run and broadcasts it
 to keyed HaplotypeCaller, VariantRecalibrator, and ApplyVQSR tasks. LongPhase
-uses upstream preparation-independent phase and haplotag stages, while local
-prioritization consumes the same optional age field in every route.
+uses one local call adapter followed by local prioritization, which consumes
+the same optional age field in every route.
 CNVnator and mitochondrial composites remain intentionally unchanged because
 splitting them would add task boundaries without making their route contracts
 clearer. Common-SV audit artifacts and report evidence combinations are also

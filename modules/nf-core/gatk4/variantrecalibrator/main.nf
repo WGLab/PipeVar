@@ -52,7 +52,7 @@ process GATK4_VARIANTRECALIBRATOR {
     """
 
     stub:
-    prefix = task.ext.prefix ?: "${meta.id}"
+    def prefix = task.ext.prefix ?: "${meta.id}"
     """
     touch ${prefix}.recal
     touch ${prefix}.idx

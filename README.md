@@ -18,17 +18,18 @@ PipeVar 0.5.0 supports:
 | I want to... | Read... |
 | --- | --- |
 | Install PipeVar or configure containers | [Installation and setup](docs/INSTALLATION.md) |
-| Check verified Nextflow versions or reproduce compatibility tests | [Nextflow compatibility](docs/NEXTFLOW_COMPATIBILITY.md) |
 | Plan compute capacity or review the 30× example | [Resources and benchmark](docs/BENCHMARKS.md) |
 | Prepare a reference, sample, phenotype file, or sample sheet | [Input guide](docs/INPUTS.md) |
 | Choose a workflow or find more run examples | [Running PipeVar](docs/USAGE.md) |
 | Look up an option and its default | [Parameter reference](docs/PARAMETERS.md) |
-| Navigate the code and route boundaries | [Concise workflow map](workflow.md) |
-| Understand the biological analysis stages | [Workflow guide](docs/WORKFLOW.md) and [nuclear figures](docs/PIPEVAR_NUCLEAR_FIGURES.md) |
-| Understand module boundaries, channel contracts, or resume compatibility | [Architecture guide](docs/ARCHITECTURE.md) |
-| Review vendored nf-core revisions and caller compatibility | [nf-core module provenance](docs/NFCORE_MODULES.md) |
-| Audit PipeVar logic packaged inside custom images | [Container-resident scripts](docs/CONTAINER_SCRIPTS.md) |
+| Understand the analysis stages | [Workflow guide](docs/WORKFLOW.md) and [nuclear figures](docs/PIPEVAR_NUCLEAR_FIGURES.md) |
 | Find and interpret published files | [Output guide](docs/OUTPUTS.md) |
+
+For maintainers, see the [concise workflow map](workflow.md),
+[architecture guide](docs/ARCHITECTURE.md),
+[Nextflow compatibility matrix](docs/NEXTFLOW_COMPATIBILITY.md),
+[nf-core module provenance](docs/NFCORE_MODULES.md), and
+[container-resident script inventory](docs/CONTAINER_SCRIPTS.md).
 
 ## Choose a workflow
 
@@ -44,7 +45,7 @@ For aligned reads, make two explicit choices:
 
    | Your data | Type this |
    | --- | --- |
-   | Illumina or other short reads, including whole-exome (WES) or whole-genome sequencing (WGS) | `--type short` |
+   | Illumina or other short-read alignments | `--type short` |
    | Oxford Nanopore | `--type ont` |
    | PacBio | `--type pacbio` |
 
@@ -52,7 +53,7 @@ For aligned reads, make two explicit choices:
 
    | What you want | Type this |
    | --- | --- |
-   | Small variants only | `--mode snp` |
+   | Small-variant branch | `--mode snp` |
    | Structural/copy-number variants and repeats | `--mode sv` |
    | Combined small and structural/copy-number analysis | Do not include `--mode` |
 
@@ -63,16 +64,21 @@ For aligned reads, make two explicit choices:
    | One sample | Supply `--bam`, `--vcf`, or prepared inputs directly |
    | Several samples | Use `--input_csv samples.csv` and follow the sample-sheet rules |
 
-CSV rows may include optional `age_of_onset` metadata. Single-sample runs pass a
-blank age value to the same age-capable prioritization processes.
+CSV batches run each sample independently. They do not perform joint calling,
+pedigree segregation, or cohort inference.
 
-For example, an Illumina WES BAM uses `--bam sample.bam --type short`. Add
-`--mode snp` for small variants only, add `--mode sv` for the structural and
-repeat route, or leave `--mode` out of the command for combined analysis. There
-is no `--mode combined` value.
+Short-read BAM/CRAM routes run ExpansionHunter screening even with
+`--mode snp`, so repeat-screening output may accompany the small-variant
+results.
 
-For an existing VCF, use `--vcf` with the required `--mode snp` or `--mode sv`
-and omit `--type`. For prepared ANNOVAR input and batch routing, use the
+For example, an Illumina WGS BAM uses `--bam sample.bam --type short`. Add
+`--mode snp` for the small-variant branch, add `--mode sv` for the structural
+and repeat route, or leave `--mode` out of the command for combined analysis.
+There is no `--mode combined` value.
+
+For an existing raw VCF, use `--vcf` with the required `--mode snp` or
+`--mode sv`, supply a matching hg38 `--ref_fa` and `<reference>.fai`, and omit
+`--type`. For prepared ANNOVAR input and batch routing, use the
 [input guide](docs/INPUTS.md) and [running guide](docs/USAGE.md).
 
 ## Quick start
@@ -82,8 +88,10 @@ and omit `--type`. For prepared ANNOVAR input and batch routing, use the
 PipeVar documentation targets Linux execution through Docker or Singularity.
 Install Nextflow 24.10.6 or newer with Java 17 or newer and a container runtime,
 obtain ANNOVAR through its registration process, and prepare an hg38 reference
-for your data. Nextflow 26.04 must currently run with
-`NXF_SYNTAX_PARSER=v1`; see the [compatibility matrix](docs/NEXTFLOW_COMPATIBILITY.md).
+for your data. PipeVar's active annotation resources are hg38-specific, so the
+alignments, supplied calls, FASTA, indexes, and annotation assets must all use
+that build. Nextflow 26.04 runs with its native v2 parser; no parser override is
+required. See the [compatibility matrix](docs/NEXTFLOW_COMPATIBILITY.md).
 Aligned-read examples also require a discoverable BAM/CRAM index and
 `<reference>.fai`; see [reference files](docs/INPUTS.md#reference-files) and
 [alignment indexes](docs/INPUTS.md#alignment-indexes).
@@ -107,8 +115,8 @@ ANNOVAR installation, downloads the hg38 ANNOVAR databases used by PipeVar,
 downloads PhenoSV resources and the Phen2Gene knowledge base, adjusts the
 resource paths, and configures `profiles.standard` for the selected container
 backend. It also pulls the PhenoGPT2 and PhenoTagger images for that backend;
-Singularity setups store validated SIFs under `./containers` by default. Run it
-from the repository root.
+Singularity setups store validated, checksum-named, read-only SIFs under
+`./containers` by default. Run it from the repository root.
 
 The script does not install Nextflow, Java, Docker, Singularity, or ANNOVAR
 itself. It also does not provide a reference FASTA and indexes, PhenoGPT2
@@ -181,15 +189,19 @@ hyphens, such as `--bam` and `--ref_fa`.
 
 Run the same command with `-profile local_singularity` in place of
 `-profile local_docker`. All PipeVar input parameters keep the same meaning.
-Large PhenoGPT2 and PhenoTagger images can be pre-staged as immutable SIF files;
-see [Singularity image staging](docs/INSTALLATION.md#pre-staging-large-phenotype-extraction-images).
+Large PhenoGPT2 and PhenoTagger images can be pre-staged as checksum-named,
+read-only SIF files. See
+[Singularity image staging](docs/INSTALLATION.md#pre-staging-large-phenotype-extraction-images).
 
 ## Results and next steps
 
 The example publishes ranked candidate variants and genes and, for supported
-combined routes, an HTML report. Open the HTML report first for a human-readable
-summary. These are candidates for expert review rather than a diagnosis. See
-the [output guide](docs/OUTPUTS.md) for exact filenames and conditional results.
+combined aligned-read routes, an HTML report. Open the HTML report first for a
+human-readable summary. Repeat and mitochondrial evidence are route-dependent;
+mitochondrial candidates remain in a separate prioritized TSV even when a
+combined report incorporates them. These are candidates for expert review
+rather than a diagnosis. See the [output guide](docs/OUTPUTS.md) for exact
+filenames and conditional results.
 
 For CSV batch runs, VCF input, long-read analysis, prepared annotations,
 mitochondrial analysis, and cluster examples, continue with
@@ -199,6 +211,10 @@ mitochondrial analysis, and cluster examples, continue with
 
 PipeVar 0.5.0 is under active development. This README and the linked guides
 define the documented operator interface.
+
+Published outputs remain compatible across the simplified refactor, but old
+`-resume` state from `PipeVar_mito` or an earlier `PipeVar_simplified` workflow
+graph is not compatible; start a new run after upgrading.
 
 Report reproducible problems through the
 [PipeVar GitHub issue tracker](https://github.com/WGLab/PipeVar/issues). Include

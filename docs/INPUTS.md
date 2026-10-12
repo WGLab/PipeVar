@@ -87,8 +87,8 @@ Use an explicit mode:
 (--hpo <HPO_FILE> | --note <CLINICAL_NOTE>)
 ```
 
-Supplying `--ref_fa` is recommended and is required for targeted region
-construction. VCF sample-sheet routes require it.
+Supply a matching hg38 reference with `--ref_fa`; raw VCF routes require it and
+its samtools index at `<reference>.fai`.
 
 ## Prepared ANNOVAR input
 

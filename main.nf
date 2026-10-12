@@ -1,11 +1,11 @@
 // Start here: help → input preparation → biological route. See workflow.md.
-def helpMessage() {
-def pipelineVersion = params.pipeline_version ?: "0.5.0"
+def helpMessage(pipelineVersion) {
+def displayedVersion = pipelineVersion ?: "0.5.0"
 
 """
 ================================================================================
   PipeVar_simplified
-  Version: ${pipelineVersion}
+  Version: ${displayedVersion}
 ================================================================================
 
 Rare-disease variant prioritization for short-read, long-read, and optional
@@ -83,7 +83,7 @@ def validateStagedSifEngine(containerEngine, phenogpt2Sif, phenotaggerSif) {
     }
     def engine = containerEngine?.toString()?.trim()?.toLowerCase()
     if (!(engine in ['singularity', 'apptainer'])) {
-        def options = supplied.keySet().collect { "--${it}" }.join(', ')
+        def options = supplied.keySet().collect { option -> "--${option}" }.join(', ')
         throw new IllegalArgumentException("${options} may be used only with a Singularity profile; active container engine: ${engine ?: 'none'}.")
     }
 }
@@ -102,11 +102,11 @@ include { PREANNOTATED_SNV_CALLED_SV_NGS } from './subworkflows/preannotated_com
 workflow {
     validateStagedSifEngine(workflow.containerEngine, params.phenogpt2_sif, params.phenotagger_sif)
 
-    if (params.help) {
-        println(helpMessage())
-        return
+    def helpRequested = params.help == true || params.help?.toString()?.trim()?.toLowerCase() == 'true'
+    if (helpRequested) {
+        println(helpMessage(params.pipeline_version))
     }
-
+    else {
     prepared = INPUT_PREPARATION()
     // Preparation has no tasks: this value is ready before route selection.
     route_settings = prepared.route_settings.val
@@ -166,7 +166,7 @@ workflow {
     }
     else if (route_settings.route == 'alignment') {
         if (route_settings.sequencing_type == 'short') {
-            mito_report_tsv = Channel.empty()
+            mito_report_tsv = channel.empty()
             if (route_settings.mitochondrial_enabled == 'yes') {
                 // Mitochondrial callers need only the sample-keyed alignment; phenotype stays nuclear-side.
                 short_mito_input = prepared.mito_input_bam.map {
@@ -191,7 +191,7 @@ workflow {
             )
         }
         else { // Long reads
-            mito_report_tsv = Channel.empty()
+            mito_report_tsv = channel.empty()
             if (route_settings.mitochondrial_enabled == 'yes') {
                 // Mitochondrial callers need only the sample-keyed alignment; phenotype stays nuclear-side.
                 long_mito_input = prepared.mito_input_bam.map {
@@ -214,5 +214,6 @@ workflow {
                 mito_report_tsv, route_settings.mitochondrial_enabled
             )
         }
+    }
     }
 }

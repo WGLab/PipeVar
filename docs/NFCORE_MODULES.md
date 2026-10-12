@@ -1,10 +1,16 @@
 # nf-core modules and container provenance
 
-PipeVar vendors nine unmodified modules from `nf-core/modules` commit
-`94b413835288b0e80bd29256d0a95e4fce020a8b`. `modules.json` is the component
-lock even though this copied project intentionally has no Git metadata.
+PipeVar vendors nine modules from `nf-core/modules` commit
+`94b413835288b0e80bd29256d0a95e4fce020a8b`. `modules.json` remains the
+upstream component lock. Four files carry a local, syntax-only compatibility
+patch: six process-body `prefix` assignments are declared with `def`, and the
+DeepVariant and LongPhase output patterns resolve the same prefix directly
+from `task.ext.prefix` or `meta.id`. This allows the snapshot to parse with
+both the legacy and strict Nextflow parsers without changing commands, output
+filenames, containers, or process names. `scripts/check_nfcore_contracts.sh`
+locks the resulting patched tree and the expected declarations.
 
-| PipeVar operation | Vendored process | Public PipeVar artifact |
+| PipeVar operation | Active implementation | Public PipeVar artifact |
 | --- | --- | --- |
 | DeepVariant | `DEEPVARIANT_RUNDEEPVARIANT` | `${sample}.deepvariant.vcf.gz` |
 | ExpansionHunter | `EXPANSIONHUNTER` | `${sample}.json` |
@@ -13,8 +19,7 @@ lock even though this copied project intentionally has no Git metadata.
 | GATK HaplotypeCaller | `GATK4_HAPLOTYPECALLER` | internal `${sample}.vcf.gz` |
 | GATK VariantRecalibrator | `GATK4_VARIANTRECALIBRATOR` | internal recalibration files |
 | GATK ApplyVQSR | `GATK4_APPLYVQSR` | `${sample}.recal.vcf.gz` |
-| LongPhase phase | `LONGPHASE_PHASE` | internal phased SNV/SV VCFs |
-| LongPhase haplotag | `LONGPHASE_HAPLOTAG` | `${sample}_haplotag.bam` for CSV mode |
+| LongPhase phase/haplotag adapter | `LONGPHASE_CALL` | internal phased SNV/SV VCFs and `${sample}_haplotag.bam` for CSV mode |
 
 The vendored modules use nf-core metadata maps and standard named outputs.
 PipeVar routes construct `[id: sample_id, single_end: false]` at each caller,
@@ -24,9 +29,12 @@ needed and materializes each artifact under PipeVar's required public filename.
 Only those public compatibility artifacts are published; other
 upstream outputs remain internal. `GATK_RESOURCE_BUNDLE` validates six objects
 by MD5 and the composite dbSNP object by immutable size, then broadcasts the
-bundle once per run. LongPhase VCF preparation and PipeVar-specific age-capable
-prioritization remain local. The same prioritizer serves single-sample and CSV
-inputs; single-sample records pass a blank age value.
+bundle once per run. LongPhase VCF preparation, phase/haplotag execution, and
+PipeVar-specific age-capable prioritization remain local. The same prioritizer
+serves single-sample and CSV inputs; single-sample records pass a blank age
+value. The pinned LongPhase nf-core source remains in the vendored snapshot for
+provenance, but its retired `LONGPHASE_PHASE` and `LONGPHASE_HAPLOTAG` processes
+are not included in the active graph and have no process selectors.
 
 DeepVariant remains on the public `--deepvariant_version` default of 1.9.0 and
 selects the matching official CPU or `-gpu` image. ExpansionHunter retains its
@@ -55,7 +63,9 @@ and contract-test that source before rebuilding its image.
 ## Updating vendored modules
 
 Resolve a specific nf-core/modules commit, install all nine modules from that
-same revision, and update `modules.json`. Do not edit installed files. Re-run
-the structure, sensitive-contract, caller-boundary, configuration, and route
-smoke checks before deleting the previous copies. Any module revision or caller
-graph change establishes a new practical `-resume` boundary.
+same revision, and update `modules.json`. Reapply the documented declaration
+patch only if the selected upstream revision still needs it, then update the
+patched-tree integrity hash. Re-run the structure, sensitive-contract,
+caller-boundary, configuration, and route smoke checks before deleting the
+previous copies. Any module revision or caller graph change establishes a new
+practical `-resume` boundary.

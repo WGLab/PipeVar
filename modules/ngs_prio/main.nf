@@ -14,9 +14,18 @@ process ngs_prio {
     tuple val(out_prefix), path("${out_prefix}.frequency_audit.tsv"), emit: frequency_audit
 
     script:
-    def min_score = params.phenosv_score ?: '0.50'
-    def gene_filter = params.gene ?: ''
-    def sv_only = params.prioritize_sv_only ?: 'no'
+    def min_score = params.phenosv_score ? params.phenosv_score.toString().trim() : '0.50'
+    def gene_filter = params.gene ? params.gene.toString().trim() : ''
+    def gene_filter_file = gene_filter ? new File(gene_filter) : null
+    if (gene_filter_file?.isFile()) {
+        gene_filter = gene_filter_file.readLines().collect { gene -> gene.trim() }.findAll { gene -> gene && !gene.startsWith('#') }.join(',')
+    }
+    def sv_only = params.prioritize_sv_only ? params.prioritize_sv_only.toString().trim().toLowerCase() : 'no'
+    def gnomad_af_ad = params.gnomad_af_ad.toString().trim()
+    def gnomad_af_ar = params.gnomad_af_ar.toString().trim()
+    def common_sv_af_ad = params.common_sv_af_ad.toString().trim()
+    def common_sv_af_ar = params.common_sv_af_ar.toString().trim()
+    def common_sv_filter_mode = params.common_sv_filter.toString().trim().toLowerCase()
 
 	"""
 
@@ -36,8 +45,8 @@ process ngs_prio {
 	fi
 
 	# Keep the ranked gene-level report and also emit a ranked variant-level VCF.
-	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio_gene.vcf gene --include-clinvar $include_clinvar_report --allow-unphased-comphet $allow_unphased_comphet --genes "$gene_filter" --gnomad-af-ad ${params.gnomad_af_ad} --gnomad-af-ar ${params.gnomad_af_ar} --common-sv-af-ad ${params.common_sv_af_ad} --common-sv-af-ar ${params.common_sv_af_ar} --common-sv-filter ${params.common_sv_filter} --frequency-audit ${out_prefix}.frequency_audit.tsv
-	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio.vcf variant --include-clinvar $include_clinvar_report --allow-unphased-comphet $allow_unphased_comphet --genes "$gene_filter" --gnomad-af-ad ${params.gnomad_af_ad} --gnomad-af-ar ${params.gnomad_af_ar} --common-sv-af-ad ${params.common_sv_af_ad} --common-sv-af-ar ${params.common_sv_af_ar} --common-sv-filter ${params.common_sv_filter}
+	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio_gene.vcf gene --include-clinvar $include_clinvar_report --allow-unphased-comphet $allow_unphased_comphet --genes "$gene_filter" --gnomad-af-ad ${gnomad_af_ad} --gnomad-af-ar ${gnomad_af_ar} --common-sv-af-ad ${common_sv_af_ad} --common-sv-af-ar ${common_sv_af_ar} --common-sv-filter ${common_sv_filter_mode} --frequency-audit ${out_prefix}.frequency_audit.tsv
+	python3 /prio_gene_only.py ${out_prefix}.assigned.vcf ${out_prefix}.prio.vcf variant --include-clinvar $include_clinvar_report --allow-unphased-comphet $allow_unphased_comphet --genes "$gene_filter" --gnomad-af-ad ${gnomad_af_ad} --gnomad-af-ar ${gnomad_af_ar} --common-sv-af-ad ${common_sv_af_ad} --common-sv-af-ar ${common_sv_af_ar} --common-sv-filter ${common_sv_filter_mode}
 
 	"""
 

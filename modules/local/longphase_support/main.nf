@@ -16,7 +16,20 @@ process LONGPHASE_CALL {
 
     script:
     def platform_args = task.ext.args != null ? task.ext.args : '--ont'
+    def phase_threads = task.ext.phase_threads != null ? task.ext.phase_threads : task.cpus
+    def haplotag_threads = task.ext.haplotag_threads != null ? task.ext.haplotag_threads : task.cpus
     """
+    echo "PIPEVAR_LONGPHASE_RESOURCES process=${task.process} attempt=${task.attempt} cpus=${task.cpus} memory='${task.memory}' phase_threads=${phase_threads} haplotag_threads=${haplotag_threads}" >&2
+    longphase_version=\$(/longphase_linux-x64 --version 2>&1 | sed -n '1p')
+    echo "PIPEVAR_LONGPHASE_VERSION \${longphase_version}" >&2
+    if [[ -r /sys/fs/cgroup/memory.max ]]; then
+        echo "PIPEVAR_LONGPHASE_CGROUP memory.max=\$(cat /sys/fs/cgroup/memory.max)" >&2
+    elif [[ -r /sys/fs/cgroup/memory/memory.limit_in_bytes ]]; then
+        echo "PIPEVAR_LONGPHASE_CGROUP memory.limit_in_bytes=\$(cat /sys/fs/cgroup/memory/memory.limit_in_bytes)" >&2
+    else
+        echo "PIPEVAR_LONGPHASE_CGROUP unavailable" >&2
+    fi
+
     bcftools reheader \\
         --fai ${fai} \\
         --output ${meta.id}.longphase_input.vcf \\
@@ -65,7 +78,7 @@ process LONGPHASE_CALL {
     /longphase_linux-x64 phase \\
         -s ${meta.id}.longphase_input.vcf \\
         --sv-file=${sv_vcf} \\
-        -t ${task.cpus} \\
+        -t ${phase_threads} \\
         -o ${meta.id}_phased \\
         ${platform_args} \\
         -b ${bam} \\
@@ -76,7 +89,7 @@ process LONGPHASE_CALL {
         -s ${meta.id}_phased.vcf \\
         --sv-file ${meta.id}_phased_SV.vcf \\
         -b ${bam} \\
-        -t ${task.cpus} \\
+        -t ${haplotag_threads} \\
         -o ${meta.id}_haplotag
     """
 
@@ -107,9 +120,18 @@ process LONGPHASE_PRIORITIZE {
     tuple val(meta), path("${meta.id}.frequency_audit.tsv"), emit: frequency_audit
 
     script:
-    def min_score = params.phenosv_score ?: '0.50'
-    def gene_filter = params.gene ?: ''
-    def sv_only = params.prioritize_sv_only ?: 'no'
+    def min_score = params.phenosv_score ? params.phenosv_score.toString().trim() : '0.50'
+    def gene_filter = params.gene ? params.gene.toString().trim() : ''
+    def gene_filter_file = gene_filter ? new File(gene_filter) : null
+    if (gene_filter_file?.isFile()) {
+        gene_filter = gene_filter_file.readLines().collect { gene -> gene.trim() }.findAll { gene -> gene && !gene.startsWith('#') }.join(',')
+    }
+    def sv_only = params.prioritize_sv_only ? params.prioritize_sv_only.toString().trim().toLowerCase() : 'no'
+    def gnomad_af_ad = params.gnomad_af_ad.toString().trim()
+    def gnomad_af_ar = params.gnomad_af_ar.toString().trim()
+    def common_sv_af_ad = params.common_sv_af_ad.toString().trim()
+    def common_sv_af_ar = params.common_sv_af_ar.toString().trim()
+    def common_sv_filter_mode = params.common_sv_filter.toString().trim().toLowerCase()
     """
     bcftools view -Ov -o ${meta.id}_phased.vcf ${phased_snv}
     bcftools view -Ov -o ${meta.id}_phased_SV.vcf ${phased_sv}
@@ -127,8 +149,8 @@ process LONGPHASE_PRIORITIZE {
         python3 /assign_dom_or_rec.py ${meta.id}.clinvar.vcf ${meta.id}.phenosv.vcf ${meta.id}.rankscore.vcf ${meta.id}.rankvar.vcf "${hpo_path}" "${age_of_onset}" "${inheritance_mode}" ${meta.id}.assigned.vcf --phenosv-score ${min_score} --genes "${gene_filter}"
     fi
 
-    python3 /prio_gene_only.py ${meta.id}.assigned.vcf ${meta.id}.prio_gene.vcf gene --include-clinvar ${include_clinvar_report} --allow-unphased-comphet ${allow_unphased_comphet} --genes "${gene_filter}" --gnomad-af-ad ${params.gnomad_af_ad} --gnomad-af-ar ${params.gnomad_af_ar} --common-sv-af-ad ${params.common_sv_af_ad} --common-sv-af-ar ${params.common_sv_af_ar} --common-sv-filter ${params.common_sv_filter} --frequency-audit ${meta.id}.frequency_audit.tsv
-    python3 /prio_gene_only.py ${meta.id}.assigned.vcf ${meta.id}.prio.vcf variant --include-clinvar ${include_clinvar_report} --allow-unphased-comphet ${allow_unphased_comphet} --genes "${gene_filter}" --gnomad-af-ad ${params.gnomad_af_ad} --gnomad-af-ar ${params.gnomad_af_ar} --common-sv-af-ad ${params.common_sv_af_ad} --common-sv-af-ar ${params.common_sv_af_ar} --common-sv-filter ${params.common_sv_filter}
+    python3 /prio_gene_only.py ${meta.id}.assigned.vcf ${meta.id}.prio_gene.vcf gene --include-clinvar ${include_clinvar_report} --allow-unphased-comphet ${allow_unphased_comphet} --genes "${gene_filter}" --gnomad-af-ad ${gnomad_af_ad} --gnomad-af-ar ${gnomad_af_ar} --common-sv-af-ad ${common_sv_af_ad} --common-sv-af-ar ${common_sv_af_ar} --common-sv-filter ${common_sv_filter_mode} --frequency-audit ${meta.id}.frequency_audit.tsv
+    python3 /prio_gene_only.py ${meta.id}.assigned.vcf ${meta.id}.prio.vcf variant --include-clinvar ${include_clinvar_report} --allow-unphased-comphet ${allow_unphased_comphet} --genes "${gene_filter}" --gnomad-af-ad ${gnomad_af_ad} --gnomad-af-ar ${gnomad_af_ar} --common-sv-af-ad ${common_sv_af_ad} --common-sv-af-ar ${common_sv_af_ar} --common-sv-filter ${common_sv_filter_mode}
     """
 
     stub:

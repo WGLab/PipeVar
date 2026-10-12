@@ -11,12 +11,12 @@ process common_sv_filter {
     tuple val(out_prefix), path("${out_prefix}.common_sv_filter.summary.tsv"), emit: summary
 
     script:
-    def common_af_ad = params.common_sv_af_ad ?: '0.005'
-    def common_af_ar = params.common_sv_af_ar ?: '0.01'
-    def reciprocal_overlap = params.common_sv_reciprocal_overlap ?: '0.5'
-    def distance = params.common_sv_distance ?: '1000'
-    def ins_distance = params.common_sv_ins_distance ?: '500'
-    def ins_identity = params.common_sv_ins_identity ?: '0.8'
+    def common_af_ad = params.common_sv_af_ad ? params.common_sv_af_ad.toString().trim() : '0.005'
+    def common_af_ar = params.common_sv_af_ar ? params.common_sv_af_ar.toString().trim() : '0.01'
+    def reciprocal_overlap = params.common_sv_reciprocal_overlap ? params.common_sv_reciprocal_overlap.toString().trim() : '0.5'
+    def distance = params.common_sv_distance ? params.common_sv_distance.toString().trim() : '1000'
+    def ins_distance = params.common_sv_ins_distance ? params.common_sv_ins_distance.toString().trim() : '500'
+    def ins_identity = params.common_sv_ins_identity ? params.common_sv_ins_identity.toString().trim() : '0.8'
 	"""
 	python3 /usr/local/bin/filter_common_svs.py \\
 	    --input-vcf $vcf \\

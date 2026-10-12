@@ -14,11 +14,15 @@ process phenogpt2 {
 	export PHENOGPT2_CHUNK_BATCH_SIZE="${params.phenogpt2_chunk_batch_size}"
 	export PHENOGPT2_WC="${params.phenogpt2_wc}"
 	export PHENOGPT2_ATTN_IMPLEMENTATION="${params.phenogpt2_attn_implementation}"
-	export PHENOGPT2_NEGATION="${params.phenogpt2_negation}"
+	export PHENOGPT2_NEGATION="${params.phenogpt2_negation.toString().trim().toLowerCase()}"
 	export PHENOGPT2_MODEL_DIR="/opt/phenogpt2/models/phenogpt2"
 	export PHENOGPT2_NEGATION_MODEL_DIR="/opt/phenogpt2/models/negation"
 	export PHENOGPT2_EMBEDDING_MODEL_DIR="/opt/phenogpt2/models/embedding"
 	export PHENOGPT2_CACHE_DIR="${params.phenogpt2_cache_host_path ? '/opt/phenogpt2/cache' : '.phenogpt2_cache'}"
+	if [[ "\$PHENOGPT2_CACHE_DIR" != /* ]]; then
+		export PHENOGPT2_CACHE_DIR="\$PWD/\$PHENOGPT2_CACHE_DIR"
+	fi
+	export FLASHINFER_WORKSPACE_BASE="\$PHENOGPT2_CACHE_DIR"
 	run_phenogpt2_to_hpo "${clinical_note}" "${out_prefix}"
 	"""
 }

@@ -57,9 +57,9 @@ runtime, filesystem mounts, and any scheduler still operate on the host.
 Run Nextflow from a writable directory and ensure `NXF_HOME` is writable. Use
 `local_docker` or `local_singularity` on a workstation; the `standard` and
 `slurm_singularity` profiles require a working SLURM installation.
-PipeVar currently uses the v1 DSL2 syntax parser. Nextflow 26.04 defaults to
-the newer v2 parser, so export `NXF_SYNTAX_PARSER=v1` before running that
-release line.
+PipeVar supports both the legacy DSL2 parser and the native v2 parser used by
+Nextflow 26.04. Do not set a parser environment variable for normal v26 runs;
+`NXF_SYNTAX_PARSER=v1` remains a temporary diagnostic fallback only.
 
 ## What `setup.sh` does
 
@@ -334,8 +334,12 @@ other containers that still use normal Nextflow caching.
 ## Runtime resource model
 
 PipeVar configures up to three retries. Many CPU and memory requests scale with
-the retry attempt, while time limits remain fixed. Local profiles retain these
-requests and do not automatically scale them down for a workstation.
+the retry attempt, while time limits remain fixed. LongPhase is intentionally
+different: it keeps eight task CPUs across retries while its memory request
+increases from 64 GB to 128 GB and then 256 GB. This avoids increasing
+chromosome-level parallelism while recovering from an out-of-memory exit.
+Local profiles retain these requests and do not automatically scale them down
+for a workstation.
 
 These are configured per-task allocations, not measured consumption or a
 whole-run minimum. Local capacity must cover the largest tasks that Nextflow
@@ -353,7 +357,7 @@ Representative first-attempt allocations are:
 | NanoCaller | 8 | 32 GB | 48 h |
 | Manta | 4 | 32 GB | 48 h |
 | CNVnator | 2 | 32 GB | 72 h |
-| LongPhase | 4 | 32 GB | 24 h |
+| LongPhase | 8 | 64 GB | 24 h |
 | ANNOVAR or repeat analysis | 1-2 | 16 GB | 12-72 h |
 | Mitochondrial processes | 1-4 | 4-8 GB | 2-8 h |
 | Final filters and reports | 1 | 4-8 GB | 1-8 h |
@@ -381,6 +385,18 @@ The repository's `standard` profile uses SLURM by default. Select
 `-profile local_docker` or `-profile local_singularity`, or intentionally replace
 `standard` through setup.
 
+### A SLURM task ignores the launcher's CPU or memory allocation
+
+The `standard` and `slurm_singularity` profiles submit every Nextflow process
+as its own SLURM child job. CPUs and memory requested by an `sbatch` launcher
+job apply to the Nextflow orchestrator and are not inherited by those child
+jobs. Configure compute resources with the matching process selector in
+`nextflow.config`; LongPhase must be selected as `LONGPHASE_CALL`, not the
+retired `LONGPHASE_PHASE` or `LONGPHASE_HAPLOTAG` names. Its task log prints the
+effective request, phase/haplotag thread counts, and detected cgroup limit.
+The enabled trace also records the scheduler job ID (`native_id`), attempt,
+requested CPUs/memory, and peak RSS for comparison with `sacct`.
+
 ### Containers cannot see ANNOVAR or PhenoSV
 
 Check the configured host paths and confirm that they exist on every execution
@@ -390,7 +406,8 @@ node. The profiles mount them at `/annovar` and `/PhenoSV/train_data`.
 
 Reduce task concurrency, set `--deepvariant_max_forks`, or use a scheduler with
 appropriate capacity. A retry can request more CPU and memory than the first
-attempt.
+attempt, except that LongPhase keeps CPU concurrency fixed and scales only
+memory.
 
 ### A resumed PhenoGPT2 run uses changed models
 
