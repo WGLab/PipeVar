@@ -99,6 +99,10 @@ require_text subworkflows/longphase_processing/main.nf 'haplotag = LONGPHASE_CAL
 require_text modules/local/longphase_support/main.nf 'path("${meta.id}_phased.vcf")'
 require_text modules/local/longphase_support/main.nf 'path("${meta.id}_phased_SV.vcf")'
 require_text modules/local/longphase_support/main.nf 'path("${meta.id}_haplotag.bam")'
+require_text modules/local/longphase_support/main.nf '${meta.id}.priority_input.snv.vcf'
+require_text modules/local/longphase_support/main.nf '${meta.id}.priority_input.sv.vcf'
+reject_text modules/local/longphase_support/main.nf 'bcftools view -Ov -o ${meta.id}_phased.vcf ${phased_snv}'
+reject_text modules/local/longphase_support/main.nf 'bcftools view -Ov -o ${meta.id}_phased_SV.vcf ${phased_sv}'
 require_text nextflow.config 'enabled: { meta.batch_input }'
 require_text nextflow.config "type == 'ont' ? '--ont' : type == 'pacbio' ? '--pb' : ''"
 
@@ -119,6 +123,7 @@ require_text scripts/prepare_phenotype_images.sh 'docker pull "$phenotagger_imag
 require_text scripts/prepare_phenotype_images.sh '"$container_runtime" pull "$partial" "docker://${source_image}"'
 require_text scripts/prepare_phenotype_images.sh '"$container_runtime" sif list "$sif_path"'
 require_text scripts/prepare_phenotype_images.sh 'update_sif_paths "$phenogpt2_sif" "$phenotagger_sif"'
+require_text modules/phenogpt2/main.nf 'export CUPY_CACHE_DIR="\$PHENOGPT2_CACHE_DIR/cupy/kernel_cache"'
 require_text modules/phenogpt2/main.nf 'export FLASHINFER_WORKSPACE_BASE="\$PHENOGPT2_CACHE_DIR"'
 require_text modules/phenogpt2/main.nf 'export PHENOGPT2_CACHE_DIR="\$PWD/\$PHENOGPT2_CACHE_DIR"'
 require_text nextflow.config 'maxForks = 1'

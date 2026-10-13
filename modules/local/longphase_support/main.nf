@@ -133,19 +133,19 @@ process LONGPHASE_PRIORITIZE {
     def common_sv_af_ar = params.common_sv_af_ar.toString().trim()
     def common_sv_filter_mode = params.common_sv_filter.toString().trim().toLowerCase()
     """
-    bcftools view -Ov -o ${meta.id}_phased.vcf ${phased_snv}
-    bcftools view -Ov -o ${meta.id}_phased_SV.vcf ${phased_sv}
+    bcftools view -Ov -o ${meta.id}.priority_input.snv.vcf ${phased_snv}
+    bcftools view -Ov -o ${meta.id}.priority_input.sv.vcf ${phased_sv}
 
-    bash /phenosv_vcf_and_tsv.sh ${sv_phenosv_evidence} ${meta.id}_phased_SV.vcf ${sv_annotation_vcf} ${meta.id}
+    bash /phenosv_vcf_and_tsv.sh ${sv_phenosv_evidence} ${meta.id}.priority_input.sv.vcf ${sv_annotation_vcf} ${meta.id}
     mv ${meta.id}.phenosv.vcf ${meta.id}.phenosv.unfiltered.vcf
     python3 /filter_phenosv_vcf.py ${meta.id}.phenosv.unfiltered.vcf ${meta.id}.phenosv.vcf --min-score ${min_score} --genes "${gene_filter}"
 
     if [[ "${sv_only}" == "yes" ]]; then
         python3 /assign_dom_or_rec_sv_only.py ${meta.id}.phenosv.vcf "${hpo_path}" "${age_of_onset}" "${inheritance_mode}" ${meta.id}.assigned.vcf --phenosv-score ${min_score} --genes "${gene_filter}"
     else
-        bash /clinvar_vcf_and_txt.sh ${snv_clinvar_evidence} ${meta.id}_phased.vcf ${meta.id}
-        bash /rankscore_vcf_and_txt.sh ${snv_rankscore} ${meta.id}_phased.vcf ${meta.id}
-        bash /rankvar_vcf_and_tsv.sh ${snv_rankvar} ${meta.id}_phased.vcf ${meta.id}
+        bash /clinvar_vcf_and_txt.sh ${snv_clinvar_evidence} ${meta.id}.priority_input.snv.vcf ${meta.id}
+        bash /rankscore_vcf_and_txt.sh ${snv_rankscore} ${meta.id}.priority_input.snv.vcf ${meta.id}
+        bash /rankvar_vcf_and_tsv.sh ${snv_rankvar} ${meta.id}.priority_input.snv.vcf ${meta.id}
         python3 /assign_dom_or_rec.py ${meta.id}.clinvar.vcf ${meta.id}.phenosv.vcf ${meta.id}.rankscore.vcf ${meta.id}.rankvar.vcf "${hpo_path}" "${age_of_onset}" "${inheritance_mode}" ${meta.id}.assigned.vcf --phenosv-score ${min_score} --genes "${gene_filter}"
     fi
 

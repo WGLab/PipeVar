@@ -22,6 +22,7 @@ process phenogpt2 {
 	if [[ "\$PHENOGPT2_CACHE_DIR" != /* ]]; then
 		export PHENOGPT2_CACHE_DIR="\$PWD/\$PHENOGPT2_CACHE_DIR"
 	fi
+	export CUPY_CACHE_DIR="\$PHENOGPT2_CACHE_DIR/cupy/kernel_cache"
 	export FLASHINFER_WORKSPACE_BASE="\$PHENOGPT2_CACHE_DIR"
 	run_phenogpt2_to_hpo "${clinical_note}" "${out_prefix}"
 	"""
